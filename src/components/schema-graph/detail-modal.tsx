@@ -8,6 +8,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   TableNode,
+  ViewNode,
   Trigger,
   StoredProcedure,
   Column,
@@ -18,6 +19,7 @@ import { SqlCodeBlock } from "./sql-code-block";
 
 export type DetailModalData =
   | { type: "table"; data: TableNode }
+  | { type: "view"; data: ViewNode }
   | { type: "trigger"; data: Trigger }
   | { type: "storedProcedure"; data: StoredProcedure };
 
@@ -40,6 +42,7 @@ export function DetailModal({
         {modalData.type === "table" && (
           <TableDetail table={modalData.data} />
         )}
+        {modalData.type === "view" && <ViewDetail view={modalData.data} />}
         {modalData.type === "trigger" && (
           <TriggerDetail trigger={modalData.data} />
         )}
@@ -105,6 +108,68 @@ function TableDetail({ table }: { table: TableNode }) {
                         </span>
                       )}
                     </td>
+                    <td className="px-3 py-2 text-center">
+                      {col.isNullable ? (
+                        <span className="text-slate-400">Yes</span>
+                      ) : (
+                        <span className="text-slate-700 font-medium">No</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ViewDetail({ view }: { view: ViewNode }) {
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center gap-2">
+          <span className="bg-emerald-100 text-emerald-600 text-xs px-2 py-1 rounded">
+            View
+          </span>
+          <span className="text-xs text-slate-400">{view.schema}</span>
+        </div>
+        <DialogTitle className="text-xl">{view.name}</DialogTitle>
+        <DialogDescription>
+          {view.columns.length} column{view.columns.length !== 1 && "s"}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="mt-4 flex-1 flex flex-col min-h-0">
+        <h4 className="text-sm font-medium mb-2">Columns</h4>
+        <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium text-slate-600">
+                    Name
+                  </th>
+                  <th className="text-left px-3 py-2 font-medium text-slate-600">
+                    Type
+                  </th>
+                  <th className="text-center px-3 py-2 font-medium text-slate-600">
+                    Nullable
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.columns.map((col: Column, idx: number) => (
+                  <tr
+                    key={col.name}
+                    className={cn(idx % 2 === 0 ? "bg-white" : "bg-slate-50/50")}
+                  >
+                    <td className="px-3 py-2 font-mono text-slate-800">
+                      {col.name}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">{col.dataType}</td>
                     <td className="px-3 py-2 text-center">
                       {col.isNullable ? (
                         <span className="text-slate-400">Yes</span>

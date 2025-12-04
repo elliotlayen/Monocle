@@ -4,8 +4,14 @@ import { Toolbar } from "@/components/toolbar";
 import { SchemaGraphView } from "@/components/schema-graph";
 
 function App() {
-  const { schema, isConnected, searchFilter, schemaFilter, focusedTableId } =
-    useSchemaStore();
+  const {
+    schema,
+    isConnected,
+    searchFilter,
+    schemaFilter,
+    focusedTableId,
+    objectTypeFilter,
+  } = useSchemaStore();
 
   if (!isConnected || !schema) {
     return <ConnectionForm />;
@@ -20,6 +26,7 @@ function App() {
           searchFilter={searchFilter}
           schemaFilter={schemaFilter}
           focusedTableId={focusedTableId}
+          objectTypeFilter={objectTypeFilter}
         />
       </main>
     </div>

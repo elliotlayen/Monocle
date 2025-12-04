@@ -4,10 +4,11 @@ use odbc_api::{buffers::TextRowSet, Cursor};
 
 use crate::db::{
     create_connection, format_data_type, FOREIGN_KEYS_QUERY, STORED_PROCEDURES_QUERY,
-    TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY,
+    TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY,
 };
 use crate::types::{
     Column, ProcedureParameter, RelationshipEdge, SchemaGraph, StoredProcedure, TableNode, Trigger,
+    ViewNode,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -33,6 +34,9 @@ pub fn load_schema_from_connection(connection_string: &str) -> Result<SchemaGrap
     // Load tables and columns
     let tables = load_tables_and_columns(&conn)?;
 
+    // Load views and columns
+    let views = load_views_and_columns(&conn)?;
+
     // Load foreign key relationships
     let relationships = load_foreign_keys(&conn)?;
 
@@ -44,6 +48,7 @@ pub fn load_schema_from_connection(connection_string: &str) -> Result<SchemaGrap
 
     Ok(SchemaGraph {
         tables,
+        views,
         relationships,
         triggers,
         stored_procedures,
@@ -96,6 +101,51 @@ fn load_tables_and_columns(
     }
 
     Ok(tables.into_values().collect())
+}
+
+fn load_views_and_columns(conn: &odbc_api::Connection<'_>) -> Result<Vec<ViewNode>, SchemaError> {
+    let mut views: HashMap<String, ViewNode> = HashMap::new();
+
+    if let Some(mut cursor) = conn.execute(VIEWS_AND_COLUMNS_QUERY, ())? {
+        let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(4096))?;
+        let mut row_set_cursor = cursor.bind_buffer(&mut buffers)?;
+
+        while let Some(batch) = row_set_cursor.fetch()? {
+            for row_idx in 0..batch.num_rows() {
+                let schema_name = get_string_column(&batch, 0, row_idx)?;
+                let view_name = get_string_column(&batch, 1, row_idx)?;
+                let column_name = get_string_column(&batch, 2, row_idx)?;
+                let data_type = get_string_column(&batch, 3, row_idx)?;
+                let max_length = get_i16_column(&batch, 4, row_idx)?;
+                let precision = get_u8_column(&batch, 5, row_idx)?;
+                let scale = get_u8_column(&batch, 6, row_idx)?;
+                let is_nullable = get_bool_column(&batch, 7, row_idx)?;
+
+                let view_id = format!("{}.{}", schema_name, view_name);
+                let formatted_type = format_data_type(&data_type, max_length, precision, scale);
+
+                let column = Column {
+                    name: column_name,
+                    data_type: formatted_type,
+                    is_nullable,
+                    is_primary_key: false,
+                };
+
+                views
+                    .entry(view_id.clone())
+                    .or_insert_with(|| ViewNode {
+                        id: view_id,
+                        name: view_name,
+                        schema: schema_name,
+                        columns: Vec::new(),
+                    })
+                    .columns
+                    .push(column);
+            }
+        }
+    }
+
+    Ok(views.into_values().collect())
 }
 
 fn load_foreign_keys(

@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { SchemaGraph, ConnectionParams } from "@/types/schema";
 
+export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures";
+
 interface SchemaStore {
   // State
   schema: SchemaGraph | null;
@@ -13,6 +15,7 @@ interface SchemaStore {
   searchFilter: string;
   schemaFilter: string;
   focusedTableId: string | null;
+  objectTypeFilter: Set<ObjectType>;
 
   // Derived data
   availableSchemas: string[];
@@ -24,8 +27,17 @@ interface SchemaStore {
   setSchemaFilter: (schema: string) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
+  toggleObjectType: (type: ObjectType) => void;
+  setObjectTypeFilter: (types: Set<ObjectType>) => void;
   disconnect: () => void;
 }
+
+const ALL_OBJECT_TYPES: Set<ObjectType> = new Set([
+  "tables",
+  "views",
+  "triggers",
+  "storedProcedures",
+]);
 
 export const useSchemaStore = create<SchemaStore>((set) => ({
   // Initial state
@@ -36,18 +48,22 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   searchFilter: "",
   schemaFilter: "all",
   focusedTableId: null,
+  objectTypeFilter: new Set(ALL_OBJECT_TYPES),
   availableSchemas: [],
 
   loadMockSchema: async () => {
     set({ isLoading: true, error: null });
     try {
       const schema = await invoke<SchemaGraph>("load_schema_mock");
-      const schemas = [...new Set(schema.tables.map((t) => t.schema))];
+      const tableSchemas = schema.tables.map((t) => t.schema);
+      const viewSchemas = schema.views.map((v) => v.schema);
+      const schemas = [...new Set([...tableSchemas, ...viewSchemas])];
       set({
         schema,
         isLoading: false,
         isConnected: true,
         availableSchemas: schemas,
+        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
       });
     } catch (err) {
       set({ error: String(err), isLoading: false });
@@ -58,7 +74,9 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const schema = await invoke<SchemaGraph>("load_schema", { params });
-      const schemas = [...new Set(schema.tables.map((t) => t.schema))];
+      const tableSchemas = schema.tables.map((t) => t.schema);
+      const viewSchemas = schema.views.map((v) => v.schema);
+      const schemas = [...new Set([...tableSchemas, ...viewSchemas])];
       set({
         schema,
         isLoading: false,
@@ -68,6 +86,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         searchFilter: "",
         schemaFilter: "all",
         focusedTableId: null,
+        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
       });
     } catch (err) {
       set({ error: String(err), isLoading: false });
@@ -82,6 +101,20 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
 
   clearFocus: () => set({ focusedTableId: null }),
 
+  toggleObjectType: (type: ObjectType) =>
+    set((state) => {
+      const newFilter = new Set(state.objectTypeFilter);
+      if (newFilter.has(type)) {
+        newFilter.delete(type);
+      } else {
+        newFilter.add(type);
+      }
+      return { objectTypeFilter: newFilter };
+    }),
+
+  setObjectTypeFilter: (types: Set<ObjectType>) =>
+    set({ objectTypeFilter: types }),
+
   disconnect: () =>
     set({
       schema: null,
@@ -89,6 +122,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
       searchFilter: "",
       schemaFilter: "all",
       focusedTableId: null,
+      objectTypeFilter: new Set(ALL_OBJECT_TYPES),
       availableSchemas: [],
       error: null,
     }),

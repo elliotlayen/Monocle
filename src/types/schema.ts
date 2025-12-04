@@ -14,6 +14,14 @@ export interface TableNode {
   columns: Column[];
 }
 
+// View node representation
+export interface ViewNode {
+  id: string; // Format: "schema.view"
+  name: string; // View name only
+  schema: string; // Schema name (e.g., "dbo")
+  columns: Column[];
+}
+
 // Foreign key relationship
 export interface RelationshipEdge {
   id: string; // Unique FK identifier
@@ -57,6 +65,7 @@ export interface StoredProcedure {
 // Complete schema graph
 export interface SchemaGraph {
   tables: TableNode[];
+  views: ViewNode[];
   relationships: RelationshipEdge[];
   triggers: Trigger[];
   storedProcedures: StoredProcedure[];

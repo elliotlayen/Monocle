@@ -20,6 +20,15 @@ pub struct TableNode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ViewNode {
+    pub id: String,
+    pub name: String,
+    pub schema: String,
+    pub columns: Vec<Column>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RelationshipEdge {
     pub id: String,
     pub from: String,
@@ -66,6 +75,7 @@ pub struct StoredProcedure {
 #[serde(rename_all = "camelCase")]
 pub struct SchemaGraph {
     pub tables: Vec<TableNode>,
+    pub views: Vec<ViewNode>,
     pub relationships: Vec<RelationshipEdge>,
     pub triggers: Vec<Trigger>,
     pub stored_procedures: Vec<StoredProcedure>,

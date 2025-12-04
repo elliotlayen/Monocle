@@ -1,5 +1,6 @@
 use crate::types::{
     Column, ProcedureParameter, RelationshipEdge, SchemaGraph, StoredProcedure, TableNode, Trigger,
+    ViewNode,
 };
 
 #[tauri::command]
@@ -170,8 +171,79 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
         ],
     };
 
+    let order_summary_view = ViewNode {
+        id: "dbo.vw_OrderSummary".to_string(),
+        name: "vw_OrderSummary".to_string(),
+        schema: "dbo".to_string(),
+        columns: vec![
+            Column {
+                name: "OrderId".to_string(),
+                data_type: "int".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+            Column {
+                name: "CustomerName".to_string(),
+                data_type: "nvarchar(100)".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+            Column {
+                name: "OrderDate".to_string(),
+                data_type: "datetime2".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+            Column {
+                name: "TotalAmount".to_string(),
+                data_type: "decimal(18,2)".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+            Column {
+                name: "ItemCount".to_string(),
+                data_type: "int".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+        ],
+    };
+
+    let product_catalog_view = ViewNode {
+        id: "dbo.vw_ProductCatalog".to_string(),
+        name: "vw_ProductCatalog".to_string(),
+        schema: "dbo".to_string(),
+        columns: vec![
+            Column {
+                name: "ProductId".to_string(),
+                data_type: "int".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+            Column {
+                name: "ProductName".to_string(),
+                data_type: "nvarchar(200)".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+            Column {
+                name: "CategoryName".to_string(),
+                data_type: "nvarchar(100)".to_string(),
+                is_nullable: true,
+                is_primary_key: false,
+            },
+            Column {
+                name: "Price".to_string(),
+                data_type: "decimal(18,2)".to_string(),
+                is_nullable: false,
+                is_primary_key: false,
+            },
+        ],
+    };
+
     Ok(SchemaGraph {
         tables: vec![customers, orders, products, order_items, categories],
+        views: vec![order_summary_view, product_catalog_view],
         relationships: vec![
             RelationshipEdge {
                 id: "FK_Orders_Customers".to_string(),

@@ -87,6 +87,24 @@ WHERE p.is_ms_shipped = 0
 ORDER BY s.name, p.name, sp.parameter_id
 "#;
 
+pub const VIEWS_AND_COLUMNS_QUERY: &str = r#"
+SELECT
+    s.name AS schema_name,
+    v.name AS view_name,
+    c.name AS column_name,
+    ty.name AS data_type,
+    c.max_length,
+    c.precision,
+    c.scale,
+    c.is_nullable
+FROM sys.views v
+JOIN sys.schemas s ON v.schema_id = s.schema_id
+JOIN sys.columns c ON v.object_id = c.object_id
+JOIN sys.types ty ON c.user_type_id = ty.user_type_id
+WHERE v.is_ms_shipped = 0
+ORDER BY s.name, v.name, c.column_id
+"#;
+
 pub fn format_data_type(
     type_name: &str,
     max_length: i16,

@@ -15,10 +15,13 @@ import "@xyflow/react/dist/style.css";
 import {
   SchemaGraph as SchemaGraphType,
   TableNode as TableNodeType,
+  ViewNode as ViewNodeType,
   Trigger,
   StoredProcedure,
 } from "@/types/schema";
+import { ObjectType } from "@/stores/schemaStore";
 import { TableNode } from "./table-node";
+import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
 import { StoredProcedureNode } from "./stored-procedure-node";
 import { DetailModal, DetailModalData } from "./detail-modal";
@@ -26,6 +29,7 @@ import { DetailModal, DetailModalData } from "./detail-modal";
 // Define custom node types outside component to prevent re-renders
 const nodeTypes = {
   tableNode: TableNode,
+  viewNode: ViewNode,
   triggerNode: TriggerNode,
   storedProcedureNode: StoredProcedureNode,
 };
@@ -35,11 +39,13 @@ interface SchemaGraphProps {
   focusedTableId?: string | null;
   searchFilter?: string;
   schemaFilter?: string;
+  objectTypeFilter?: Set<ObjectType>;
 }
 
 // Callback types for node clicks
 interface ConvertOptions {
   onTableClick?: (table: TableNodeType) => void;
+  onViewClick?: (view: ViewNodeType) => void;
   onTriggerClick?: (trigger: Trigger) => void;
   onProcedureClick?: (procedure: StoredProcedure) => void;
 }
@@ -50,10 +56,17 @@ function convertToFlowElements(
   focusedTableId?: string | null,
   searchFilter?: string,
   schemaFilter?: string,
+  objectTypeFilter?: Set<ObjectType>,
   options?: ConvertOptions
 ): { nodes: Node[]; edges: Edge[] } {
+  const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
+  const showViews = !objectTypeFilter || objectTypeFilter.has("views");
+  const showTriggers = !objectTypeFilter || objectTypeFilter.has("triggers");
+  const showProcedures =
+    !objectTypeFilter || objectTypeFilter.has("storedProcedures");
+
   // Filter tables based on search and schema
-  let filteredTables = schema.tables;
+  let filteredTables = showTables ? schema.tables : [];
 
   if (searchFilter) {
     const lowerSearch = searchFilter.toLowerCase();
@@ -69,14 +82,33 @@ function convertToFlowElements(
     filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
   }
 
+  // Filter views based on search and schema
+  let filteredViews = showViews ? (schema.views || []) : [];
+
+  if (searchFilter) {
+    const lowerSearch = searchFilter.toLowerCase();
+    filteredViews = filteredViews.filter(
+      (v) =>
+        v.name.toLowerCase().includes(lowerSearch) ||
+        v.schema.toLowerCase().includes(lowerSearch) ||
+        v.id.toLowerCase().includes(lowerSearch)
+    );
+  }
+
+  if (schemaFilter && schemaFilter !== "all") {
+    filteredViews = filteredViews.filter((v) => v.schema === schemaFilter);
+  }
+
   const tableIds = new Set(filteredTables.map((t) => t.id));
 
-  // Filter triggers and stored procedures based on schema filter
+  // Filter triggers and stored procedures based on schema filter and object type
   const triggers = schema.triggers || [];
   const storedProcedures = schema.storedProcedures || [];
 
-  let filteredTriggers = triggers.filter((tr) => tableIds.has(tr.tableId));
-  let filteredProcedures = storedProcedures;
+  let filteredTriggers = showTriggers
+    ? triggers.filter((tr) => tableIds.has(tr.tableId))
+    : [];
+  let filteredProcedures = showProcedures ? storedProcedures : [];
 
   if (schemaFilter && schemaFilter !== "all") {
     filteredProcedures = filteredProcedures.filter(
@@ -110,7 +142,7 @@ function convertToFlowElements(
   const GAP_X = 120;
   const GAP_Y = 100;
 
-  // Track table positions for trigger placement
+  // Track table and view positions for trigger placement
   const tablePositions: Record<string, { x: number; y: number }> = {};
 
   const tableNodes: Node[] = filteredTables.map((table, index) => {
@@ -138,6 +170,39 @@ function convertToFlowElements(
         isFocused: table.id === focusedTableId,
         isDimmed,
         onClick: () => options?.onTableClick?.(table),
+      },
+    };
+  });
+
+  // Calculate starting row for views (after tables)
+  const tableRowCount = Math.ceil(filteredTables.length / GRID_COLS);
+  const viewStartY = tableRowCount * (NODE_HEIGHT + GAP_Y);
+
+  // Convert views to nodes - positioned below tables
+  const viewNodes: Node[] = filteredViews.map((view, index) => {
+    const col = index % GRID_COLS;
+    const row = Math.floor(index / GRID_COLS);
+
+    const isDimmed =
+      focusedTableId !== null &&
+      focusedTableId !== undefined &&
+      view.id !== focusedTableId &&
+      !focusedNeighbors.has(view.id);
+
+    const position = {
+      x: col * (NODE_WIDTH + GAP_X),
+      y: viewStartY + row * (NODE_HEIGHT + GAP_Y),
+    };
+
+    return {
+      id: view.id,
+      type: "viewNode",
+      position,
+      data: {
+        view,
+        isFocused: view.id === focusedTableId,
+        isDimmed,
+        onClick: () => options?.onViewClick?.(view),
       },
     };
   });
@@ -200,7 +265,12 @@ function convertToFlowElements(
     },
   }));
 
-  const nodes: Node[] = [...tableNodes, ...triggerNodes, ...procedureNodes];
+  const nodes: Node[] = [
+    ...tableNodes,
+    ...viewNodes,
+    ...triggerNodes,
+    ...procedureNodes,
+  ];
 
   // Convert relationships to edges (only for visible tables)
   const fkEdges: Edge[] = schema.relationships
@@ -279,12 +349,18 @@ export function SchemaGraphView({
   focusedTableId,
   searchFilter,
   schemaFilter,
+  objectTypeFilter,
 }: SchemaGraphProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
 
   const handleTableClick = (table: TableNodeType) => {
     setModalData({ type: "table", data: table });
+    setModalOpen(true);
+  };
+
+  const handleViewClick = (view: ViewNodeType) => {
+    setModalData({ type: "view", data: view });
     setModalOpen(true);
   };
 
@@ -300,6 +376,7 @@ export function SchemaGraphView({
 
   const options: ConvertOptions = {
     onTableClick: handleTableClick,
+    onViewClick: handleViewClick,
     onTriggerClick: handleTriggerClick,
     onProcedureClick: handleProcedureClick,
   };
@@ -311,9 +388,10 @@ export function SchemaGraphView({
         focusedTableId,
         searchFilter,
         schemaFilter,
+        objectTypeFilter,
         options
       ),
-    [schema, focusedTableId, searchFilter, schemaFilter]
+    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -326,11 +404,12 @@ export function SchemaGraphView({
       focusedTableId,
       searchFilter,
       schemaFilter,
+      objectTypeFilter,
       options
     );
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [schema, focusedTableId, searchFilter, schemaFilter, setNodes, setEdges]);
+  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, setNodes, setEdges]);
 
   return (
     <div className="w-full h-full">
@@ -353,6 +432,7 @@ export function SchemaGraphView({
           nodeColor={(node) => {
             if (node.data?.isFocused) return "#3b82f6";
             if (node.data?.isDimmed) return "#e2e8f0";
+            if (node.type === "viewNode") return "#10b981";
             if (node.type === "triggerNode") return "#f59e0b";
             if (node.type === "storedProcedureNode") return "#8b5cf6";
             return "#64748b";
