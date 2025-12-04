@@ -1,8 +1,6 @@
-import { useState, useRef, useEffect } from "react";
 import { useSchemaStore, ObjectType } from "@/stores/schemaStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -10,6 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Search, X, Database, ChevronDown } from "lucide-react";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
@@ -32,25 +38,9 @@ export function Toolbar() {
     setFocusedTable,
     clearFocus,
     toggleObjectType,
+    selectAllObjectTypes,
     disconnect,
   } = useSchemaStore();
-
-  const [objectTypeOpen, setObjectTypeOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setObjectTypeOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   if (!schema) return null;
 
@@ -62,7 +52,10 @@ export function Toolbar() {
       {/* App title */}
       <div className="flex items-center gap-2 mr-2">
         <Database className="w-5 h-5 text-blue-600" />
-        <span className="font-semibold text-slate-800">Schema Visualizer</span>
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-800 leading-tight">Relova</span>
+          <span className="text-[10px] text-slate-500 leading-tight">By Elliot Layen</span>
+        </div>
       </div>
 
       <div className="w-px h-6 bg-slate-200" />
@@ -103,35 +96,35 @@ export function Toolbar() {
       </Select>
 
       {/* Object type filter */}
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={() => setObjectTypeOpen(!objectTypeOpen)}
-          className="flex items-center gap-2 h-9 px-3 text-sm border border-slate-200 rounded-md bg-white hover:bg-slate-50"
-        >
-          <span>
-            {allSelected ? "All Types" : `${selectedCount} Type${selectedCount !== 1 ? "s" : ""}`}
-          </span>
-          <ChevronDown className="w-4 h-4 text-slate-500" />
-        </button>
-        {objectTypeOpen && (
-          <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-slate-200 rounded-md shadow-lg z-50">
-            <div className="p-2 space-y-2">
-              {(Object.keys(OBJECT_TYPE_LABELS) as ObjectType[]).map((type) => (
-                <label
-                  key={type}
-                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer"
-                >
-                  <Checkbox
-                    checked={objectTypeFilter.has(type)}
-                    onCheckedChange={() => toggleObjectType(type)}
-                  />
-                  <span className="text-sm">{OBJECT_TYPE_LABELS[type]}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-2 h-9 px-3 text-sm border border-slate-200 rounded-md bg-white hover:bg-slate-50">
+            <span>
+              {allSelected ? "All Types" : `${selectedCount} Type${selectedCount !== 1 ? "s" : ""}`}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-500" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-48">
+          {!allSelected && (
+            <>
+              <DropdownMenuItem onSelect={selectAllObjectTypes}>
+                All Types
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {(Object.keys(OBJECT_TYPE_LABELS) as ObjectType[]).map((type) => (
+            <DropdownMenuCheckboxItem
+              key={type}
+              checked={objectTypeFilter.has(type)}
+              onCheckedChange={() => toggleObjectType(type)}
+            >
+              {OBJECT_TYPE_LABELS[type]}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Focus mode */}
       <Select

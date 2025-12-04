@@ -29,6 +29,7 @@ interface SchemaStore {
   clearFocus: () => void;
   toggleObjectType: (type: ObjectType) => void;
   setObjectTypeFilter: (types: Set<ObjectType>) => void;
+  selectAllObjectTypes: () => void;
   disconnect: () => void;
 }
 
@@ -114,6 +115,9 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
 
   setObjectTypeFilter: (types: Set<ObjectType>) =>
     set({ objectTypeFilter: types }),
+
+  selectAllObjectTypes: () =>
+    set({ objectTypeFilter: new Set(ALL_OBJECT_TYPES) }),
 
   disconnect: () =>
     set({
