@@ -16,7 +16,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Search, X, Database, ChevronDown } from "lucide-react";
+import { Search, X, Database, ChevronDown, Table2, Eye, GitBranch } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { SettingsSheet } from "@/components/settings-sheet";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
@@ -160,10 +167,37 @@ export function Toolbar() {
       <div className="flex-1" />
 
       {/* Stats */}
-      <div className="text-sm text-muted-foreground">
-        {schema.tables.length} tables &middot; {schema.views?.length || 0} views
-        &middot; {schema.relationships.length} relationships
-      </div>
+      <TooltipProvider>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="slate" className="gap-1 cursor-default">
+                <Table2 className="w-3 h-3" />
+                {schema.tables.length}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>{schema.tables.length} Tables</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="emerald" className="gap-1 cursor-default">
+                <Eye className="w-3 h-3" />
+                {schema.views?.length || 0}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>{schema.views?.length || 0} Views</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="blue" className="gap-1 cursor-default">
+                <GitBranch className="w-3 h-3" />
+                {schema.relationships.length}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>{schema.relationships.length} Relationships</TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
 
       {/* Settings */}
       <SettingsSheet />
