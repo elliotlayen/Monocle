@@ -23,10 +23,43 @@ export interface RelationshipEdge {
   toColumn: string; // Referenced column in target
 }
 
+// Trigger definition
+export interface Trigger {
+  id: string; // Format: "schema.table.trigger_name"
+  name: string;
+  schema: string;
+  tableId: string; // Parent table ID ("schema.table")
+  triggerType: string; // e.g., "AFTER", "INSTEAD OF"
+  isDisabled: boolean;
+  firesOnInsert: boolean;
+  firesOnUpdate: boolean;
+  firesOnDelete: boolean;
+  definition: string; // SQL definition
+}
+
+// Stored procedure parameter
+export interface ProcedureParameter {
+  name: string;
+  dataType: string;
+  isOutput: boolean;
+}
+
+// Stored procedure definition
+export interface StoredProcedure {
+  id: string; // Format: "schema.procedure_name"
+  name: string;
+  schema: string;
+  procedureType: string; // e.g., "SQL_STORED_PROCEDURE"
+  parameters: ProcedureParameter[];
+  definition: string; // SQL definition
+}
+
 // Complete schema graph
 export interface SchemaGraph {
   tables: TableNode[];
   relationships: RelationshipEdge[];
+  triggers: Trigger[];
+  storedProcedures: StoredProcedure[];
 }
 
 // Connection parameters

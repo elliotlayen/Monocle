@@ -1,4 +1,6 @@
-use crate::types::{Column, RelationshipEdge, SchemaGraph, TableNode};
+use crate::types::{
+    Column, ProcedureParameter, RelationshipEdge, SchemaGraph, StoredProcedure, TableNode, Trigger,
+};
 
 #[tauri::command]
 pub fn load_schema_mock() -> Result<SchemaGraph, String> {
@@ -198,6 +200,185 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 to: "dbo.Categories".to_string(),
                 from_column: "CategoryId".to_string(),
                 to_column: "Id".to_string(),
+            },
+        ],
+        triggers: vec![
+            Trigger {
+                id: "dbo.Orders.TR_Orders_Audit".to_string(),
+                name: "TR_Orders_Audit".to_string(),
+                schema: "dbo".to_string(),
+                table_id: "dbo.Orders".to_string(),
+                trigger_type: "AFTER".to_string(),
+                is_disabled: false,
+                fires_on_insert: true,
+                fires_on_update: true,
+                fires_on_delete: false,
+                definition: r#"CREATE TRIGGER TR_Orders_Audit
+ON dbo.Orders
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO dbo.AuditLog (TableName, Action, RecordId, ChangedAt)
+    SELECT 'Orders',
+           CASE WHEN EXISTS(SELECT 1 FROM deleted) THEN 'UPDATE' ELSE 'INSERT' END,
+           i.Id,
+           GETDATE()
+    FROM inserted i;
+END"#
+                    .to_string(),
+            },
+            Trigger {
+                id: "dbo.Products.TR_Products_UpdatePrice".to_string(),
+                name: "TR_Products_UpdatePrice".to_string(),
+                schema: "dbo".to_string(),
+                table_id: "dbo.Products".to_string(),
+                trigger_type: "AFTER".to_string(),
+                is_disabled: false,
+                fires_on_insert: false,
+                fires_on_update: true,
+                fires_on_delete: false,
+                definition: r#"CREATE TRIGGER TR_Products_UpdatePrice
+ON dbo.Products
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF UPDATE(Price)
+    BEGIN
+        INSERT INTO dbo.PriceHistory (ProductId, OldPrice, NewPrice, ChangedAt)
+        SELECT d.Id, d.Price, i.Price, GETDATE()
+        FROM deleted d
+        INNER JOIN inserted i ON d.Id = i.Id
+        WHERE d.Price <> i.Price;
+    END
+END"#
+                    .to_string(),
+            },
+            Trigger {
+                id: "dbo.Customers.TR_Customers_ValidateEmail".to_string(),
+                name: "TR_Customers_ValidateEmail".to_string(),
+                schema: "dbo".to_string(),
+                table_id: "dbo.Customers".to_string(),
+                trigger_type: "INSTEAD OF".to_string(),
+                is_disabled: true,
+                fires_on_insert: true,
+                fires_on_update: true,
+                fires_on_delete: false,
+                definition: r#"CREATE TRIGGER TR_Customers_ValidateEmail
+ON dbo.Customers
+INSTEAD OF INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Validate email format before insert/update
+    IF EXISTS (SELECT 1 FROM inserted WHERE Email NOT LIKE '%@%.%')
+    BEGIN
+        RAISERROR('Invalid email format', 16, 1);
+        RETURN;
+    END
+    -- Perform the actual insert/update
+    INSERT INTO dbo.Customers (Name, Email, CreatedAt)
+    SELECT Name, Email, CreatedAt FROM inserted;
+END"#
+                    .to_string(),
+            },
+        ],
+        stored_procedures: vec![
+            StoredProcedure {
+                id: "dbo.GetOrdersByCustomer".to_string(),
+                name: "GetOrdersByCustomer".to_string(),
+                schema: "dbo".to_string(),
+                procedure_type: "SQL_STORED_PROCEDURE".to_string(),
+                parameters: vec![
+                    ProcedureParameter {
+                        name: "@CustomerId".to_string(),
+                        data_type: "int".to_string(),
+                        is_output: false,
+                    },
+                    ProcedureParameter {
+                        name: "@StartDate".to_string(),
+                        data_type: "datetime2".to_string(),
+                        is_output: false,
+                    },
+                    ProcedureParameter {
+                        name: "@EndDate".to_string(),
+                        data_type: "datetime2".to_string(),
+                        is_output: false,
+                    },
+                ],
+                definition: r#"CREATE PROCEDURE GetOrdersByCustomer
+    @CustomerId INT,
+    @StartDate DATETIME2 = NULL,
+    @EndDate DATETIME2 = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT o.Id, o.OrderDate, o.TotalAmount, o.Status
+    FROM dbo.Orders o
+    WHERE o.CustomerId = @CustomerId
+      AND (@StartDate IS NULL OR o.OrderDate >= @StartDate)
+      AND (@EndDate IS NULL OR o.OrderDate <= @EndDate)
+    ORDER BY o.OrderDate DESC;
+END"#
+                    .to_string(),
+            },
+            StoredProcedure {
+                id: "dbo.CalculateOrderTotal".to_string(),
+                name: "CalculateOrderTotal".to_string(),
+                schema: "dbo".to_string(),
+                procedure_type: "SQL_STORED_PROCEDURE".to_string(),
+                parameters: vec![
+                    ProcedureParameter {
+                        name: "@OrderId".to_string(),
+                        data_type: "int".to_string(),
+                        is_output: false,
+                    },
+                    ProcedureParameter {
+                        name: "@Total".to_string(),
+                        data_type: "decimal".to_string(),
+                        is_output: true,
+                    },
+                ],
+                definition: r#"CREATE PROCEDURE CalculateOrderTotal
+    @OrderId INT,
+    @Total DECIMAL(18,2) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT @Total = SUM(Quantity * UnitPrice)
+    FROM dbo.OrderItems
+    WHERE OrderId = @OrderId;
+END"#
+                    .to_string(),
+            },
+            StoredProcedure {
+                id: "dbo.ArchiveOldOrders".to_string(),
+                name: "ArchiveOldOrders".to_string(),
+                schema: "dbo".to_string(),
+                procedure_type: "SQL_STORED_PROCEDURE".to_string(),
+                parameters: vec![ProcedureParameter {
+                    name: "@DaysOld".to_string(),
+                    data_type: "int".to_string(),
+                    is_output: false,
+                }],
+                definition: r#"CREATE PROCEDURE ArchiveOldOrders
+    @DaysOld INT = 365
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+
+    INSERT INTO dbo.OrdersArchive
+    SELECT * FROM dbo.Orders
+    WHERE OrderDate < DATEADD(DAY, -@DaysOld, GETDATE());
+
+    DELETE FROM dbo.Orders
+    WHERE OrderDate < DATEADD(DAY, -@DaysOld, GETDATE());
+
+    COMMIT TRANSACTION;
+END"#
+                    .to_string(),
             },
         ],
     })

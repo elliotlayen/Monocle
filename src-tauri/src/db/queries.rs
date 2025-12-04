@@ -52,6 +52,41 @@ JOIN sys.columns c_ref
  AND fkc.referenced_column_id = c_ref.column_id
 "#;
 
+pub const TRIGGERS_QUERY: &str = r#"
+SELECT
+    s.name AS schema_name,
+    t.name AS table_name,
+    tr.name AS trigger_name,
+    tr.type_desc AS trigger_type,
+    tr.is_disabled,
+    ISNULL(OBJECTPROPERTY(tr.object_id, 'ExecIsInsertTrigger'), 0) AS is_insert,
+    ISNULL(OBJECTPROPERTY(tr.object_id, 'ExecIsUpdateTrigger'), 0) AS is_update,
+    ISNULL(OBJECTPROPERTY(tr.object_id, 'ExecIsDeleteTrigger'), 0) AS is_delete,
+    ISNULL(OBJECT_DEFINITION(tr.object_id), '') AS trigger_definition
+FROM sys.triggers tr
+JOIN sys.tables t ON tr.parent_id = t.object_id
+JOIN sys.schemas s ON t.schema_id = s.schema_id
+WHERE t.is_ms_shipped = 0
+ORDER BY s.name, t.name, tr.name
+"#;
+
+pub const STORED_PROCEDURES_QUERY: &str = r#"
+SELECT
+    s.name AS schema_name,
+    p.name AS procedure_name,
+    p.type_desc AS procedure_type,
+    ISNULL(sp.name, '') AS parameter_name,
+    ISNULL(ty.name, '') AS parameter_type,
+    ISNULL(sp.is_output, 0) AS is_output,
+    ISNULL(OBJECT_DEFINITION(p.object_id), '') AS procedure_definition
+FROM sys.procedures p
+JOIN sys.schemas s ON p.schema_id = s.schema_id
+LEFT JOIN sys.parameters sp ON p.object_id = sp.object_id AND sp.parameter_id > 0
+LEFT JOIN sys.types ty ON sp.user_type_id = ty.user_type_id
+WHERE p.is_ms_shipped = 0
+ORDER BY s.name, p.name, sp.parameter_id
+"#;
+
 pub fn format_data_type(
     type_name: &str,
     max_length: i16,

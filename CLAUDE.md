@@ -20,12 +20,15 @@ npm run dev
 
 # Type check and build frontend
 npm run build
+
 ```
+
 Note: Always lint, test, and typecheck updated files. Use project-wide build sparingly.
 
 ## Architecture
 
 ### Frontend (React + TypeScript)
+
 - `src/App.tsx` - Root component, conditionally shows ConnectionForm or SchemaGraphView
 - `src/stores/schemaStore.ts` - Zustand store managing schema state, filters, and Tauri command invocations
 - `src/types/schema.ts` - Shared type definitions (SchemaGraph, TableNode, Column, RelationshipEdge)
@@ -36,6 +39,7 @@ Note: Always lint, test, and typecheck updated files. Use project-wide build spa
 - `src/components/toolbar.tsx` - Search, schema filter, and focus controls
 
 ### Backend (Rust + Tauri)
+
 - `src-tauri/src/lib.rs` - Tauri app setup, registers commands
 - `src-tauri/src/commands/` - Tauri command handlers
   - `schema.rs` - `load_schema` command (real database)
@@ -47,6 +51,7 @@ Note: Always lint, test, and typecheck updated files. Use project-wide build spa
 - `src-tauri/src/types/` - Rust type definitions mirroring frontend types
 
 ### Key Data Flow
+
 1. Frontend calls `invoke<SchemaGraph>("load_schema", { params })` via Tauri
 2. Rust builds ODBC connection string, executes SQL Server metadata queries
 3. Results parsed into `SchemaGraph` struct, serialized to JSON

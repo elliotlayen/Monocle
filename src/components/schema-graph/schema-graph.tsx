@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -12,12 +12,22 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { SchemaGraph as SchemaGraphType } from "@/types/schema";
+import {
+  SchemaGraph as SchemaGraphType,
+  TableNode as TableNodeType,
+  Trigger,
+  StoredProcedure,
+} from "@/types/schema";
 import { TableNode } from "./table-node";
+import { TriggerNode } from "./trigger-node";
+import { StoredProcedureNode } from "./stored-procedure-node";
+import { DetailModal, DetailModalData } from "./detail-modal";
 
 // Define custom node types outside component to prevent re-renders
 const nodeTypes = {
   tableNode: TableNode,
+  triggerNode: TriggerNode,
+  storedProcedureNode: StoredProcedureNode,
 };
 
 interface SchemaGraphProps {
@@ -27,12 +37,20 @@ interface SchemaGraphProps {
   schemaFilter?: string;
 }
 
+// Callback types for node clicks
+interface ConvertOptions {
+  onTableClick?: (table: TableNodeType) => void;
+  onTriggerClick?: (trigger: Trigger) => void;
+  onProcedureClick?: (procedure: StoredProcedure) => void;
+}
+
 // Convert SchemaGraph to React Flow format
 function convertToFlowElements(
   schema: SchemaGraphType,
   focusedTableId?: string | null,
   searchFilter?: string,
-  schemaFilter?: string
+  schemaFilter?: string,
+  options?: ConvertOptions
 ): { nodes: Node[]; edges: Edge[] } {
   // Filter tables based on search and schema
   let filteredTables = schema.tables;
@@ -53,6 +71,29 @@ function convertToFlowElements(
 
   const tableIds = new Set(filteredTables.map((t) => t.id));
 
+  // Filter triggers and stored procedures based on schema filter
+  const triggers = schema.triggers || [];
+  const storedProcedures = schema.storedProcedures || [];
+
+  let filteredTriggers = triggers.filter((tr) => tableIds.has(tr.tableId));
+  let filteredProcedures = storedProcedures;
+
+  if (schemaFilter && schemaFilter !== "all") {
+    filteredProcedures = filteredProcedures.filter(
+      (p) => p.schema === schemaFilter
+    );
+  }
+
+  if (searchFilter) {
+    const lowerSearch = searchFilter.toLowerCase();
+    filteredTriggers = filteredTriggers.filter((tr) =>
+      tr.name.toLowerCase().includes(lowerSearch)
+    );
+    filteredProcedures = filteredProcedures.filter((p) =>
+      p.name.toLowerCase().includes(lowerSearch)
+    );
+  }
+
   // Calculate focused neighbors
   const focusedNeighbors = new Set<string>();
   if (focusedTableId) {
@@ -69,7 +110,10 @@ function convertToFlowElements(
   const GAP_X = 120;
   const GAP_Y = 100;
 
-  const nodes: Node[] = filteredTables.map((table, index) => {
+  // Track table positions for trigger placement
+  const tablePositions: Record<string, { x: number; y: number }> = {};
+
+  const tableNodes: Node[] = filteredTables.map((table, index) => {
     const col = index % GRID_COLS;
     const row = Math.floor(index / GRID_COLS);
 
@@ -79,23 +123,87 @@ function convertToFlowElements(
       table.id !== focusedTableId &&
       !focusedNeighbors.has(table.id);
 
+    const position = {
+      x: col * (NODE_WIDTH + GAP_X),
+      y: row * (NODE_HEIGHT + GAP_Y),
+    };
+    tablePositions[table.id] = position;
+
     return {
       id: table.id,
       type: "tableNode",
-      position: {
-        x: col * (NODE_WIDTH + GAP_X),
-        y: row * (NODE_HEIGHT + GAP_Y),
-      },
+      position,
       data: {
         table,
         isFocused: table.id === focusedTableId,
         isDimmed,
+        onClick: () => options?.onTableClick?.(table),
       },
     };
   });
 
+  // Group triggers by table and position them
+  const triggersByTable: Record<string, Trigger[]> = {};
+  filteredTriggers.forEach((trigger) => {
+    if (!triggersByTable[trigger.tableId]) {
+      triggersByTable[trigger.tableId] = [];
+    }
+    triggersByTable[trigger.tableId].push(trigger);
+  });
+
+  const triggerNodes: Node[] = [];
+  Object.entries(triggersByTable).forEach(([tableId, tableTriggers]) => {
+    const tablePos = tablePositions[tableId];
+    if (!tablePos) return;
+
+    tableTriggers.forEach((trigger, idx) => {
+      const isDimmed =
+        focusedTableId !== null &&
+        focusedTableId !== undefined &&
+        trigger.tableId !== focusedTableId &&
+        !focusedNeighbors.has(trigger.tableId);
+
+      triggerNodes.push({
+        id: trigger.id,
+        type: "triggerNode",
+        position: {
+          x: tablePos.x + NODE_WIDTH + 60,
+          y: tablePos.y + idx * 120,
+        },
+        data: {
+          trigger,
+          isDimmed,
+          onClick: () => options?.onTriggerClick?.(trigger),
+        },
+      });
+    });
+  });
+
+  // Position stored procedures in a separate column on the right
+  const maxTableX = Math.max(
+    ...Object.values(tablePositions).map((p) => p.x),
+    0
+  );
+  const procedureStartX = maxTableX + NODE_WIDTH + GAP_X + 300;
+
+  const procedureNodes: Node[] = filteredProcedures.map((procedure, index) => ({
+    id: procedure.id,
+    type: "storedProcedureNode",
+    position: {
+      x: procedureStartX,
+      y: index * 180,
+    },
+    data: {
+      procedure,
+      isDimmed: false,
+      onClick: () => options?.onProcedureClick?.(procedure),
+    },
+  }));
+
+  const nodes: Node[] = [...tableNodes, ...triggerNodes, ...procedureNodes];
+
   // Convert relationships to edges (only for visible tables)
-  const edges: Edge[] = schema.relationships
+  const fkEdges: Edge[] = schema.relationships
     .filter((rel) => tableIds.has(rel.from) && tableIds.has(rel.to))
     .map((rel) => {
       const isDimmed =
@@ -133,6 +241,36 @@ function convertToFlowElements(
       };
     });
 
+  // Create edges from triggers to their parent tables
+  const triggerEdges: Edge[] = filteredTriggers
+    .filter((tr) => tableIds.has(tr.tableId))
+    .map((trigger) => {
+      const isDimmed =
+        focusedTableId !== null &&
+        focusedTableId !== undefined &&
+        trigger.tableId !== focusedTableId;
+
+      return {
+        id: `trigger-edge-${trigger.id}`,
+        source: trigger.tableId,
+        target: trigger.id,
+        type: "smoothstep",
+        animated: false,
+        style: {
+          stroke: isDimmed ? "#fcd34d" : "#f59e0b",
+          strokeWidth: isDimmed ? 1 : 2,
+          strokeDasharray: "5,5",
+          opacity: isDimmed ? 0.4 : 1,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isDimmed ? "#fcd34d" : "#f59e0b",
+        },
+      };
+    });
+
+  const edges: Edge[] = [...fkEdges, ...triggerEdges];
+
   return { nodes, edges };
 }
 
@@ -142,9 +280,39 @@ export function SchemaGraphView({
   searchFilter,
   schemaFilter,
 }: SchemaGraphProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<DetailModalData | null>(null);
+
+  const handleTableClick = (table: TableNodeType) => {
+    setModalData({ type: "table", data: table });
+    setModalOpen(true);
+  };
+
+  const handleTriggerClick = (trigger: Trigger) => {
+    setModalData({ type: "trigger", data: trigger });
+    setModalOpen(true);
+  };
+
+  const handleProcedureClick = (procedure: StoredProcedure) => {
+    setModalData({ type: "storedProcedure", data: procedure });
+    setModalOpen(true);
+  };
+
+  const options: ConvertOptions = {
+    onTableClick: handleTableClick,
+    onTriggerClick: handleTriggerClick,
+    onProcedureClick: handleProcedureClick,
+  };
+
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () =>
-      convertToFlowElements(schema, focusedTableId, searchFilter, schemaFilter),
+      convertToFlowElements(
+        schema,
+        focusedTableId,
+        searchFilter,
+        schemaFilter,
+        options
+      ),
     [schema, focusedTableId, searchFilter, schemaFilter]
   );
 
@@ -157,7 +325,8 @@ export function SchemaGraphView({
       schema,
       focusedTableId,
       searchFilter,
-      schemaFilter
+      schemaFilter,
+      options
     );
     setNodes(newNodes);
     setEdges(newEdges);
@@ -184,12 +353,19 @@ export function SchemaGraphView({
           nodeColor={(node) => {
             if (node.data?.isFocused) return "#3b82f6";
             if (node.data?.isDimmed) return "#e2e8f0";
+            if (node.type === "triggerNode") return "#f59e0b";
+            if (node.type === "storedProcedureNode") return "#8b5cf6";
             return "#64748b";
           }}
           maskColor="rgba(0, 0, 0, 0.1)"
           className="!bg-white !border-slate-200"
         />
       </ReactFlow>
+      <DetailModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        modalData={modalData}
+      />
     </div>
   );
 }

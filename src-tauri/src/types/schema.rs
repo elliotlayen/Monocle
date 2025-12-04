@@ -30,9 +30,45 @@ pub struct RelationshipEdge {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProcedureParameter {
+    pub name: String,
+    pub data_type: String,
+    pub is_output: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Trigger {
+    pub id: String,
+    pub name: String,
+    pub schema: String,
+    pub table_id: String,
+    pub trigger_type: String,
+    pub is_disabled: bool,
+    pub fires_on_insert: bool,
+    pub fires_on_update: bool,
+    pub fires_on_delete: bool,
+    pub definition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredProcedure {
+    pub id: String,
+    pub name: String,
+    pub schema: String,
+    pub procedure_type: String,
+    pub parameters: Vec<ProcedureParameter>,
+    pub definition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SchemaGraph {
     pub tables: Vec<TableNode>,
     pub relationships: Vec<RelationshipEdge>,
+    pub triggers: Vec<Trigger>,
+    pub stored_procedures: Vec<StoredProcedure>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

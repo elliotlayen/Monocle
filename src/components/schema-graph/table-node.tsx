@@ -7,15 +7,17 @@ interface TableNodeData {
   table: TableNodeType;
   isFocused?: boolean;
   isDimmed?: boolean;
+  onClick?: () => void;
 }
 
 function TableNodeComponent({ data }: NodeProps) {
-  const { table, isFocused, isDimmed } = data as TableNodeData;
+  const { table, isFocused, isDimmed, onClick } = data as unknown as TableNodeData;
 
   return (
     <div
+      onClick={onClick}
       className={cn(
-        "bg-white border border-slate-200 rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200",
+        "bg-white border border-slate-200 rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer",
         isFocused && "border-blue-500 ring-2 ring-blue-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
