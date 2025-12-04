@@ -426,19 +426,19 @@ export function SchemaGraphView({
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#e2e8f0" gap={20} />
-        <Controls className="!bg-white !border-slate-200 !shadow-sm" />
+        <Background className="!bg-background [&>pattern>circle]:!fill-border" gap={20} />
+        <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
         <MiniMap
           nodeColor={(node) => {
             if (node.data?.isFocused) return "#3b82f6";
-            if (node.data?.isDimmed) return "#e2e8f0";
+            if (node.data?.isDimmed) return "var(--color-muted)";
             if (node.type === "viewNode") return "#10b981";
             if (node.type === "triggerNode") return "#f59e0b";
             if (node.type === "storedProcedureNode") return "#8b5cf6";
             return "#64748b";
           }}
           maskColor="rgba(0, 0, 0, 0.1)"
-          className="!bg-white !border-slate-200"
+          className="!bg-background !border-border"
         />
       </ReactFlow>
       <DetailModal

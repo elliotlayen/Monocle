@@ -37,7 +37,7 @@ export function ConnectionForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Connect to SQL Server</CardTitle>
@@ -108,7 +108,7 @@ export function ConnectionForm() {
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md text-sm text-destructive">
                 {error}
               </div>
             )}

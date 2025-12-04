@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Search, X, Database, ChevronDown } from "lucide-react";
+import { SettingsSheet } from "@/components/settings-sheet";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
@@ -48,21 +49,21 @@ export function Toolbar() {
   const allSelected = selectedCount === 4;
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-slate-200 shadow-sm">
+    <div className="flex items-center gap-4 px-4 py-3 bg-background border-b border-border shadow-sm">
       {/* App title */}
       <div className="flex items-center gap-2 mr-2">
         <Database className="w-5 h-5 text-blue-600" />
         <div className="flex flex-col">
-          <span className="font-semibold text-slate-800 leading-tight">Relova</span>
-          <span className="text-[10px] text-slate-500 leading-tight">By Elliot Layen</span>
+          <span className="font-semibold text-foreground leading-tight">Relova</span>
+          <span className="text-[10px] text-muted-foreground leading-tight">By Elliot Layen</span>
         </div>
       </div>
 
-      <div className="w-px h-6 bg-slate-200" />
+      <div className="w-px h-6 bg-border" />
 
       {/* Search */}
       <div className="relative flex-1 max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           type="text"
           placeholder="Search tables..."
@@ -73,9 +74,9 @@ export function Toolbar() {
         {searchFilter && (
           <button
             onClick={() => setSearchFilter("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded"
           >
-            <X className="w-3 h-3 text-slate-400" />
+            <X className="w-3 h-3 text-muted-foreground" />
           </button>
         )}
       </div>
@@ -98,11 +99,11 @@ export function Toolbar() {
       {/* Object type filter */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 h-9 px-3 text-sm border border-slate-200 rounded-md bg-white hover:bg-slate-50">
+          <button className="flex items-center gap-2 h-9 px-3 text-sm border border-input rounded-md bg-background hover:bg-accent">
             <span>
               {allSelected ? "All Types" : `${selectedCount} Type${selectedCount !== 1 ? "s" : ""}`}
             </span>
-            <ChevronDown className="w-4 h-4 text-slate-500" />
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-48">
@@ -159,10 +160,13 @@ export function Toolbar() {
       <div className="flex-1" />
 
       {/* Stats */}
-      <div className="text-sm text-slate-500">
+      <div className="text-sm text-muted-foreground">
         {schema.tables.length} tables &middot; {schema.views?.length || 0} views
         &middot; {schema.relationships.length} relationships
       </div>
+
+      {/* Settings */}
+      <SettingsSheet />
 
       {/* Disconnect */}
       <Button variant="outline" size="sm" onClick={disconnect} className="h-9">

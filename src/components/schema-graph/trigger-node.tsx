@@ -23,7 +23,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-white border border-slate-200 rounded-lg shadow-sm min-w-[180px] max-w-[240px] overflow-hidden transition-all duration-200 cursor-pointer",
+        "bg-card border border-border rounded-lg shadow-sm min-w-[180px] max-w-[240px] overflow-hidden transition-all duration-200 cursor-pointer",
         isFocused && "border-amber-500 ring-2 ring-amber-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -58,11 +58,11 @@ function TriggerNodeComponent({ data }: NodeProps) {
       {/* Body */}
       <div className="px-3 py-2 space-y-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-500 uppercase">Type:</span>
-          <span className="text-xs text-slate-700">{trigger.triggerType}</span>
+          <span className="text-[10px] text-muted-foreground uppercase">Type:</span>
+          <span className="text-xs text-foreground">{trigger.triggerType}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-500 uppercase">Events:</span>
+          <span className="text-[10px] text-muted-foreground uppercase">Events:</span>
           <div className="flex gap-1">
             {events.map((event, idx) => (
               <span

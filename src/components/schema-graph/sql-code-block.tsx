@@ -9,7 +9,7 @@ interface SqlCodeBlockProps {
 export function SqlCodeBlock({ code, maxHeight = "300px" }: SqlCodeBlockProps) {
   if (!code) {
     return (
-      <div className="bg-slate-900 text-slate-400 p-4 rounded-lg text-xs font-mono italic">
+      <div className="bg-muted text-muted-foreground p-4 rounded-lg text-xs font-mono italic">
         Definition not available
       </div>
     );
@@ -26,7 +26,7 @@ export function SqlCodeBlock({ code, maxHeight = "300px" }: SqlCodeBlockProps) {
             <code className="text-xs">
               {tokens.map((line, i) => (
                 <div key={i} {...getLineProps({ line })} className="whitespace-pre">
-                  <span className="inline-block w-8 text-slate-500 select-none text-right mr-4">
+                  <span className="inline-block w-8 text-slate-400 select-none text-right mr-4">
                     {i + 1}
                   </span>
                   {line.map((token, key) => (

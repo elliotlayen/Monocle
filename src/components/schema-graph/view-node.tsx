@@ -17,7 +17,7 @@ function ViewNodeComponent({ data }: NodeProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-white border border-slate-200 rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer",
+        "bg-card border border-border rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer",
         isFocused && "border-emerald-500 ring-2 ring-emerald-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -59,7 +59,7 @@ function ColumnRow({ column, viewId, index }: ColumnRowProps) {
   const handleTop = 52 + index * 28 + 14;
 
   return (
-    <div className="flex items-center px-3 py-1 hover:bg-slate-50 relative min-h-[28px]">
+    <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
       {/* Left handle for incoming references (target) */}
       <Handle
         type="target"
@@ -71,8 +71,8 @@ function ColumnRow({ column, viewId, index }: ColumnRowProps) {
 
       {/* Column info */}
       <div className="flex items-center gap-2 flex-1 overflow-hidden">
-        <span className="text-xs text-slate-700 truncate">{column.name}</span>
-        <span className="text-[10px] text-slate-400 flex-shrink-0 ml-auto">
+        <span className="text-xs text-foreground truncate">{column.name}</span>
+        <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-auto">
           {column.dataType}
         </span>
         {column.isNullable && (

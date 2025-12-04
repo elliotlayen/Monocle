@@ -59,10 +59,10 @@ function TableDetail({ table }: { table: TableNode }) {
     <>
       <DialogHeader>
         <div className="flex items-center gap-2">
-          <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">
+          <span className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
             Table
           </span>
-          <span className="text-xs text-slate-400">{table.schema}</span>
+          <span className="text-xs text-muted-foreground">{table.schema}</span>
         </div>
         <DialogTitle className="text-xl">{table.name}</DialogTitle>
         <DialogDescription>
@@ -75,18 +75,18 @@ function TableDetail({ table }: { table: TableNode }) {
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
           <ScrollArea className="h-full">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 sticky top-0">
+              <thead className="bg-muted sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium text-slate-600">
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                     Name
                   </th>
-                  <th className="text-left px-3 py-2 font-medium text-slate-600">
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                     Type
                   </th>
-                  <th className="text-center px-3 py-2 font-medium text-slate-600">
+                  <th className="text-center px-3 py-2 font-medium text-muted-foreground">
                     PK
                   </th>
-                  <th className="text-center px-3 py-2 font-medium text-slate-600">
+                  <th className="text-center px-3 py-2 font-medium text-muted-foreground">
                     Nullable
                   </th>
                 </tr>
@@ -95,24 +95,24 @@ function TableDetail({ table }: { table: TableNode }) {
                 {table.columns.map((col: Column, idx: number) => (
                   <tr
                     key={col.name}
-                    className={cn(idx % 2 === 0 ? "bg-white" : "bg-slate-50/50")}
+                    className={cn(idx % 2 === 0 ? "bg-background" : "bg-muted/50")}
                   >
-                    <td className="px-3 py-2 font-mono text-slate-800">
+                    <td className="px-3 py-2 font-mono text-foreground">
                       {col.name}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{col.dataType}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{col.dataType}</td>
                     <td className="px-3 py-2 text-center">
                       {col.isPrimaryKey && (
-                        <span className="bg-amber-100 text-amber-800 text-xs px-1.5 py-0.5 rounded">
+                        <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-xs px-1.5 py-0.5 rounded">
                           PK
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       {col.isNullable ? (
-                        <span className="text-slate-400">Yes</span>
+                        <span className="text-muted-foreground">Yes</span>
                       ) : (
-                        <span className="text-slate-700 font-medium">No</span>
+                        <span className="text-foreground font-medium">No</span>
                       )}
                     </td>
                   </tr>
@@ -131,10 +131,10 @@ function ViewDetail({ view }: { view: ViewNode }) {
     <>
       <DialogHeader>
         <div className="flex items-center gap-2">
-          <span className="bg-emerald-100 text-emerald-600 text-xs px-2 py-1 rounded">
+          <span className="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs px-2 py-1 rounded">
             View
           </span>
-          <span className="text-xs text-slate-400">{view.schema}</span>
+          <span className="text-xs text-muted-foreground">{view.schema}</span>
         </div>
         <DialogTitle className="text-xl">{view.name}</DialogTitle>
         <DialogDescription>
@@ -147,15 +147,15 @@ function ViewDetail({ view }: { view: ViewNode }) {
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
           <ScrollArea className="h-full">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 sticky top-0">
+              <thead className="bg-muted sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium text-slate-600">
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                     Name
                   </th>
-                  <th className="text-left px-3 py-2 font-medium text-slate-600">
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                     Type
                   </th>
-                  <th className="text-center px-3 py-2 font-medium text-slate-600">
+                  <th className="text-center px-3 py-2 font-medium text-muted-foreground">
                     Nullable
                   </th>
                 </tr>
@@ -164,17 +164,17 @@ function ViewDetail({ view }: { view: ViewNode }) {
                 {view.columns.map((col: Column, idx: number) => (
                   <tr
                     key={col.name}
-                    className={cn(idx % 2 === 0 ? "bg-white" : "bg-slate-50/50")}
+                    className={cn(idx % 2 === 0 ? "bg-background" : "bg-muted/50")}
                   >
-                    <td className="px-3 py-2 font-mono text-slate-800">
+                    <td className="px-3 py-2 font-mono text-foreground">
                       {col.name}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{col.dataType}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{col.dataType}</td>
                     <td className="px-3 py-2 text-center">
                       {col.isNullable ? (
-                        <span className="text-slate-400">Yes</span>
+                        <span className="text-muted-foreground">Yes</span>
                       ) : (
-                        <span className="text-slate-700 font-medium">No</span>
+                        <span className="text-foreground font-medium">No</span>
                       )}
                     </td>
                   </tr>
@@ -199,12 +199,12 @@ function TriggerDetail({ trigger }: { trigger: Trigger }) {
     <>
       <DialogHeader>
         <div className="flex items-center gap-2">
-          <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded">
+          <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs px-2 py-1 rounded">
             Trigger
           </span>
-          <span className="text-xs text-slate-400">{trigger.schema}</span>
+          <span className="text-xs text-muted-foreground">{trigger.schema}</span>
           {trigger.isDisabled && (
-            <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded">
+            <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs px-2 py-1 rounded">
               Disabled
             </span>
           )}
@@ -218,20 +218,20 @@ function TriggerDetail({ trigger }: { trigger: Trigger }) {
       <div className="mt-4 flex-1 flex flex-col min-h-0 space-y-4">
         <div className="flex gap-4 flex-shrink-0">
           <div>
-            <h4 className="text-xs font-medium text-slate-500 uppercase mb-1">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
               Type
             </h4>
             <span className="text-sm">{trigger.triggerType}</span>
           </div>
           <div>
-            <h4 className="text-xs font-medium text-slate-500 uppercase mb-1">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
               Events
             </h4>
             <div className="flex gap-1">
               {events.map((event, idx) => (
                 <span
                   key={idx}
-                  className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded"
+                  className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-xs px-2 py-1 rounded"
                 >
                   {event}
                 </span>
@@ -239,7 +239,7 @@ function TriggerDetail({ trigger }: { trigger: Trigger }) {
             </div>
           </div>
           <div>
-            <h4 className="text-xs font-medium text-slate-500 uppercase mb-1">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
               Table
             </h4>
             <span className="text-sm font-mono">{trigger.tableId}</span>
@@ -265,10 +265,10 @@ function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
     <>
       <DialogHeader>
         <div className="flex items-center gap-2">
-          <span className="bg-violet-100 text-violet-700 text-xs px-2 py-1 rounded">
+          <span className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-xs px-2 py-1 rounded">
             Stored Procedure
           </span>
-          <span className="text-xs text-slate-400">{procedure.schema}</span>
+          <span className="text-xs text-muted-foreground">{procedure.schema}</span>
         </div>
         <DialogTitle className="text-xl">{procedure.name}</DialogTitle>
         <DialogDescription>
@@ -284,15 +284,15 @@ function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
             <div className="border rounded-lg overflow-hidden max-h-[120px]">
               <ScrollArea className="h-full max-h-[120px]">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 sticky top-0">
+                  <thead className="bg-muted sticky top-0">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium text-slate-600">
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                         Name
                       </th>
-                      <th className="text-left px-3 py-2 font-medium text-slate-600">
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                         Type
                       </th>
-                      <th className="text-center px-3 py-2 font-medium text-slate-600">
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground">
                         Direction
                       </th>
                     </tr>
@@ -303,22 +303,22 @@ function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
                         <tr
                           key={param.name}
                           className={cn(
-                            idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                            idx % 2 === 0 ? "bg-background" : "bg-muted/50"
                           )}
                         >
-                          <td className="px-3 py-2 font-mono text-slate-800">
+                          <td className="px-3 py-2 font-mono text-foreground">
                             {param.name}
                           </td>
-                          <td className="px-3 py-2 text-slate-600">
+                          <td className="px-3 py-2 text-muted-foreground">
                             {param.dataType}
                           </td>
                           <td className="px-3 py-2 text-center">
                             {param.isOutput ? (
-                              <span className="bg-violet-100 text-violet-800 text-xs px-2 py-1 rounded">
+                              <span className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 text-xs px-2 py-1 rounded">
                                 OUTPUT
                               </span>
                             ) : (
-                              <span className="text-slate-400">INPUT</span>
+                              <span className="text-muted-foreground">INPUT</span>
                             )}
                           </td>
                         </tr>

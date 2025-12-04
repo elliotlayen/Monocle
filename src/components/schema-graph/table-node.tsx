@@ -17,7 +17,7 @@ function TableNodeComponent({ data }: NodeProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-white border border-slate-200 rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer",
+        "bg-card border border-border rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer",
         isFocused && "border-blue-500 ring-2 ring-blue-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -59,7 +59,7 @@ function ColumnRow({ column, tableId, index }: ColumnRowProps) {
   const handleTop = 52 + index * 28 + 14;
 
   return (
-    <div className="flex items-center px-3 py-1 hover:bg-slate-50 relative min-h-[28px]">
+    <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
       {/* Left handle for incoming FKs (target) */}
       <Handle
         type="target"
@@ -78,13 +78,13 @@ function ColumnRow({ column, tableId, index }: ColumnRowProps) {
         )}
         <span
           className={cn(
-            "text-xs text-slate-700 truncate",
+            "text-xs text-foreground truncate",
             column.isPrimaryKey && "font-semibold"
           )}
         >
           {column.name}
         </span>
-        <span className="text-[10px] text-slate-400 flex-shrink-0 ml-auto">
+        <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-auto">
           {column.dataType}
         </span>
         {column.isNullable && (
