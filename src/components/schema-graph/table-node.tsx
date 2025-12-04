@@ -17,12 +17,20 @@ function TableNodeComponent({ data }: NodeProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer",
+        "bg-card border border-border rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-blue-500 ring-2 ring-blue-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
       )}
     >
+      {/* Generic target handle for incoming procedure/trigger references */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={`${table.id}-target`}
+        className="!w-2 !h-2 !bg-blue-500 !border-2 !border-white"
+        style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
+      />
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2">
         <span className="text-[10px] text-slate-400 uppercase tracking-wide block">
@@ -52,11 +60,8 @@ interface ColumnRowProps {
   index: number;
 }
 
-function ColumnRow({ column, tableId, index }: ColumnRowProps) {
+function ColumnRow({ column, tableId }: ColumnRowProps) {
   const handleId = `${tableId}-${column.name}`;
-  // Calculate handle position based on index
-  // Header is ~52px, each column row is ~28px
-  const handleTop = 52 + index * 28 + 14;
 
   return (
     <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
@@ -64,9 +69,9 @@ function ColumnRow({ column, tableId, index }: ColumnRowProps) {
       <Handle
         type="target"
         position={Position.Left}
-        id={handleId}
+        id={`${handleId}-target`}
         className="!w-2 !h-2 !bg-blue-500 !border-2 !border-white"
-        style={{ top: handleTop, left: -4 }}
+        style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
       />
 
       {/* Column info */}
@@ -98,9 +103,9 @@ function ColumnRow({ column, tableId, index }: ColumnRowProps) {
       <Handle
         type="source"
         position={Position.Right}
-        id={handleId}
+        id={`${handleId}-source`}
         className="!w-2 !h-2 !bg-blue-500 !border-2 !border-white"
-        style={{ top: handleTop, right: -4 }}
+        style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
       />
     </div>
   );

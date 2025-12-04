@@ -43,6 +43,7 @@ export interface Trigger {
   firesOnUpdate: boolean;
   firesOnDelete: boolean;
   definition: string; // SQL definition
+  referencedTables: string[]; // List of table/view IDs referenced in the trigger
 }
 
 // Stored procedure parameter
@@ -60,6 +61,7 @@ export interface StoredProcedure {
   procedureType: string; // e.g., "SQL_STORED_PROCEDURE"
   parameters: ProcedureParameter[];
   definition: string; // SQL definition
+  referencedTables: string[]; // List of table/view IDs referenced in the procedure
 }
 
 // Complete schema graph

@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use odbc_api::{buffers::TextRowSet, Cursor};
+use regex::Regex;
 
 use crate::db::{
     create_connection, format_data_type, FOREIGN_KEYS_QUERY, STORED_PROCEDURES_QUERY,
@@ -37,14 +38,26 @@ pub fn load_schema_from_connection(connection_string: &str) -> Result<SchemaGrap
     // Load views and columns
     let views = load_views_and_columns(&conn)?;
 
+    // Collect all table and view IDs for reference validation
+    let mut valid_refs: HashSet<String> = HashSet::new();
+    for table in &tables {
+        valid_refs.insert(table.id.clone());
+        // Also add just the table name for unqualified references
+        valid_refs.insert(table.name.to_lowercase());
+    }
+    for view in &views {
+        valid_refs.insert(view.id.clone());
+        valid_refs.insert(view.name.to_lowercase());
+    }
+
     // Load foreign key relationships
     let relationships = load_foreign_keys(&conn)?;
 
-    // Load triggers
-    let triggers = load_triggers(&conn)?;
+    // Load triggers with table reference parsing
+    let triggers = load_triggers(&conn, &tables, &views)?;
 
-    // Load stored procedures
-    let stored_procedures = load_stored_procedures(&conn)?;
+    // Load stored procedures with table reference parsing
+    let stored_procedures = load_stored_procedures(&conn, &tables, &views)?;
 
     Ok(SchemaGraph {
         tables,
@@ -209,8 +222,23 @@ fn get_bool_column(batch: &TextRowSet, col: usize, row: usize) -> Result<bool, S
     Ok(s == "1" || s.eq_ignore_ascii_case("true"))
 }
 
-fn load_triggers(conn: &odbc_api::Connection<'_>) -> Result<Vec<Trigger>, SchemaError> {
+fn load_triggers(
+    conn: &odbc_api::Connection<'_>,
+    tables: &[TableNode],
+    views: &[ViewNode],
+) -> Result<Vec<Trigger>, SchemaError> {
     let mut triggers = Vec::new();
+
+    // Build lookup maps for table/view name resolution
+    let mut name_to_id: HashMap<String, String> = HashMap::new();
+    for table in tables {
+        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
+        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
+    }
+    for view in views {
+        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
+        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
+    }
 
     if let Some(mut cursor) = conn.execute(TRIGGERS_QUERY, ())? {
         let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
@@ -231,6 +259,9 @@ fn load_triggers(conn: &odbc_api::Connection<'_>) -> Result<Vec<Trigger>, Schema
                 let table_id = format!("{}.{}", schema_name, table_name);
                 let trigger_id = format!("{}.{}.{}", schema_name, table_name, trigger_name);
 
+                // Extract table references from the trigger definition
+                let referenced_tables = extract_table_references(&definition, &name_to_id);
+
                 triggers.push(Trigger {
                     id: trigger_id,
                     name: trigger_name,
@@ -242,6 +273,7 @@ fn load_triggers(conn: &odbc_api::Connection<'_>) -> Result<Vec<Trigger>, Schema
                     fires_on_update,
                     fires_on_delete,
                     definition,
+                    referenced_tables,
                 });
             }
         }
@@ -252,8 +284,21 @@ fn load_triggers(conn: &odbc_api::Connection<'_>) -> Result<Vec<Trigger>, Schema
 
 fn load_stored_procedures(
     conn: &odbc_api::Connection<'_>,
+    tables: &[TableNode],
+    views: &[ViewNode],
 ) -> Result<Vec<StoredProcedure>, SchemaError> {
     let mut procedures: HashMap<String, StoredProcedure> = HashMap::new();
+
+    // Build lookup maps for table/view name resolution
+    let mut name_to_id: HashMap<String, String> = HashMap::new();
+    for table in tables {
+        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
+        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
+    }
+    for view in views {
+        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
+        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
+    }
 
     if let Some(mut cursor) = conn.execute(STORED_PROCEDURES_QUERY, ())? {
         let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
@@ -272,6 +317,7 @@ fn load_stored_procedures(
                 let procedure_id = format!("{}.{}", schema_name, procedure_name);
 
                 let procedure = procedures.entry(procedure_id.clone()).or_insert_with(|| {
+                    let referenced_tables = extract_table_references(&definition, &name_to_id);
                     StoredProcedure {
                         id: procedure_id,
                         name: procedure_name,
@@ -279,6 +325,7 @@ fn load_stored_procedures(
                         procedure_type,
                         parameters: Vec::new(),
                         definition,
+                        referenced_tables,
                     }
                 });
 
@@ -294,4 +341,45 @@ fn load_stored_procedures(
     }
 
     Ok(procedures.into_values().collect())
+}
+
+/// Extract table/view references from SQL definition
+fn extract_table_references(
+    definition: &str,
+    name_to_id: &HashMap<String, String>,
+) -> Vec<String> {
+    let mut refs: HashSet<String> = HashSet::new();
+
+    // Patterns to match table references in SQL
+    // Handles: FROM table, JOIN table, INSERT INTO table, UPDATE table, DELETE FROM table
+    // Supports optional schema prefix and square brackets: [schema].[table] or schema.table
+    let patterns = [
+        r"(?i)\bFROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
+        r"(?i)\bJOIN\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
+        r"(?i)\bINSERT\s+INTO\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
+        r"(?i)\bUPDATE\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
+        r"(?i)\bDELETE\s+FROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
+    ];
+
+    for pattern in patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            for cap in re.captures_iter(definition) {
+                let schema = cap.get(1).map(|m| m.as_str());
+                if let Some(table) = cap.get(2).map(|m| m.as_str()) {
+                    // Try to resolve the reference to a known table/view ID
+                    let lookup_key = if let Some(s) = schema {
+                        format!("{}.{}", s, table).to_lowercase()
+                    } else {
+                        table.to_lowercase()
+                    };
+
+                    if let Some(id) = name_to_id.get(&lookup_key) {
+                        refs.insert(id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    refs.into_iter().collect()
 }

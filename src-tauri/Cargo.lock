@@ -3261,6 +3261,7 @@ name = "relova"
 version = "0.1.0"
 dependencies = [
  "odbc-api",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

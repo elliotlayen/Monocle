@@ -23,7 +23,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[180px] max-w-[240px] overflow-hidden transition-all duration-200 cursor-pointer",
+        "bg-card border border-border rounded-lg shadow-sm min-w-[180px] max-w-[240px] overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-amber-500 ring-2 ring-amber-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -35,7 +35,15 @@ function TriggerNodeComponent({ data }: NodeProps) {
         position={Position.Left}
         id={trigger.id}
         className="!w-2 !h-2 !bg-amber-500 !border-2 !border-white"
-        style={{ top: "50%", left: -4 }}
+        style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
+      />
+      {/* Right handle for outgoing connections to referenced tables */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={`${trigger.id}-source`}
+        className="!w-2 !h-2 !bg-amber-500 !border-2 !border-white"
+        style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
       />
 
       {/* Header */}

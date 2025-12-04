@@ -58,6 +58,7 @@ pub struct Trigger {
     pub fires_on_update: bool,
     pub fires_on_delete: bool,
     pub definition: String,
+    pub referenced_tables: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +70,7 @@ pub struct StoredProcedure {
     pub procedure_type: String,
     pub parameters: Vec<ProcedureParameter>,
     pub definition: String,
+    pub referenced_tables: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { StoredProcedure } from "@/types/schema";
 import { cn } from "@/lib/utils";
 
@@ -21,12 +21,20 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[200px] max-w-[280px] overflow-hidden transition-all duration-200 cursor-pointer",
+        "bg-card border border-border rounded-lg shadow-sm min-w-[200px] max-w-[280px] overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-violet-500 ring-2 ring-violet-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
       )}
     >
+      {/* Source handle for outgoing connections to referenced tables */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={`${procedure.id}-source`}
+        className="!w-2 !h-2 !bg-violet-500 !border-2 !border-white"
+        style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
+      />
       {/* Header */}
       <div className="bg-gradient-to-r from-violet-600 to-violet-500 text-white px-3 py-2">
         <div className="flex items-center gap-2">

@@ -299,6 +299,7 @@ BEGIN
     FROM inserted i;
 END"#
                     .to_string(),
+                referenced_tables: vec![],  // AuditLog doesn't exist in mock
             },
             Trigger {
                 id: "dbo.Products.TR_Products_UpdatePrice".to_string(),
@@ -326,6 +327,7 @@ BEGIN
     END
 END"#
                     .to_string(),
+                referenced_tables: vec![],  // PriceHistory doesn't exist in mock
             },
             Trigger {
                 id: "dbo.Customers.TR_Customers_ValidateEmail".to_string(),
@@ -354,6 +356,7 @@ BEGIN
     SELECT Name, Email, CreatedAt FROM inserted;
 END"#
                     .to_string(),
+                referenced_tables: vec!["dbo.Customers".to_string()],  // References its own table
             },
         ],
         stored_procedures: vec![
@@ -394,6 +397,7 @@ BEGIN
     ORDER BY o.OrderDate DESC;
 END"#
                     .to_string(),
+                referenced_tables: vec!["dbo.Orders".to_string()],
             },
             StoredProcedure {
                 id: "dbo.CalculateOrderTotal".to_string(),
@@ -423,6 +427,7 @@ BEGIN
     WHERE OrderId = @OrderId;
 END"#
                     .to_string(),
+                referenced_tables: vec!["dbo.OrderItems".to_string()],
             },
             StoredProcedure {
                 id: "dbo.ArchiveOldOrders".to_string(),
@@ -451,6 +456,7 @@ BEGIN
     COMMIT TRANSACTION;
 END"#
                     .to_string(),
+                referenced_tables: vec!["dbo.Orders".to_string()],
             },
         ],
     })

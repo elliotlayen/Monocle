@@ -100,6 +100,7 @@ function convertToFlowElements(
   }
 
   const tableIds = new Set(filteredTables.map((t) => t.id));
+  const viewIds = new Set(filteredViews.map((v) => v.id));
 
   // Filter triggers and stored procedures based on schema filter and object type
   const triggers = schema.triggers || [];
@@ -286,8 +287,8 @@ function convertToFlowElements(
         id: rel.id,
         source: rel.from,
         target: rel.to,
-        sourceHandle: `${rel.from}-${rel.fromColumn}`,
-        targetHandle: `${rel.to}-${rel.toColumn}`,
+        sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
+        targetHandle: `${rel.to}-${rel.toColumn}-target`,
         type: "smoothstep",
         animated: !isDimmed,
         style: {
@@ -339,7 +340,74 @@ function convertToFlowElements(
       };
     });
 
-  const edges: Edge[] = [...fkEdges, ...triggerEdges];
+  // Create edges from triggers to their referenced tables/views (other than parent table)
+  const triggerRefEdges: Edge[] = filteredTriggers.flatMap((trigger) => {
+    return (trigger.referencedTables || [])
+      .filter((tableId) =>
+        (tableIds.has(tableId) || viewIds.has(tableId)) &&
+        tableId !== trigger.tableId  // Exclude parent table, already connected
+      )
+      .map((tableId) => {
+        const isDimmed =
+          focusedTableId !== null &&
+          focusedTableId !== undefined &&
+          tableId !== focusedTableId;
+
+        return {
+          id: `trigger-ref-edge-${trigger.id}-${tableId}`,
+          source: trigger.id,
+          sourceHandle: `${trigger.id}-source`,
+          target: tableId,
+          targetHandle: `${tableId}-target`,
+          type: "smoothstep",
+          animated: false,
+          style: {
+            stroke: isDimmed ? "#fcd34d" : "#f59e0b",
+            strokeWidth: isDimmed ? 1 : 2,
+            strokeDasharray: "5,5",
+            opacity: isDimmed ? 0.4 : 1,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isDimmed ? "#fcd34d" : "#f59e0b",
+          },
+        };
+      });
+  });
+
+  // Create edges from stored procedures to their referenced tables/views
+  const procedureEdges: Edge[] = filteredProcedures.flatMap((procedure) => {
+    return (procedure.referencedTables || [])
+      .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
+      .map((tableId) => {
+        const isDimmed =
+          focusedTableId !== null &&
+          focusedTableId !== undefined &&
+          tableId !== focusedTableId;
+
+        return {
+          id: `proc-edge-${procedure.id}-${tableId}`,
+          source: procedure.id,
+          sourceHandle: `${procedure.id}-source`,
+          target: tableId,
+          targetHandle: `${tableId}-target`,
+          type: "smoothstep",
+          animated: false,
+          style: {
+            stroke: isDimmed ? "#c4b5fd" : "#8b5cf6",
+            strokeWidth: isDimmed ? 1 : 2,
+            strokeDasharray: "5,5",
+            opacity: isDimmed ? 0.4 : 1,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isDimmed ? "#c4b5fd" : "#8b5cf6",
+          },
+        };
+      });
+  });
+
+  const edges: Edge[] = [...fkEdges, ...triggerEdges, ...triggerRefEdges, ...procedureEdges];
 
   return { nodes, edges };
 }
