@@ -283,12 +283,13 @@ function convertToFlowElements(
   const fkEdges: Edge[] = schema.relationships
     .filter((rel) => tableIds.has(rel.from) && tableIds.has(rel.to))
     .map((rel) => {
+      const isFocusActiveLocal = focusedTableId !== null && focusedTableId !== undefined;
       const isDimmed =
-        focusedTableId !== null &&
-        focusedTableId !== undefined &&
+        isFocusActiveLocal &&
         rel.from !== focusedTableId &&
         rel.to !== focusedTableId;
-      const isSelected = selectedEdgeIds?.has(rel.id) ?? false;
+      const isFocused = isFocusActiveLocal && !isDimmed;
+      const isSelected = !isFocusActiveLocal && (selectedEdgeIds?.has(rel.id) ?? false);
 
       return {
         id: rel.id,
@@ -297,13 +298,13 @@ function convertToFlowElements(
         sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
         targetHandle: `${rel.to}-${rel.toColumn}-target`,
         type: "smoothstep",
-        animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+        animated: isSelected || isFocused,
         style: {
           stroke: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
-          strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+          strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
           strokeDasharray: "5,5",
-          opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-          cursor: "pointer",
+          opacity: isDimmed ? 0.4 : 1,
+          cursor: isFocusActiveLocal ? "default" : "pointer",
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -322,15 +323,14 @@ function convertToFlowElements(
     });
 
   // Create edges from triggers to their parent tables
+  const isFocusActive = focusedTableId !== null && focusedTableId !== undefined;
   const triggerEdges: Edge[] = filteredTriggers
     .filter((tr) => tableIds.has(tr.tableId))
     .map((trigger) => {
       const edgeId = `trigger-edge-${trigger.id}`;
-      const isDimmed =
-        focusedTableId !== null &&
-        focusedTableId !== undefined &&
-        trigger.tableId !== focusedTableId;
-      const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+      const isDimmed = isFocusActive && trigger.tableId !== focusedTableId;
+      const isFocused = isFocusActive && !isDimmed;
+      const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
 
       return {
         id: edgeId,
@@ -338,13 +338,13 @@ function convertToFlowElements(
         sourceHandle: `${trigger.tableId}-source`,
         target: trigger.id,
         type: "smoothstep",
-        animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+        animated: isSelected || isFocused,
         style: {
           stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
-          strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+          strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
           strokeDasharray: "5,5",
-          opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-          cursor: "pointer",
+          opacity: isDimmed ? 0.4 : 1,
+          cursor: isFocusActive ? "default" : "pointer",
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -371,11 +371,9 @@ function convertToFlowElements(
       )
       .map((tableId) => {
         const edgeId = `trigger-ref-edge-${trigger.id}-${tableId}`;
-        const isDimmed =
-          focusedTableId !== null &&
-          focusedTableId !== undefined &&
-          tableId !== focusedTableId;
-        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+        const isDimmed = isFocusActive && tableId !== focusedTableId;
+        const isFocused = isFocusActive && !isDimmed;
+        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
 
         return {
           id: edgeId,
@@ -384,13 +382,13 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
-            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
             strokeDasharray: "5,5",
-            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-            cursor: "pointer",
+            opacity: isDimmed ? 0.4 : 1,
+            cursor: isFocusActive ? "default" : "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -415,11 +413,9 @@ function convertToFlowElements(
       .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
       .map((tableId) => {
         const edgeId = `proc-edge-${procedure.id}-${tableId}`;
-        const isDimmed =
-          focusedTableId !== null &&
-          focusedTableId !== undefined &&
-          tableId !== focusedTableId;
-        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+        const isDimmed = isFocusActive && tableId !== focusedTableId;
+        const isFocused = isFocusActive && !isDimmed;
+        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
 
         return {
           id: edgeId,
@@ -428,13 +424,13 @@ function convertToFlowElements(
           target: procedure.id,
           targetHandle: `${procedure.id}-target`,
           type: "smoothstep",
-          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
-            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
             strokeDasharray: "5,5",
-            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-            cursor: "pointer",
+            opacity: isDimmed ? 0.4 : 1,
+            cursor: isFocusActive ? "default" : "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -462,11 +458,9 @@ function convertToFlowElements(
       )
       .map((tableId) => {
         const edgeId = `trigger-affects-${trigger.id}-${tableId}`;
-        const isDimmed =
-          focusedTableId !== null &&
-          focusedTableId !== undefined &&
-          tableId !== focusedTableId;
-        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+        const isDimmed = isFocusActive && tableId !== focusedTableId;
+        const isFocused = isFocusActive && !isDimmed;
+        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
 
         return {
           id: edgeId,
@@ -475,13 +469,13 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
-            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
             strokeDasharray: "5,5",
-            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-            cursor: "pointer",
+            opacity: isDimmed ? 0.4 : 1,
+            cursor: isFocusActive ? "default" : "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -506,11 +500,9 @@ function convertToFlowElements(
       .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
       .map((tableId) => {
         const edgeId = `proc-affects-${procedure.id}-${tableId}`;
-        const isDimmed =
-          focusedTableId !== null &&
-          focusedTableId !== undefined &&
-          tableId !== focusedTableId;
-        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+        const isDimmed = isFocusActive && tableId !== focusedTableId;
+        const isFocused = isFocusActive && !isDimmed;
+        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
 
         return {
           id: edgeId,
@@ -519,13 +511,13 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
-            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
             strokeDasharray: "5,5",
-            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-            cursor: "pointer",
+            opacity: isDimmed ? 0.4 : 1,
+            cursor: isFocusActive ? "default" : "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -560,11 +552,11 @@ function convertToFlowElements(
       .map(({ col, sourceTableId }) => {
         const edgeId = `view-col-edge-${view.id}-${col.name}`;
         const isDimmed =
-          focusedTableId !== null &&
-          focusedTableId !== undefined &&
+          isFocusActive &&
           view.id !== focusedTableId &&
           sourceTableId !== focusedTableId;
-        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+        const isFocused = isFocusActive && !isDimmed;
+        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
 
         return {
           id: edgeId,
@@ -573,13 +565,13 @@ function convertToFlowElements(
           target: view.id,
           targetHandle: `${view.id}-${col.name}-target`,
           type: "smoothstep",
-          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
-            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
             strokeDasharray: "5,5",
-            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
-            cursor: "pointer",
+            opacity: isDimmed ? 0.4 : 1,
+            cursor: isFocusActive ? "default" : "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -625,9 +617,11 @@ export function SchemaGraphView({
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
+      // Don't allow selection when focus is active - focused edges are already highlighted
+      if (focusedTableId) return;
       toggleEdgeSelection(edge.id);
     },
-    [toggleEdgeSelection]
+    [toggleEdgeSelection, focusedTableId]
   );
 
   const handleTableClick = (table: TableNodeType) => {

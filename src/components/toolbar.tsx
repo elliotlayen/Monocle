@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Database, ChevronDown, Table2, Eye, GitBranch, X } from "lucide-react";
+import { Database, ChevronDown, Layers, GitBranch, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/tooltip";
 import { SettingsSheet } from "@/components/settings-sheet";
 import { SearchBar } from "@/components/search-bar";
+import { useFilteredCounts } from "@/hooks/useFilteredCounts";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
@@ -49,6 +50,8 @@ export function Toolbar() {
     objectTypeFilter,
     edgeTypeFilter,
     selectedEdgeIds,
+    searchFilter,
+    schemaFilter,
     setFocusedTable,
     clearFocus,
     toggleObjectType,
@@ -59,6 +62,15 @@ export function Toolbar() {
     disconnect,
   } = useSchemaStore();
 
+  const counts = useFilteredCounts(
+    schema,
+    searchFilter,
+    schemaFilter,
+    objectTypeFilter,
+    edgeTypeFilter,
+    focusedTableId
+  );
+
   if (!schema) return null;
 
   const selectedObjectCount = objectTypeFilter.size;
@@ -66,6 +78,13 @@ export function Toolbar() {
 
   const selectedEdgeCount = edgeTypeFilter.size;
   const allEdgesSelected = selectedEdgeCount === 6;
+
+  const hasActiveFilters =
+    searchFilter !== "" ||
+    schemaFilter !== "all" ||
+    focusedTableId !== null ||
+    !allObjectsSelected ||
+    !allEdgesSelected;
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 bg-background border-b border-border shadow-sm">
@@ -196,29 +215,36 @@ export function Toolbar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Badge variant="slate" className="gap-1 cursor-default">
-                <Table2 className="w-3 h-3" />
-                {schema.tables.length}
+                <Layers className="w-3 h-3" />
+                {hasActiveFilters
+                  ? `${counts.filteredObjects} / ${counts.totalObjects} Objects`
+                  : `${counts.totalObjects} Objects`}
               </Badge>
             </TooltipTrigger>
-            <TooltipContent>{schema.tables.length} Tables</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="emerald" className="gap-1 cursor-default">
-                <Eye className="w-3 h-3" />
-                {schema.views?.length || 0}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>{schema.views?.length || 0} Views</TooltipContent>
+            <TooltipContent>
+              <div className="text-xs">
+                <div className="font-medium mb-1">Objects</div>
+                <div>Tables: {counts.breakdown.tables.filtered} / {counts.breakdown.tables.total}</div>
+                <div>Views: {counts.breakdown.views.filtered} / {counts.breakdown.views.total}</div>
+                <div>Triggers: {counts.breakdown.triggers.filtered} / {counts.breakdown.triggers.total}</div>
+                <div>Procedures: {counts.breakdown.storedProcedures.filtered} / {counts.breakdown.storedProcedures.total}</div>
+              </div>
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Badge variant="blue" className="gap-1 cursor-default">
                 <GitBranch className="w-3 h-3" />
-                {schema.relationships.length}
+                {hasActiveFilters
+                  ? `${counts.filteredEdges} / ${counts.totalEdges} Edges`
+                  : `${counts.totalEdges} Edges`}
               </Badge>
             </TooltipTrigger>
-            <TooltipContent>{schema.relationships.length} Relationships</TooltipContent>
+            <TooltipContent>
+              {hasActiveFilters
+                ? `${counts.filteredEdges} of ${counts.totalEdges} edges visible`
+                : `${counts.totalEdges} edges`}
+            </TooltipContent>
           </Tooltip>
         </div>
       </TooltipProvider>

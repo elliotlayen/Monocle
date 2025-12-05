@@ -226,6 +226,10 @@ export function SearchBar() {
             setIsOpen(true);
           }
         }}
+        onBlur={() => {
+          // Small delay to allow click events on dropdown items to fire
+          setTimeout(() => setIsOpen(false), 150);
+        }}
         className="pl-9 h-9"
       />
       {searchFilter && (
