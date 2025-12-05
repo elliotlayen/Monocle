@@ -4,6 +4,8 @@ export interface Column {
   dataType: string;
   isNullable: boolean;
   isPrimaryKey: boolean;
+  sourceTable?: string; // Source table name (for view columns)
+  sourceColumn?: string; // Source column name (for view columns)
 }
 
 // Table node representation
@@ -20,6 +22,8 @@ export interface ViewNode {
   name: string; // View name only
   schema: string; // Schema name (e.g., "dbo")
   columns: Column[];
+  definition: string; // SQL definition
+  referencedTables: string[]; // List of table/view IDs referenced in the view
 }
 
 // Foreign key relationship

@@ -96,13 +96,33 @@ SELECT
     c.max_length,
     c.precision,
     c.scale,
-    c.is_nullable
+    c.is_nullable,
+    ISNULL(OBJECT_DEFINITION(v.object_id), '') AS view_definition
 FROM sys.views v
 JOIN sys.schemas s ON v.schema_id = s.schema_id
 JOIN sys.columns c ON v.object_id = c.object_id
 JOIN sys.types ty ON c.user_type_id = ty.user_type_id
 WHERE v.is_ms_shipped = 0
 ORDER BY s.name, v.name, c.column_id
+"#;
+
+pub const VIEW_COLUMN_SOURCES_QUERY: &str = r#"
+SELECT
+    vs.name AS view_schema,
+    v.name AS view_name,
+    vc.name AS view_column,
+    ref.referenced_entity_name AS source_table,
+    ref.referenced_minor_name AS source_column
+FROM sys.views v
+JOIN sys.schemas vs ON v.schema_id = vs.schema_id
+JOIN sys.columns vc ON v.object_id = vc.object_id
+CROSS APPLY sys.dm_sql_referenced_entities(
+    QUOTENAME(vs.name) + '.' + QUOTENAME(v.name), 'OBJECT'
+) ref
+WHERE v.is_ms_shipped = 0
+  AND ref.referenced_minor_name IS NOT NULL
+  AND ref.referenced_class_desc = 'OBJECT_OR_COLUMN'
+ORDER BY vs.name, v.name, vc.column_id
 "#;
 
 pub fn format_data_type(

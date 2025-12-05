@@ -420,7 +420,52 @@ function convertToFlowElements(
       });
   });
 
-  const edges: Edge[] = [...fkEdges, ...triggerEdges, ...triggerRefEdges, ...procedureEdges];
+  // Create edges from view columns to their source table columns
+  const allNodeIds = new Set([...tableIds, ...viewIds]);
+  const viewEdges: Edge[] = filteredViews.flatMap((view) => {
+    return view.columns
+      .filter((col) => col.sourceTable && col.sourceColumn)
+      .map((col) => {
+        // Find the source table ID by matching table name
+        const sourceTableId = [...allNodeIds].find(
+          (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
+        );
+        return { col, sourceTableId };
+      })
+      .filter(({ sourceTableId }) => sourceTableId !== undefined)
+      .map(({ col, sourceTableId }) => {
+        const edgeId = `view-col-edge-${view.id}-${col.name}`;
+        const isDimmed =
+          focusedTableId !== null &&
+          focusedTableId !== undefined &&
+          view.id !== focusedTableId &&
+          sourceTableId !== focusedTableId;
+        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+
+        return {
+          id: edgeId,
+          source: view.id,
+          sourceHandle: `${view.id}-${col.name}-source`,
+          target: sourceTableId!,
+          targetHandle: `${sourceTableId}-${col.sourceColumn}-target`,
+          type: "smoothstep",
+          animated: isSelected,
+          style: {
+            stroke: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
+            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeDasharray: "5,5",
+            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+            cursor: "pointer",
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
+          },
+        };
+      });
+  });
+
+  const edges: Edge[] = [...fkEdges, ...triggerEdges, ...triggerRefEdges, ...procedureEdges, ...viewEdges];
 
   return { nodes, edges };
 }

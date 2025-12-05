@@ -15,24 +15,28 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: true,
+                ..Default::default()
             },
             Column {
                 name: "Name".to_string(),
                 data_type: "nvarchar(100)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "Email".to_string(),
                 data_type: "nvarchar(255)".to_string(),
                 is_nullable: true,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "CreatedAt".to_string(),
                 data_type: "datetime2".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
         ],
     };
@@ -47,30 +51,35 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: true,
+                ..Default::default()
             },
             Column {
                 name: "CustomerId".to_string(),
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "OrderDate".to_string(),
                 data_type: "datetime2".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "TotalAmount".to_string(),
                 data_type: "decimal(18,2)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "Status".to_string(),
                 data_type: "nvarchar(50)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
         ],
     };
@@ -85,24 +94,28 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: true,
+                ..Default::default()
             },
             Column {
                 name: "Name".to_string(),
                 data_type: "nvarchar(200)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "Price".to_string(),
                 data_type: "decimal(18,2)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "CategoryId".to_string(),
                 data_type: "int".to_string(),
                 is_nullable: true,
                 is_primary_key: false,
+                ..Default::default()
             },
         ],
     };
@@ -117,30 +130,35 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: true,
+                ..Default::default()
             },
             Column {
                 name: "OrderId".to_string(),
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "ProductId".to_string(),
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "Quantity".to_string(),
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "UnitPrice".to_string(),
                 data_type: "decimal(18,2)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
         ],
     };
@@ -155,18 +173,21 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: true,
+                ..Default::default()
             },
             Column {
                 name: "Name".to_string(),
                 data_type: "nvarchar(100)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                ..Default::default()
             },
             Column {
                 name: "Description".to_string(),
                 data_type: "nvarchar(500)".to_string(),
                 is_nullable: true,
                 is_primary_key: false,
+                ..Default::default()
             },
         ],
     };
@@ -181,31 +202,54 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Orders".to_string()),
+                source_column: Some("Id".to_string()),
             },
             Column {
                 name: "CustomerName".to_string(),
                 data_type: "nvarchar(100)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Customers".to_string()),
+                source_column: Some("Name".to_string()),
             },
             Column {
                 name: "OrderDate".to_string(),
                 data_type: "datetime2".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Orders".to_string()),
+                source_column: Some("OrderDate".to_string()),
             },
             Column {
                 name: "TotalAmount".to_string(),
                 data_type: "decimal(18,2)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Orders".to_string()),
+                source_column: Some("TotalAmount".to_string()),
             },
             Column {
                 name: "ItemCount".to_string(),
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("OrderItems".to_string()),
+                source_column: Some("Id".to_string()),
             },
+        ],
+        definition: r#"CREATE VIEW vw_OrderSummary AS
+SELECT o.Id AS OrderId, c.Name AS CustomerName, o.OrderDate, o.TotalAmount,
+       COUNT(oi.Id) AS ItemCount
+FROM dbo.Orders o
+JOIN dbo.Customers c ON o.CustomerId = c.Id
+LEFT JOIN dbo.OrderItems oi ON o.Id = oi.OrderId
+GROUP BY o.Id, c.Name, o.OrderDate, o.TotalAmount"#
+            .to_string(),
+        referenced_tables: vec![
+            "dbo.Orders".to_string(),
+            "dbo.Customers".to_string(),
+            "dbo.OrderItems".to_string(),
         ],
     };
 
@@ -219,25 +263,42 @@ pub fn load_schema_mock() -> Result<SchemaGraph, String> {
                 data_type: "int".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Products".to_string()),
+                source_column: Some("Id".to_string()),
             },
             Column {
                 name: "ProductName".to_string(),
                 data_type: "nvarchar(200)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Products".to_string()),
+                source_column: Some("Name".to_string()),
             },
             Column {
                 name: "CategoryName".to_string(),
                 data_type: "nvarchar(100)".to_string(),
                 is_nullable: true,
                 is_primary_key: false,
+                source_table: Some("Categories".to_string()),
+                source_column: Some("Name".to_string()),
             },
             Column {
                 name: "Price".to_string(),
                 data_type: "decimal(18,2)".to_string(),
                 is_nullable: false,
                 is_primary_key: false,
+                source_table: Some("Products".to_string()),
+                source_column: Some("Price".to_string()),
             },
+        ],
+        definition: r#"CREATE VIEW vw_ProductCatalog AS
+SELECT p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.Price
+FROM dbo.Products p
+LEFT JOIN dbo.Categories c ON p.CategoryId = c.Id"#
+            .to_string(),
+        referenced_tables: vec![
+            "dbo.Products".to_string(),
+            "dbo.Categories".to_string(),
         ],
     };
 

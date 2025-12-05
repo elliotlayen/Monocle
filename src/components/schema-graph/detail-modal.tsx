@@ -155,6 +155,9 @@ function ViewDetail({ view }: { view: ViewNode }) {
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">
                     Type
                   </th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                    Source
+                  </th>
                   <th className="text-center px-3 py-2 font-medium text-muted-foreground">
                     Nullable
                   </th>
@@ -170,6 +173,15 @@ function ViewDetail({ view }: { view: ViewNode }) {
                       {col.name}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{col.dataType}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {col.sourceTable && col.sourceColumn ? (
+                        <span className="font-mono text-xs">
+                          {col.sourceTable}.{col.sourceColumn}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/50">-</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-center">
                       {col.isNullable ? (
                         <span className="text-muted-foreground">Yes</span>

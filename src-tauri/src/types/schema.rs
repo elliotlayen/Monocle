@@ -1,12 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Column {
     pub name: String,
     pub data_type: String,
     pub is_nullable: bool,
     pub is_primary_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub source_table: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub source_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +29,8 @@ pub struct ViewNode {
     pub name: String,
     pub schema: String,
     pub columns: Vec<Column>,
+    pub definition: String,
+    pub referenced_tables: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

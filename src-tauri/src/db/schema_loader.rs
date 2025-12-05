@@ -5,7 +5,7 @@ use regex::Regex;
 
 use crate::db::{
     create_connection, format_data_type, FOREIGN_KEYS_QUERY, STORED_PROCEDURES_QUERY,
-    TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY,
+    TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY, VIEW_COLUMN_SOURCES_QUERY,
 };
 use crate::types::{
     Column, ProcedureParameter, RelationshipEdge, SchemaGraph, StoredProcedure, TableNode, Trigger,
@@ -36,19 +36,13 @@ pub fn load_schema_from_connection(connection_string: &str) -> Result<SchemaGrap
     let tables = load_tables_and_columns(&conn)?;
 
     // Load views and columns
-    let views = load_views_and_columns(&conn)?;
+    let mut views = load_views_and_columns(&conn)?;
 
-    // Collect all table and view IDs for reference validation
-    let mut valid_refs: HashSet<String> = HashSet::new();
-    for table in &tables {
-        valid_refs.insert(table.id.clone());
-        // Also add just the table name for unqualified references
-        valid_refs.insert(table.name.to_lowercase());
-    }
-    for view in &views {
-        valid_refs.insert(view.id.clone());
-        valid_refs.insert(view.name.to_lowercase());
-    }
+    // Populate view column sources (from SQL Server dependency metadata)
+    load_view_column_sources(&conn, &mut views)?;
+
+    // Populate view references (needs tables to be loaded first)
+    load_views_with_references(&mut views, &tables);
 
     // Load foreign key relationships
     let relationships = load_foreign_keys(&conn)?;
@@ -97,6 +91,8 @@ fn load_tables_and_columns(
                     data_type: formatted_type,
                     is_nullable,
                     is_primary_key,
+                    source_table: None,
+                    source_column: None,
                 };
 
                 tables
@@ -117,10 +113,11 @@ fn load_tables_and_columns(
 }
 
 fn load_views_and_columns(conn: &odbc_api::Connection<'_>) -> Result<Vec<ViewNode>, SchemaError> {
-    let mut views: HashMap<String, ViewNode> = HashMap::new();
+    // First pass: collect views with definitions
+    let mut views: HashMap<String, (ViewNode, String)> = HashMap::new();
 
     if let Some(mut cursor) = conn.execute(VIEWS_AND_COLUMNS_QUERY, ())? {
-        let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(4096))?;
+        let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
         let mut row_set_cursor = cursor.bind_buffer(&mut buffers)?;
 
         while let Some(batch) = row_set_cursor.fetch()? {
@@ -133,6 +130,7 @@ fn load_views_and_columns(conn: &odbc_api::Connection<'_>) -> Result<Vec<ViewNod
                 let precision = get_u8_column(&batch, 5, row_idx)?;
                 let scale = get_u8_column(&batch, 6, row_idx)?;
                 let is_nullable = get_bool_column(&batch, 7, row_idx)?;
+                let definition = get_string_column(&batch, 8, row_idx).unwrap_or_default();
 
                 let view_id = format!("{}.{}", schema_name, view_name);
                 let formatted_type = format_data_type(&data_type, max_length, precision, scale);
@@ -142,23 +140,97 @@ fn load_views_and_columns(conn: &odbc_api::Connection<'_>) -> Result<Vec<ViewNod
                     data_type: formatted_type,
                     is_nullable,
                     is_primary_key: false,
+                    source_table: None,
+                    source_column: None,
                 };
 
-                views
+                let entry = views
                     .entry(view_id.clone())
-                    .or_insert_with(|| ViewNode {
-                        id: view_id,
-                        name: view_name,
-                        schema: schema_name,
-                        columns: Vec::new(),
-                    })
-                    .columns
-                    .push(column);
+                    .or_insert_with(|| {
+                        (
+                            ViewNode {
+                                id: view_id,
+                                name: view_name,
+                                schema: schema_name,
+                                columns: Vec::new(),
+                                definition: definition.clone(),
+                                referenced_tables: Vec::new(),
+                            },
+                            definition,
+                        )
+                    });
+                entry.0.columns.push(column);
             }
         }
     }
 
-    Ok(views.into_values().collect())
+    Ok(views.into_values().map(|(v, _)| v).collect())
+}
+
+fn load_view_column_sources(
+    conn: &odbc_api::Connection<'_>,
+    views: &mut [ViewNode],
+) -> Result<(), SchemaError> {
+    // Build a map from view_id -> column_name -> (source_table, source_column)
+    let mut column_sources: HashMap<String, HashMap<String, (String, String)>> = HashMap::new();
+
+    if let Some(mut cursor) = conn.execute(VIEW_COLUMN_SOURCES_QUERY, ())? {
+        let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(4096))?;
+        let mut row_set_cursor = cursor.bind_buffer(&mut buffers)?;
+
+        while let Some(batch) = row_set_cursor.fetch()? {
+            for row_idx in 0..batch.num_rows() {
+                let view_schema = get_string_column(&batch, 0, row_idx)?;
+                let view_name = get_string_column(&batch, 1, row_idx)?;
+                let view_column = get_string_column(&batch, 2, row_idx)?;
+                let source_table = get_string_column(&batch, 3, row_idx)?;
+                let source_column = get_string_column(&batch, 4, row_idx)?;
+
+                let view_id = format!("{}.{}", view_schema, view_name);
+
+                column_sources
+                    .entry(view_id)
+                    .or_default()
+                    .insert(view_column, (source_table, source_column));
+            }
+        }
+    }
+
+    // Apply sources to view columns
+    for view in views.iter_mut() {
+        if let Some(view_sources) = column_sources.get(&view.id) {
+            for column in view.columns.iter_mut() {
+                if let Some((source_table, source_column)) = view_sources.get(&column.name) {
+                    column.source_table = Some(source_table.clone());
+                    column.source_column = Some(source_column.clone());
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn load_views_with_references(
+    views: &mut [ViewNode],
+    tables: &[TableNode],
+) {
+    // Build lookup maps for table/view name resolution
+    let mut name_to_id: HashMap<String, String> = HashMap::new();
+    for table in tables {
+        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
+        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
+    }
+    // Also add views themselves as potential targets
+    for view in views.iter() {
+        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
+        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
+    }
+
+    // Extract table references from each view's definition
+    for view in views.iter_mut() {
+        view.referenced_tables = extract_table_references(&view.definition, &name_to_id);
+    }
 }
 
 fn load_foreign_keys(
