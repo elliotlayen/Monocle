@@ -78,7 +78,8 @@ function convertToFlowElements(
       (t) =>
         t.name.toLowerCase().includes(lowerSearch) ||
         t.schema.toLowerCase().includes(lowerSearch) ||
-        t.id.toLowerCase().includes(lowerSearch)
+        t.id.toLowerCase().includes(lowerSearch) ||
+        t.columns.some((col) => col.name.toLowerCase().includes(lowerSearch))
     );
   }
 
@@ -95,7 +96,8 @@ function convertToFlowElements(
       (v) =>
         v.name.toLowerCase().includes(lowerSearch) ||
         v.schema.toLowerCase().includes(lowerSearch) ||
-        v.id.toLowerCase().includes(lowerSearch)
+        v.id.toLowerCase().includes(lowerSearch) ||
+        v.columns.some((col) => col.name.toLowerCase().includes(lowerSearch))
     );
   }
 

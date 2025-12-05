@@ -1,6 +1,5 @@
 import { useSchemaStore, type ObjectType, type EdgeType } from "@/stores/schemaStore";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Search, X, Database, ChevronDown, Table2, Eye, GitBranch } from "lucide-react";
+import { Database, ChevronDown, Table2, Eye, GitBranch, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -25,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SettingsSheet } from "@/components/settings-sheet";
+import { SearchBar } from "@/components/search-bar";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
@@ -45,12 +45,10 @@ const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
 export function Toolbar() {
   const {
     schema,
-    searchFilter,
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
     selectedEdgeIds,
-    setSearchFilter,
     setFocusedTable,
     clearFocus,
     toggleObjectType,
@@ -83,24 +81,7 @@ export function Toolbar() {
       <div className="w-px h-6 bg-border" />
 
       {/* Search */}
-      <div className="relative flex-1 max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Search tables..."
-          value={searchFilter}
-          onChange={(e) => setSearchFilter(e.target.value)}
-          className="pl-9 h-9"
-        />
-        {searchFilter && (
-          <button
-            onClick={() => setSearchFilter("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded"
-          >
-            <X className="w-3 h-3 text-muted-foreground" />
-          </button>
-        )}
-      </div>
+      <SearchBar />
 
       {/* Object type filter */}
       <DropdownMenu>
