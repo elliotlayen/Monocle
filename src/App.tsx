@@ -7,7 +7,7 @@ function App() {
   const {
     schema,
     isConnected,
-    searchFilter,
+    debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
     objectTypeFilter,
@@ -24,7 +24,7 @@ function App() {
       <main className="flex-1 overflow-hidden">
         <SchemaGraphView
           schema={schema}
-          searchFilter={searchFilter}
+          searchFilter={debouncedSearchFilter}
           schemaFilter={schemaFilter}
           focusedTableId={focusedTableId}
           objectTypeFilter={objectTypeFilter}

@@ -13,6 +13,9 @@ export type EdgeType =
   | "viewDependencies";
 
 interface SchemaStore {
+  // Internal
+  _debounceTimer: ReturnType<typeof setTimeout> | null;
+
   // State
   schema: SchemaGraph | null;
   isLoading: boolean;
@@ -21,6 +24,7 @@ interface SchemaStore {
 
   // Filters
   searchFilter: string;
+  debouncedSearchFilter: string;
   schemaFilter: string;
   focusedTableId: string | null;
   objectTypeFilter: Set<ObjectType>;
@@ -66,12 +70,16 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
 ]);
 
 export const useSchemaStore = create<SchemaStore>((set) => ({
+  // Internal debounce timer
+  _debounceTimer: null as ReturnType<typeof setTimeout> | null,
+
   // Initial state
   schema: null,
   isLoading: false,
   error: null,
   isConnected: false,
   searchFilter: "",
+  debouncedSearchFilter: "",
   schemaFilter: "all",
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
@@ -113,6 +121,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         availableSchemas: schemas,
         // Reset filters on new connection
         searchFilter: "",
+        debouncedSearchFilter: "",
         schemaFilter: "all",
         focusedTableId: null,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
@@ -124,7 +133,18 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
     }
   },
 
-  setSearchFilter: (search: string) => set({ searchFilter: search }),
+  setSearchFilter: (search: string) =>
+    set((state) => {
+      // Clear existing timer
+      if (state._debounceTimer) {
+        clearTimeout(state._debounceTimer);
+      }
+      // Set new timer for debounced value
+      const timer = setTimeout(() => {
+        set({ debouncedSearchFilter: search });
+      }, 150);
+      return { searchFilter: search, _debounceTimer: timer };
+    }),
 
   setSchemaFilter: (schema: string) => set({ schemaFilter: schema }),
 
@@ -181,6 +201,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
       schema: null,
       isConnected: false,
       searchFilter: "",
+      debouncedSearchFilter: "",
       schemaFilter: "all",
       focusedTableId: null,
       objectTypeFilter: new Set(ALL_OBJECT_TYPES),

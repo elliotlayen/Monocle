@@ -35,6 +35,16 @@ const nodeTypes = {
   storedProcedureNode: StoredProcedureNode,
 };
 
+// MiniMap node color function - defined outside component for stable reference
+function getMinimapNodeColor(node: Node): string {
+  if (node.data?.isFocused) return "#3b82f6";
+  if (node.data?.isDimmed) return "var(--color-muted)";
+  if (node.type === "viewNode") return "#10b981";
+  if (node.type === "triggerNode") return "#f59e0b";
+  if (node.type === "storedProcedureNode") return "#8b5cf6";
+  return "#64748b";
+}
+
 interface SchemaGraphProps {
   schema: SchemaGraphType;
   focusedTableId?: string | null;
@@ -52,6 +62,38 @@ interface ConvertOptions {
   onProcedureClick?: (procedure: StoredProcedure) => void;
 }
 
+// Pre-compute which columns have relationships (for conditional handle rendering)
+function computeColumnsWithHandles(schema: SchemaGraphType): Set<string> {
+  const cols = new Set<string>();
+
+  // Add columns from FK relationships
+  schema.relationships.forEach((rel) => {
+    cols.add(`${rel.from}-${rel.fromColumn}`);
+    cols.add(`${rel.to}-${rel.toColumn}`);
+  });
+
+  // Add columns from view column sources
+  (schema.views || []).forEach((view) => {
+    view.columns.forEach((col) => {
+      if (col.sourceTable && col.sourceColumn) {
+        // Add the view column
+        cols.add(`${view.id}-${col.name}`);
+        // Add the source table column (need to find table ID)
+        const allTables = schema.tables;
+        const allViews = schema.views || [];
+        const sourceTableId = [...allTables.map(t => t.id), ...allViews.map(v => v.id)].find(
+          (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
+        );
+        if (sourceTableId) {
+          cols.add(`${sourceTableId}-${col.sourceColumn}`);
+        }
+      }
+    });
+  });
+
+  return cols;
+}
+
 // Convert SchemaGraph to React Flow format
 function convertToFlowElements(
   schema: SchemaGraphType,
@@ -61,7 +103,8 @@ function convertToFlowElements(
   objectTypeFilter?: Set<ObjectType>,
   edgeTypeFilter?: Set<EdgeType>,
   selectedEdgeIds?: Set<string>,
-  options?: ConvertOptions
+  options?: ConvertOptions,
+  columnsWithHandles?: Set<string>
 ): { nodes: Node[]; edges: Edge[] } {
   const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
   const showViews = !objectTypeFilter || objectTypeFilter.has("views");
@@ -176,6 +219,7 @@ function convertToFlowElements(
         table,
         isFocused: table.id === focusedTableId,
         isDimmed,
+        columnsWithHandles,
         onClick: () => options?.onTableClick?.(table),
       },
     };
@@ -209,6 +253,7 @@ function convertToFlowElements(
         view,
         isFocused: view.id === focusedTableId,
         isDimmed,
+        columnsWithHandles,
         onClick: () => options?.onViewClick?.(view),
       },
     };
@@ -298,11 +343,9 @@ function convertToFlowElements(
         sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
         targetHandle: `${rel.to}-${rel.toColumn}-target`,
         type: "smoothstep",
-        animated: isSelected || isFocused,
         style: {
           stroke: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
           strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-          strokeDasharray: "5,5",
           opacity: isDimmed ? 0.4 : 1,
           cursor: isFocusActiveLocal ? "default" : "pointer",
         },
@@ -338,11 +381,9 @@ function convertToFlowElements(
         sourceHandle: `${trigger.tableId}-source`,
         target: trigger.id,
         type: "smoothstep",
-        animated: isSelected || isFocused,
         style: {
           stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
           strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-          strokeDasharray: "5,5",
           opacity: isDimmed ? 0.4 : 1,
           cursor: isFocusActive ? "default" : "pointer",
         },
@@ -382,11 +423,9 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
             strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            strokeDasharray: "5,5",
             opacity: isDimmed ? 0.4 : 1,
             cursor: isFocusActive ? "default" : "pointer",
           },
@@ -424,11 +463,9 @@ function convertToFlowElements(
           target: procedure.id,
           targetHandle: `${procedure.id}-target`,
           type: "smoothstep",
-          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
             strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            strokeDasharray: "5,5",
             opacity: isDimmed ? 0.4 : 1,
             cursor: isFocusActive ? "default" : "pointer",
           },
@@ -469,11 +506,9 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
             strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            strokeDasharray: "5,5",
             opacity: isDimmed ? 0.4 : 1,
             cursor: isFocusActive ? "default" : "pointer",
           },
@@ -511,11 +546,9 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
             strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            strokeDasharray: "5,5",
             opacity: isDimmed ? 0.4 : 1,
             cursor: isFocusActive ? "default" : "pointer",
           },
@@ -565,11 +598,9 @@ function convertToFlowElements(
           target: view.id,
           targetHandle: `${view.id}-${col.name}-target`,
           type: "smoothstep",
-          animated: isSelected || isFocused,
           style: {
             stroke: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
             strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            strokeDasharray: "5,5",
             opacity: isDimmed ? 0.4 : 1,
             cursor: isFocusActive ? "default" : "pointer",
           },
@@ -651,6 +682,12 @@ export function SchemaGraphView({
     onProcedureClick: handleProcedureClick,
   };
 
+  // Memoize columns that need handles (only depends on schema relationships)
+  const columnsWithHandles = useMemo(
+    () => computeColumnsWithHandles(schema),
+    [schema]
+  );
+
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () =>
       convertToFlowElements(
@@ -661,9 +698,10 @@ export function SchemaGraphView({
         objectTypeFilter,
         edgeTypeFilter,
         selectedEdgeIds,
-        options
+        options,
+        columnsWithHandles
       ),
-    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds]
+    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds, columnsWithHandles]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -679,7 +717,8 @@ export function SchemaGraphView({
       objectTypeFilter,
       edgeTypeFilter,
       selectedEdgeIds,
-      options
+      options,
+      columnsWithHandles
     );
 
     // Preserve existing node positions - only update data, not positions
@@ -691,7 +730,7 @@ export function SchemaGraphView({
       }));
     });
     setEdges(newEdges);
-  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds, setNodes, setEdges]);
+  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds, columnsWithHandles, setNodes, setEdges]);
 
   return (
     <div className="w-full h-full">
@@ -708,18 +747,13 @@ export function SchemaGraphView({
         maxZoom={2}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
         proOptions={{ hideAttribution: true }}
+        onlyRenderVisibleElements={true}
+        nodesConnectable={false}
       >
         <Background className="!bg-background [&>pattern>circle]:!fill-border" gap={20} />
         <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
         <MiniMap
-          nodeColor={(node) => {
-            if (node.data?.isFocused) return "#3b82f6";
-            if (node.data?.isDimmed) return "var(--color-muted)";
-            if (node.type === "viewNode") return "#10b981";
-            if (node.type === "triggerNode") return "#f59e0b";
-            if (node.type === "storedProcedureNode") return "#8b5cf6";
-            return "#64748b";
-          }}
+          nodeColor={getMinimapNodeColor}
           maskColor="rgba(0, 0, 0, 0.1)"
           className="!bg-background !border-border"
         />

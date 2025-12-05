@@ -50,7 +50,7 @@ export function Toolbar() {
     objectTypeFilter,
     edgeTypeFilter,
     selectedEdgeIds,
-    searchFilter,
+    debouncedSearchFilter,
     schemaFilter,
     setFocusedTable,
     clearFocus,
@@ -64,7 +64,7 @@ export function Toolbar() {
 
   const counts = useFilteredCounts(
     schema,
-    searchFilter,
+    debouncedSearchFilter,
     schemaFilter,
     objectTypeFilter,
     edgeTypeFilter,
@@ -80,7 +80,7 @@ export function Toolbar() {
   const allEdgesSelected = selectedEdgeCount === 6;
 
   const hasActiveFilters =
-    searchFilter !== "" ||
+    debouncedSearchFilter !== "" ||
     schemaFilter !== "all" ||
     focusedTableId !== null ||
     !allObjectsSelected ||

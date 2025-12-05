@@ -7,11 +7,12 @@ interface ViewNodeData {
   view: ViewNodeType;
   isFocused?: boolean;
   isDimmed?: boolean;
+  columnsWithHandles?: Set<string>;
   onClick?: () => void;
 }
 
 function ViewNodeComponent({ data }: NodeProps) {
-  const { view, isFocused, isDimmed, onClick } = data as unknown as ViewNodeData;
+  const { view, isFocused, isDimmed, columnsWithHandles, onClick } = data as unknown as ViewNodeData;
 
   return (
     <div
@@ -47,6 +48,7 @@ function ViewNodeComponent({ data }: NodeProps) {
             column={column}
             viewId={view.id}
             index={index}
+            hasHandle={columnsWithHandles?.has(`${view.id}-${column.name}`) ?? true}
           />
         ))}
       </div>
@@ -58,21 +60,24 @@ interface ColumnRowProps {
   column: Column;
   viewId: string;
   index: number;
+  hasHandle: boolean;
 }
 
-function ColumnRow({ column, viewId }: ColumnRowProps) {
+function ColumnRow({ column, viewId, hasHandle }: ColumnRowProps) {
   const handleId = `${viewId}-${column.name}`;
 
   return (
     <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
-      {/* Left handle for incoming references (target) */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id={`${handleId}-target`}
-        className="!w-0 !h-0 !bg-transparent !border-0"
-        style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
-      />
+      {/* Left handle for incoming references (target) - only render if column has relationships */}
+      {hasHandle && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id={`${handleId}-target`}
+          className="!w-0 !h-0 !bg-transparent !border-0"
+          style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
+        />
+      )}
 
       {/* Column info */}
       <div className="flex items-center gap-2 flex-1 overflow-hidden">
@@ -87,14 +92,16 @@ function ColumnRow({ column, viewId }: ColumnRowProps) {
         )}
       </div>
 
-      {/* Right handle for outgoing references (source) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={`${handleId}-source`}
-        className="!w-0 !h-0 !bg-transparent !border-0"
-        style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
-      />
+      {/* Right handle for outgoing references (source) - only render if column has relationships */}
+      {hasHandle && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={`${handleId}-source`}
+          className="!w-0 !h-0 !bg-transparent !border-0"
+          style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
+        />
+      )}
     </div>
   );
 }
