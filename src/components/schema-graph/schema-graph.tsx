@@ -821,7 +821,7 @@ export function SchemaGraphView({
 }: SchemaGraphProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
-  const { selectedEdgeIds, toggleEdgeSelection } = useSchemaStore();
+  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection } = useSchemaStore();
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
@@ -831,6 +831,12 @@ export function SchemaGraphView({
     },
     [toggleEdgeSelection, focusedTableId]
   );
+
+  const onPaneClick = useCallback(() => {
+    if (selectedEdgeIds.size > 0) {
+      clearEdgeSelection();
+    }
+  }, [selectedEdgeIds.size, clearEdgeSelection]);
 
   const handleTableClick = (table: TableNodeType) => {
     setModalData({ type: "table", data: table });
@@ -923,6 +929,7 @@ export function SchemaGraphView({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onEdgeClick={onEdgeClick}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
