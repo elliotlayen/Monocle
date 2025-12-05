@@ -29,15 +29,6 @@ function TriggerNodeComponent({ data }: NodeProps) {
         !isDimmed && "hover:shadow-md"
       )}
     >
-      {/* Right handle for outgoing connections to referenced tables */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={`${trigger.id}-source`}
-        className="!w-0 !h-0 !bg-transparent !border-0"
-        style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
-      />
-
       {/* Header */}
       <div className="bg-gradient-to-r from-amber-600 to-amber-500 text-white px-3 py-2 relative">
         {/* Left handle for connection FROM parent table - inside header */}
@@ -47,6 +38,14 @@ function TriggerNodeComponent({ data }: NodeProps) {
           id={trigger.id}
           className="!w-0 !h-0 !bg-transparent !border-0"
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
+        />
+        {/* Right handle for outgoing connections (affects edges) - inside header */}
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={`${trigger.id}-source`}
+          className="!w-0 !h-0 !bg-transparent !border-0"
+          style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-amber-200 uppercase tracking-wide">

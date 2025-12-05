@@ -37,6 +37,14 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
           className="!w-0 !h-0 !bg-transparent !border-0"
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
+        {/* Source handle for outgoing connections (affects edges) - inside header */}
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={`${procedure.id}-source`}
+          className="!w-0 !h-0 !bg-transparent !border-0"
+          style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
+        />
         <span className="text-[10px] text-violet-200 uppercase tracking-wide block">
           Procedure
         </span>

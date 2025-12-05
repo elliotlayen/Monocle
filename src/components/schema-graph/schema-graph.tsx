@@ -20,7 +20,7 @@ import {
   Trigger,
   StoredProcedure,
 } from "@/types/schema";
-import { ObjectType, useSchemaStore } from "@/stores/schemaStore";
+import { ObjectType, EdgeType, useSchemaStore } from "@/stores/schemaStore";
 import { TableNode } from "./table-node";
 import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
@@ -41,6 +41,7 @@ interface SchemaGraphProps {
   searchFilter?: string;
   schemaFilter?: string;
   objectTypeFilter?: Set<ObjectType>;
+  edgeTypeFilter?: Set<EdgeType>;
 }
 
 // Callback types for node clicks
@@ -58,6 +59,7 @@ function convertToFlowElements(
   searchFilter?: string,
   schemaFilter?: string,
   objectTypeFilter?: Set<ObjectType>,
+  edgeTypeFilter?: Set<EdgeType>,
   selectedEdgeIds?: Set<string>,
   options?: ConvertOptions
 ): { nodes: Node[]; edges: Edge[] } {
@@ -405,7 +407,7 @@ function convertToFlowElements(
       });
   });
 
-  // Create edges from stored procedures to their referenced tables/views
+  // Create edges from stored procedures to their referenced tables/views (reads)
   const procedureEdges: Edge[] = filteredProcedures.flatMap((procedure) => {
     return (procedure.referencedTables || [])
       .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
@@ -440,6 +442,97 @@ function convertToFlowElements(
           labelStyle: {
             fontSize: 10,
             fill: isSelected ? "#5b21b6" : (isDimmed ? "#c4b5fd" : "#7c3aed"),
+          },
+          labelBgStyle: {
+            fill: "#ffffff",
+            fillOpacity: 0.8,
+          },
+        };
+      });
+  });
+
+  // Create "affects" edges from triggers to tables they write to (INSERT/UPDATE/DELETE)
+  const triggerAffectsEdges: Edge[] = filteredTriggers.flatMap((trigger) => {
+    return (trigger.affectedTables || [])
+      .filter((tableId) =>
+        (tableIds.has(tableId) || viewIds.has(tableId)) &&
+        tableId !== trigger.tableId  // Exclude parent table
+      )
+      .map((tableId) => {
+        const edgeId = `trigger-affects-${trigger.id}-${tableId}`;
+        const isDimmed =
+          focusedTableId !== null &&
+          focusedTableId !== undefined &&
+          tableId !== focusedTableId;
+        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+
+        return {
+          id: edgeId,
+          source: trigger.id,
+          sourceHandle: `${trigger.id}-source`,
+          target: tableId,
+          targetHandle: `${tableId}-target`,
+          type: "smoothstep",
+          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          style: {
+            stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
+            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeDasharray: "5,5",
+            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+            cursor: "pointer",
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
+          },
+          label: `${trigger.name} (writes)`,
+          labelStyle: {
+            fontSize: 10,
+            fill: isSelected ? "#991b1b" : (isDimmed ? "#fca5a5" : "#dc2626"),
+          },
+          labelBgStyle: {
+            fill: "#ffffff",
+            fillOpacity: 0.8,
+          },
+        };
+      });
+  });
+
+  // Create "affects" edges from stored procedures to tables they write to (INSERT/UPDATE/DELETE)
+  const procedureAffectsEdges: Edge[] = filteredProcedures.flatMap((procedure) => {
+    return (procedure.affectedTables || [])
+      .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
+      .map((tableId) => {
+        const edgeId = `proc-affects-${procedure.id}-${tableId}`;
+        const isDimmed =
+          focusedTableId !== null &&
+          focusedTableId !== undefined &&
+          tableId !== focusedTableId;
+        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
+
+        return {
+          id: edgeId,
+          source: procedure.id,
+          sourceHandle: `${procedure.id}-source`,
+          target: tableId,
+          targetHandle: `${tableId}-target`,
+          type: "smoothstep",
+          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
+          style: {
+            stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
+            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+            strokeDasharray: "5,5",
+            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+            cursor: "pointer",
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
+          },
+          label: `${procedure.name} (writes)`,
+          labelStyle: {
+            fontSize: 10,
+            fill: isSelected ? "#991b1b" : (isDimmed ? "#fca5a5" : "#dc2626"),
           },
           labelBgStyle: {
             fill: "#ffffff",
@@ -503,7 +596,15 @@ function convertToFlowElements(
       });
   });
 
-  const edges: Edge[] = [...fkEdges, ...triggerEdges, ...triggerRefEdges, ...procedureEdges, ...viewEdges];
+  // Apply edge type filter
+  const edges: Edge[] = [
+    ...(!edgeTypeFilter || edgeTypeFilter.has("foreignKeys") ? fkEdges : []),
+    ...(!edgeTypeFilter || edgeTypeFilter.has("triggerDependencies") ? [...triggerEdges, ...triggerRefEdges] : []),
+    ...(!edgeTypeFilter || edgeTypeFilter.has("triggerWrites") ? triggerAffectsEdges : []),
+    ...(!edgeTypeFilter || edgeTypeFilter.has("procedureReads") ? procedureEdges : []),
+    ...(!edgeTypeFilter || edgeTypeFilter.has("procedureWrites") ? procedureAffectsEdges : []),
+    ...(!edgeTypeFilter || edgeTypeFilter.has("viewDependencies") ? viewEdges : []),
+  ];
 
   return { nodes, edges };
 }
@@ -514,6 +615,7 @@ export function SchemaGraphView({
   searchFilter,
   schemaFilter,
   objectTypeFilter,
+  edgeTypeFilter,
 }: SchemaGraphProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
@@ -561,10 +663,11 @@ export function SchemaGraphView({
         searchFilter,
         schemaFilter,
         objectTypeFilter,
+        edgeTypeFilter,
         selectedEdgeIds,
         options
       ),
-    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, selectedEdgeIds]
+    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -578,6 +681,7 @@ export function SchemaGraphView({
       searchFilter,
       schemaFilter,
       objectTypeFilter,
+      edgeTypeFilter,
       selectedEdgeIds,
       options
     );
@@ -591,7 +695,7 @@ export function SchemaGraphView({
       }));
     });
     setEdges(newEdges);
-  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, selectedEdgeIds, setNodes, setEdges]);
+  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds, setNodes, setEdges]);
 
   return (
     <div className="w-full h-full">

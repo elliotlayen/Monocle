@@ -11,6 +11,7 @@ function App() {
     schemaFilter,
     focusedTableId,
     objectTypeFilter,
+    edgeTypeFilter,
   } = useSchemaStore();
 
   if (!isConnected || !schema) {
@@ -27,6 +28,7 @@ function App() {
           schemaFilter={schemaFilter}
           focusedTableId={focusedTableId}
           objectTypeFilter={objectTypeFilter}
+          edgeTypeFilter={edgeTypeFilter}
         />
       </main>
     </div>

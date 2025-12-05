@@ -4,6 +4,14 @@ import { SchemaGraph, ConnectionParams } from "@/types/schema";
 
 export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures";
 
+export type EdgeType =
+  | "foreignKeys"
+  | "triggerDependencies"
+  | "triggerWrites"
+  | "procedureReads"
+  | "procedureWrites"
+  | "viewDependencies";
+
 interface SchemaStore {
   // State
   schema: SchemaGraph | null;
@@ -16,6 +24,7 @@ interface SchemaStore {
   schemaFilter: string;
   focusedTableId: string | null;
   objectTypeFilter: Set<ObjectType>;
+  edgeTypeFilter: Set<EdgeType>;
 
   // Selection
   selectedEdgeIds: Set<string>;
@@ -33,6 +42,8 @@ interface SchemaStore {
   toggleObjectType: (type: ObjectType) => void;
   setObjectTypeFilter: (types: Set<ObjectType>) => void;
   selectAllObjectTypes: () => void;
+  toggleEdgeType: (type: EdgeType) => void;
+  selectAllEdgeTypes: () => void;
   toggleEdgeSelection: (edgeId: string) => void;
   clearEdgeSelection: () => void;
   disconnect: () => void;
@@ -45,6 +56,15 @@ const ALL_OBJECT_TYPES: Set<ObjectType> = new Set([
   "storedProcedures",
 ]);
 
+const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
+  "foreignKeys",
+  "triggerDependencies",
+  "triggerWrites",
+  "procedureReads",
+  "procedureWrites",
+  "viewDependencies",
+]);
+
 export const useSchemaStore = create<SchemaStore>((set) => ({
   // Initial state
   schema: null,
@@ -55,6 +75,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   schemaFilter: "all",
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+  edgeTypeFilter: new Set(ALL_EDGE_TYPES),
   selectedEdgeIds: new Set(),
   availableSchemas: [],
 
@@ -71,6 +92,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         isConnected: true,
         availableSchemas: schemas,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       });
     } catch (err) {
       set({ error: String(err), isLoading: false });
@@ -94,6 +116,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         schemaFilter: "all",
         focusedTableId: null,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set(),
       });
     } catch (err) {
@@ -126,6 +149,20 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   selectAllObjectTypes: () =>
     set({ objectTypeFilter: new Set(ALL_OBJECT_TYPES) }),
 
+  toggleEdgeType: (type: EdgeType) =>
+    set((state) => {
+      const newFilter = new Set(state.edgeTypeFilter);
+      if (newFilter.has(type)) {
+        newFilter.delete(type);
+      } else {
+        newFilter.add(type);
+      }
+      return { edgeTypeFilter: newFilter };
+    }),
+
+  selectAllEdgeTypes: () =>
+    set({ edgeTypeFilter: new Set(ALL_EDGE_TYPES) }),
+
   toggleEdgeSelection: (edgeId: string) =>
     set((state) => {
       const newSelection = new Set(state.selectedEdgeIds);
@@ -147,6 +184,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
       schemaFilter: "all",
       focusedTableId: null,
       objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+      edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set(),
       availableSchemas: [],
       error: null,

@@ -228,8 +228,10 @@ fn load_views_with_references(
     }
 
     // Extract table references from each view's definition
+    // Views only read, so we just use the read references
     for view in views.iter_mut() {
-        view.referenced_tables = extract_table_references(&view.definition, &name_to_id);
+        let (read_refs, _) = extract_table_references(&view.definition, &name_to_id);
+        view.referenced_tables = read_refs;
     }
 }
 
@@ -332,7 +334,7 @@ fn load_triggers(
                 let trigger_id = format!("{}.{}.{}", schema_name, table_name, trigger_name);
 
                 // Extract table references from the trigger definition
-                let referenced_tables = extract_table_references(&definition, &name_to_id);
+                let (referenced_tables, affected_tables) = extract_table_references(&definition, &name_to_id);
 
                 triggers.push(Trigger {
                     id: trigger_id,
@@ -346,6 +348,7 @@ fn load_triggers(
                     fires_on_delete,
                     definition,
                     referenced_tables,
+                    affected_tables,
                 });
             }
         }
@@ -389,7 +392,7 @@ fn load_stored_procedures(
                 let procedure_id = format!("{}.{}", schema_name, procedure_name);
 
                 let procedure = procedures.entry(procedure_id.clone()).or_insert_with(|| {
-                    let referenced_tables = extract_table_references(&definition, &name_to_id);
+                    let (referenced_tables, affected_tables) = extract_table_references(&definition, &name_to_id);
                     StoredProcedure {
                         id: procedure_id,
                         name: procedure_name,
@@ -398,6 +401,7 @@ fn load_stored_procedures(
                         parameters: Vec::new(),
                         definition,
                         referenced_tables,
+                        affected_tables,
                     }
                 });
 
@@ -416,29 +420,33 @@ fn load_stored_procedures(
 }
 
 /// Extract table/view references from SQL definition
+/// Returns (read_tables, write_tables) - tables read from vs. tables written to
 fn extract_table_references(
     definition: &str,
     name_to_id: &HashMap<String, String>,
-) -> Vec<String> {
-    let mut refs: HashSet<String> = HashSet::new();
+) -> (Vec<String>, Vec<String>) {
+    let mut read_refs: HashSet<String> = HashSet::new();
+    let mut write_refs: HashSet<String> = HashSet::new();
 
-    // Patterns to match table references in SQL
-    // Handles: FROM table, JOIN table, INSERT INTO table, UPDATE table, DELETE FROM table
-    // Supports optional schema prefix and square brackets: [schema].[table] or schema.table
-    let patterns = [
+    // Read patterns: FROM, JOIN
+    let read_patterns = [
         r"(?i)\bFROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
         r"(?i)\bJOIN\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
+    ];
+
+    // Write patterns: INSERT INTO, UPDATE, DELETE FROM
+    let write_patterns = [
         r"(?i)\bINSERT\s+INTO\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
         r"(?i)\bUPDATE\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
         r"(?i)\bDELETE\s+FROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
     ];
 
-    for pattern in patterns {
+    // Process read patterns
+    for pattern in read_patterns {
         if let Ok(re) = Regex::new(pattern) {
             for cap in re.captures_iter(definition) {
                 let schema = cap.get(1).map(|m| m.as_str());
                 if let Some(table) = cap.get(2).map(|m| m.as_str()) {
-                    // Try to resolve the reference to a known table/view ID
                     let lookup_key = if let Some(s) = schema {
                         format!("{}.{}", s, table).to_lowercase()
                     } else {
@@ -446,12 +454,32 @@ fn extract_table_references(
                     };
 
                     if let Some(id) = name_to_id.get(&lookup_key) {
-                        refs.insert(id.clone());
+                        read_refs.insert(id.clone());
                     }
                 }
             }
         }
     }
 
-    refs.into_iter().collect()
+    // Process write patterns
+    for pattern in write_patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            for cap in re.captures_iter(definition) {
+                let schema = cap.get(1).map(|m| m.as_str());
+                if let Some(table) = cap.get(2).map(|m| m.as_str()) {
+                    let lookup_key = if let Some(s) = schema {
+                        format!("{}.{}", s, table).to_lowercase()
+                    } else {
+                        table.to_lowercase()
+                    };
+
+                    if let Some(id) = name_to_id.get(&lookup_key) {
+                        write_refs.insert(id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    (read_refs.into_iter().collect(), write_refs.into_iter().collect())
 }

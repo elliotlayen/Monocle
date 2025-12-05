@@ -15,9 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme } from "@/providers/theme-provider";
+import { useSchemaStore } from "@/stores/schemaStore";
 
 export function SettingsSheet() {
   const { theme, setTheme } = useTheme();
+  const { schemaFilter, availableSchemas, setSchemaFilter } = useSchemaStore();
 
   return (
     <Sheet>
@@ -31,6 +33,26 @@ export function SettingsSheet() {
           <SheetTitle>Settings</SheetTitle>
         </SheetHeader>
         <div className="mt-6 space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Schema Filter</label>
+            <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Schemas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Schemas</SelectItem>
+                {availableSchemas.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Filter objects by database schema
+            </p>
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Theme</label>
             <Select value={theme} onValueChange={setTheme}>

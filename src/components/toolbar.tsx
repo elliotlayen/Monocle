@@ -1,4 +1,4 @@
-import { useSchemaStore, type ObjectType } from "@/stores/schemaStore";
+import { useSchemaStore, type ObjectType, type EdgeType } from "@/stores/schemaStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,29 +33,41 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   storedProcedures: "Stored Procedures",
 };
 
+const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
+  foreignKeys: "Foreign Keys",
+  triggerDependencies: "Trigger Dependencies",
+  triggerWrites: "Trigger Writes",
+  procedureReads: "Procedure Reads",
+  procedureWrites: "Procedure Writes",
+  viewDependencies: "View Dependencies",
+};
+
 export function Toolbar() {
   const {
     schema,
     searchFilter,
-    schemaFilter,
     focusedTableId,
     objectTypeFilter,
+    edgeTypeFilter,
     selectedEdgeIds,
-    availableSchemas,
     setSearchFilter,
-    setSchemaFilter,
     setFocusedTable,
     clearFocus,
     toggleObjectType,
     selectAllObjectTypes,
+    toggleEdgeType,
+    selectAllEdgeTypes,
     clearEdgeSelection,
     disconnect,
   } = useSchemaStore();
 
   if (!schema) return null;
 
-  const selectedCount = objectTypeFilter.size;
-  const allSelected = selectedCount === 4;
+  const selectedObjectCount = objectTypeFilter.size;
+  const allObjectsSelected = selectedObjectCount === 4;
+
+  const selectedEdgeCount = edgeTypeFilter.size;
+  const allEdgesSelected = selectedEdgeCount === 6;
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 bg-background border-b border-border shadow-sm">
@@ -90,36 +102,21 @@ export function Toolbar() {
         )}
       </div>
 
-      {/* Schema filter */}
-      <Select value={schemaFilter} onValueChange={setSchemaFilter}>
-        <SelectTrigger className="w-[140px] h-9">
-          <SelectValue placeholder="All Schemas" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Schemas</SelectItem>
-          {availableSchemas.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
       {/* Object type filter */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 h-9 px-3 text-sm border border-input rounded-md bg-background hover:bg-accent">
             <span>
-              {allSelected ? "All Types" : `${selectedCount} Type${selectedCount !== 1 ? "s" : ""}`}
+              {allObjectsSelected ? "All Objects" : `${selectedObjectCount} Object${selectedObjectCount !== 1 ? "s" : ""}`}
             </span>
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-48">
-          {!allSelected && (
+          {!allObjectsSelected && (
             <>
               <DropdownMenuItem onSelect={selectAllObjectTypes}>
-                All Types
+                All Objects
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -131,6 +128,37 @@ export function Toolbar() {
               onCheckedChange={() => toggleObjectType(type)}
             >
               {OBJECT_TYPE_LABELS[type]}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Edge type filter */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-2 h-9 px-3 text-sm border border-input rounded-md bg-background hover:bg-accent">
+            <span>
+              {allEdgesSelected ? "All Edges" : `${selectedEdgeCount} Edge${selectedEdgeCount !== 1 ? "s" : ""}`}
+            </span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56">
+          {!allEdgesSelected && (
+            <>
+              <DropdownMenuItem onSelect={selectAllEdgeTypes}>
+                All Edges
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {(Object.keys(EDGE_TYPE_LABELS) as EdgeType[]).map((type) => (
+            <DropdownMenuCheckboxItem
+              key={type}
+              checked={edgeTypeFilter.has(type)}
+              onCheckedChange={() => toggleEdgeType(type)}
+            >
+              {EDGE_TYPE_LABELS[type]}
             </DropdownMenuCheckboxItem>
           ))}
         </DropdownMenuContent>

@@ -360,7 +360,8 @@ BEGIN
     FROM inserted i;
 END"#
                     .to_string(),
-                referenced_tables: vec![],  // AuditLog doesn't exist in mock
+                referenced_tables: vec![],
+                affected_tables: vec!["dbo.Customers".to_string()],  // Writes to Customers table
             },
             Trigger {
                 id: "dbo.Products.TR_Products_UpdatePrice".to_string(),
@@ -388,7 +389,8 @@ BEGIN
     END
 END"#
                     .to_string(),
-                referenced_tables: vec![],  // PriceHistory doesn't exist in mock
+                referenced_tables: vec![],
+                affected_tables: vec!["dbo.OrderItems".to_string()],  // Updates OrderItems prices
             },
             Trigger {
                 id: "dbo.Customers.TR_Customers_ValidateEmail".to_string(),
@@ -417,7 +419,8 @@ BEGIN
     SELECT Name, Email, CreatedAt FROM inserted;
 END"#
                     .to_string(),
-                referenced_tables: vec!["dbo.Customers".to_string()],  // References its own table
+                referenced_tables: vec![],
+                affected_tables: vec!["dbo.Customers".to_string()],  // Writes to its own table
             },
         ],
         stored_procedures: vec![
@@ -459,6 +462,7 @@ BEGIN
 END"#
                     .to_string(),
                 referenced_tables: vec!["dbo.Orders".to_string()],
+                affected_tables: vec![],  // Read-only procedure
             },
             StoredProcedure {
                 id: "dbo.CalculateOrderTotal".to_string(),
@@ -489,6 +493,7 @@ BEGIN
 END"#
                     .to_string(),
                 referenced_tables: vec!["dbo.OrderItems".to_string()],
+                affected_tables: vec!["dbo.Orders".to_string()],  // Updates Orders.TotalAmount
             },
             StoredProcedure {
                 id: "dbo.ArchiveOldOrders".to_string(),
@@ -518,6 +523,7 @@ BEGIN
 END"#
                     .to_string(),
                 referenced_tables: vec!["dbo.Orders".to_string()],
+                affected_tables: vec!["dbo.Orders".to_string()],  // DELETEs from Orders, INSERTs to OrdersArchive (not in mock)
             },
         ],
     })
