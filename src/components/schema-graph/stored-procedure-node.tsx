@@ -27,21 +27,19 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
         !isDimmed && "hover:shadow-md"
       )}
     >
-      {/* Target handle for incoming connections from referenced tables */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id={`${procedure.id}-target`}
-        className="!w-0 !h-0 !bg-transparent !border-0"
-        style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
-      />
       {/* Header */}
-      <div className="bg-gradient-to-r from-violet-600 to-violet-500 text-white px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-violet-200 uppercase tracking-wide">
-            {procedure.schema}
-          </span>
-        </div>
+      <div className="bg-gradient-to-r from-violet-600 to-violet-500 text-white px-3 py-2 relative">
+        {/* Target handle for incoming connections from referenced tables - inside header */}
+        <Handle
+          type="target"
+          position={Position.Left}
+          id={`${procedure.id}-target`}
+          className="!w-0 !h-0 !bg-transparent !border-0"
+          style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
+        />
+        <span className="text-[10px] text-violet-200 uppercase tracking-wide block">
+          Procedure
+        </span>
         <span className="text-sm font-semibold block truncate">
           {procedure.name}
         </span>

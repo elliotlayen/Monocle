@@ -34,7 +34,7 @@ function ViewNodeComponent({ data }: NodeProps) {
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-3 py-2">
         <span className="text-[10px] text-emerald-200 uppercase tracking-wide block">
-          {view.schema}
+          View
         </span>
         <span className="text-sm font-semibold">{view.name}</span>
       </div>

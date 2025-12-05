@@ -42,7 +42,7 @@ function TableNodeComponent({ data }: NodeProps) {
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
         <span className="text-[10px] text-slate-400 uppercase tracking-wide block">
-          {table.schema}
+          Table
         </span>
         <span className="text-sm font-semibold">{table.name}</span>
       </div>

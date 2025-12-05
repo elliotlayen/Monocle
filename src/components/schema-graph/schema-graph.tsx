@@ -346,6 +346,15 @@ function convertToFlowElements(
           type: MarkerType.ArrowClosed,
           color: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
         },
+        label: trigger.name,
+        labelStyle: {
+          fontSize: 10,
+          fill: isSelected ? "#92400e" : (isDimmed ? "#fcd34d" : "#b45309"),
+        },
+        labelBgStyle: {
+          fill: "#ffffff",
+          fillOpacity: 0.8,
+        },
       };
     });
 
@@ -383,6 +392,15 @@ function convertToFlowElements(
             type: MarkerType.ArrowClosed,
             color: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
           },
+          label: trigger.name,
+          labelStyle: {
+            fontSize: 10,
+            fill: isSelected ? "#92400e" : (isDimmed ? "#fcd34d" : "#b45309"),
+          },
+          labelBgStyle: {
+            fill: "#ffffff",
+            fillOpacity: 0.8,
+          },
         };
       });
   });
@@ -417,6 +435,15 @@ function convertToFlowElements(
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
+          },
+          label: procedure.name,
+          labelStyle: {
+            fontSize: 10,
+            fill: isSelected ? "#5b21b6" : (isDimmed ? "#c4b5fd" : "#7c3aed"),
+          },
+          labelBgStyle: {
+            fill: "#ffffff",
+            fillOpacity: 0.8,
           },
         };
       });
@@ -462,6 +489,15 @@ function convertToFlowElements(
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
+          },
+          label: view.name,
+          labelStyle: {
+            fontSize: 10,
+            fill: isSelected ? "#065f46" : (isDimmed ? "#6ee7b7" : "#047857"),
+          },
+          labelBgStyle: {
+            fill: "#ffffff",
+            fillOpacity: 0.8,
           },
         };
       });
