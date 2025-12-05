@@ -105,7 +105,7 @@ function convertToFlowElements(
   selectedEdgeIds?: Set<string>,
   options?: ConvertOptions,
   columnsWithHandles?: Set<string>
-): { nodes: Node[]; edges: Edge[] } {
+): { nodes: Node[]; edges: Edge[]; handleEdgeTypes: Map<string, Set<EdgeType>> } {
   const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
   const showViews = !objectTypeFilter || objectTypeFilter.has("views");
   const showTriggers = !objectTypeFilter || objectTypeFilter.has("triggers");
@@ -176,6 +176,96 @@ function convertToFlowElements(
     );
   }
 
+  // Compute edge types for each handle (for color indicators)
+  // This must use the same filtering as edge creation to stay in sync
+  const handleEdgeTypes = new Map<string, Set<EdgeType>>();
+  const addEdgeType = (handleId: string, edgeType: EdgeType) => {
+    if (!handleEdgeTypes.has(handleId)) {
+      handleEdgeTypes.set(handleId, new Set());
+    }
+    handleEdgeTypes.get(handleId)!.add(edgeType);
+  };
+
+  // Foreign keys - column-level handles (only for visible tables)
+  if (!edgeTypeFilter || edgeTypeFilter.has("foreignKeys")) {
+    schema.relationships
+      .filter((rel) => tableIds.has(rel.from) && tableIds.has(rel.to))
+      .forEach((rel) => {
+        addEdgeType(`${rel.from}-${rel.fromColumn}-source`, "foreignKeys");
+        addEdgeType(`${rel.to}-${rel.toColumn}-target`, "foreignKeys");
+      });
+  }
+
+  // Trigger dependencies - table header handles (only for filtered triggers)
+  if (!edgeTypeFilter || edgeTypeFilter.has("triggerDependencies")) {
+    filteredTriggers
+      .filter((tr) => tableIds.has(tr.tableId))
+      .forEach((trigger) => {
+        addEdgeType(`${trigger.tableId}-source`, "triggerDependencies");
+        (trigger.referencedTables || [])
+          .filter((tId) => (tableIds.has(tId) || viewIds.has(tId)) && tId !== trigger.tableId)
+          .forEach((tId) => {
+            addEdgeType(`${tId}-target`, "triggerDependencies");
+          });
+      });
+  }
+
+  // Trigger writes - table header handles (only for filtered triggers)
+  if (!edgeTypeFilter || edgeTypeFilter.has("triggerWrites")) {
+    filteredTriggers.forEach((trigger) => {
+      (trigger.affectedTables || [])
+        .filter((tId) => (tableIds.has(tId) || viewIds.has(tId)) && tId !== trigger.tableId)
+        .forEach((tId) => {
+          addEdgeType(`${tId}-target`, "triggerWrites");
+        });
+    });
+  }
+
+  // Procedure reads - table header handles (only for filtered procedures)
+  if (!edgeTypeFilter || edgeTypeFilter.has("procedureReads")) {
+    filteredProcedures.forEach((procedure) => {
+      (procedure.referencedTables || [])
+        .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
+        .forEach((tId) => {
+          addEdgeType(`${tId}-source`, "procedureReads");
+        });
+    });
+  }
+
+  // Procedure writes - table header handles (only for filtered procedures)
+  if (!edgeTypeFilter || edgeTypeFilter.has("procedureWrites")) {
+    filteredProcedures.forEach((procedure) => {
+      (procedure.affectedTables || [])
+        .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
+        .forEach((tId) => {
+          addEdgeType(`${tId}-target`, "procedureWrites");
+        });
+    });
+  }
+
+  // View dependencies - column-level handles (only for filtered views)
+  if (!edgeTypeFilter || edgeTypeFilter.has("viewDependencies")) {
+    const visibleNodeIds = new Set([...tableIds, ...viewIds]);
+    filteredViews.forEach((view) => {
+      view.columns
+        .filter((col) => col.sourceTable && col.sourceColumn)
+        .forEach((col) => {
+          const sourceTableId = [...visibleNodeIds].find(
+            (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
+          );
+          if (sourceTableId) {
+            addEdgeType(`${sourceTableId}-${col.sourceColumn}-source`, "viewDependencies");
+            addEdgeType(`${view.id}-${col.name}-target`, "viewDependencies");
+          }
+        });
+    });
+  }
+
+  // Debug: Log handleEdgeTypes to understand indicator computation
+  if (handleEdgeTypes.size > 0) {
+    console.log('handleEdgeTypes:', Object.fromEntries([...handleEdgeTypes.entries()].map(([k, v]) => [k, [...v]])));
+  }
+
   // Calculate focused neighbors
   const focusedNeighbors = new Set<string>();
   if (focusedTableId) {
@@ -220,6 +310,7 @@ function convertToFlowElements(
         isFocused: table.id === focusedTableId,
         isDimmed,
         columnsWithHandles,
+        handleEdgeTypes,
         onClick: () => options?.onTableClick?.(table),
       },
     };
@@ -254,6 +345,7 @@ function convertToFlowElements(
         isFocused: view.id === focusedTableId,
         isDimmed,
         columnsWithHandles,
+        handleEdgeTypes,
         onClick: () => options?.onViewClick?.(view),
       },
     };
@@ -631,7 +723,7 @@ function convertToFlowElements(
     ...(!edgeTypeFilter || edgeTypeFilter.has("viewDependencies") ? viewEdges : []),
   ];
 
-  return { nodes, edges };
+  return { nodes, edges, handleEdgeTypes };
 }
 
 export function SchemaGraphView({
