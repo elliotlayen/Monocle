@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   ReactFlow,
   Background,
@@ -8,6 +8,7 @@ import {
   useEdgesState,
   type Node,
   type Edge,
+  type EdgeMouseHandler,
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -19,7 +20,7 @@ import {
   Trigger,
   StoredProcedure,
 } from "@/types/schema";
-import { ObjectType } from "@/stores/schemaStore";
+import { ObjectType, useSchemaStore } from "@/stores/schemaStore";
 import { TableNode } from "./table-node";
 import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
@@ -57,6 +58,7 @@ function convertToFlowElements(
   searchFilter?: string,
   schemaFilter?: string,
   objectTypeFilter?: Set<ObjectType>,
+  selectedEdgeIds?: Set<string>,
   options?: ConvertOptions
 ): { nodes: Node[]; edges: Edge[] } {
   const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
@@ -282,6 +284,7 @@ function convertToFlowElements(
         focusedTableId !== undefined &&
         rel.from !== focusedTableId &&
         rel.to !== focusedTableId;
+      const isSelected = selectedEdgeIds?.has(rel.id) ?? false;
 
       return {
         id: rel.id,
@@ -290,20 +293,21 @@ function convertToFlowElements(
         sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
         targetHandle: `${rel.to}-${rel.toColumn}-target`,
         type: "smoothstep",
-        animated: !isDimmed,
+        animated: !isDimmed || isSelected,
         style: {
-          stroke: isDimmed ? "#cbd5e1" : "#3b82f6",
-          strokeWidth: isDimmed ? 1 : 2,
-          opacity: isDimmed ? 0.4 : 1,
+          stroke: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
+          strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+          opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+          cursor: "pointer",
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isDimmed ? "#cbd5e1" : "#3b82f6",
+          color: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
         },
         label: `${rel.fromColumn} → ${rel.toColumn}`,
         labelStyle: {
           fontSize: 10,
-          fill: isDimmed ? "#94a3b8" : "#475569",
+          fill: isSelected ? "#1e40af" : (isDimmed ? "#94a3b8" : "#475569"),
         },
         labelBgStyle: {
           fill: "#ffffff",
@@ -316,26 +320,29 @@ function convertToFlowElements(
   const triggerEdges: Edge[] = filteredTriggers
     .filter((tr) => tableIds.has(tr.tableId))
     .map((trigger) => {
+      const edgeId = `trigger-edge-${trigger.id}`;
       const isDimmed =
         focusedTableId !== null &&
         focusedTableId !== undefined &&
         trigger.tableId !== focusedTableId;
+      const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
 
       return {
-        id: `trigger-edge-${trigger.id}`,
+        id: edgeId,
         source: trigger.tableId,
         target: trigger.id,
         type: "smoothstep",
-        animated: false,
+        animated: isSelected,
         style: {
-          stroke: isDimmed ? "#fcd34d" : "#f59e0b",
-          strokeWidth: isDimmed ? 1 : 2,
+          stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
+          strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
           strokeDasharray: "5,5",
-          opacity: isDimmed ? 0.4 : 1,
+          opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+          cursor: "pointer",
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isDimmed ? "#fcd34d" : "#f59e0b",
+          color: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
         },
       };
     });
@@ -348,28 +355,31 @@ function convertToFlowElements(
         tableId !== trigger.tableId  // Exclude parent table, already connected
       )
       .map((tableId) => {
+        const edgeId = `trigger-ref-edge-${trigger.id}-${tableId}`;
         const isDimmed =
           focusedTableId !== null &&
           focusedTableId !== undefined &&
           tableId !== focusedTableId;
+        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
 
         return {
-          id: `trigger-ref-edge-${trigger.id}-${tableId}`,
+          id: edgeId,
           source: trigger.id,
           sourceHandle: `${trigger.id}-source`,
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: false,
+          animated: isSelected,
           style: {
-            stroke: isDimmed ? "#fcd34d" : "#f59e0b",
-            strokeWidth: isDimmed ? 1 : 2,
+            stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
+            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
             strokeDasharray: "5,5",
-            opacity: isDimmed ? 0.4 : 1,
+            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+            cursor: "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: isDimmed ? "#fcd34d" : "#f59e0b",
+            color: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
           },
         };
       });
@@ -380,28 +390,31 @@ function convertToFlowElements(
     return (procedure.referencedTables || [])
       .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
       .map((tableId) => {
+        const edgeId = `proc-edge-${procedure.id}-${tableId}`;
         const isDimmed =
           focusedTableId !== null &&
           focusedTableId !== undefined &&
           tableId !== focusedTableId;
+        const isSelected = selectedEdgeIds?.has(edgeId) ?? false;
 
         return {
-          id: `proc-edge-${procedure.id}-${tableId}`,
+          id: edgeId,
           source: procedure.id,
           sourceHandle: `${procedure.id}-source`,
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: false,
+          animated: isSelected,
           style: {
-            stroke: isDimmed ? "#c4b5fd" : "#8b5cf6",
-            strokeWidth: isDimmed ? 1 : 2,
+            stroke: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
+            strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
             strokeDasharray: "5,5",
-            opacity: isDimmed ? 0.4 : 1,
+            opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
+            cursor: "pointer",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: isDimmed ? "#c4b5fd" : "#8b5cf6",
+            color: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
           },
         };
       });
@@ -421,6 +434,14 @@ export function SchemaGraphView({
 }: SchemaGraphProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
+  const { selectedEdgeIds, toggleEdgeSelection } = useSchemaStore();
+
+  const onEdgeClick: EdgeMouseHandler = useCallback(
+    (_event, edge) => {
+      toggleEdgeSelection(edge.id);
+    },
+    [toggleEdgeSelection]
+  );
 
   const handleTableClick = (table: TableNodeType) => {
     setModalData({ type: "table", data: table });
@@ -457,9 +478,10 @@ export function SchemaGraphView({
         searchFilter,
         schemaFilter,
         objectTypeFilter,
+        selectedEdgeIds,
         options
       ),
-    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter]
+    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, selectedEdgeIds]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -473,11 +495,12 @@ export function SchemaGraphView({
       searchFilter,
       schemaFilter,
       objectTypeFilter,
+      selectedEdgeIds,
       options
     );
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, setNodes, setEdges]);
+  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, selectedEdgeIds, setNodes, setEdges]);
 
   return (
     <div className="w-full h-full">
@@ -486,6 +509,7 @@ export function SchemaGraphView({
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgeClick={onEdgeClick}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}

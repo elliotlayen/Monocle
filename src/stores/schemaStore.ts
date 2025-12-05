@@ -17,6 +17,9 @@ interface SchemaStore {
   focusedTableId: string | null;
   objectTypeFilter: Set<ObjectType>;
 
+  // Selection
+  selectedEdgeIds: Set<string>;
+
   // Derived data
   availableSchemas: string[];
 
@@ -30,6 +33,8 @@ interface SchemaStore {
   toggleObjectType: (type: ObjectType) => void;
   setObjectTypeFilter: (types: Set<ObjectType>) => void;
   selectAllObjectTypes: () => void;
+  toggleEdgeSelection: (edgeId: string) => void;
+  clearEdgeSelection: () => void;
   disconnect: () => void;
 }
 
@@ -50,6 +55,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   schemaFilter: "all",
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+  selectedEdgeIds: new Set(),
   availableSchemas: [],
 
   loadMockSchema: async () => {
@@ -88,6 +94,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         schemaFilter: "all",
         focusedTableId: null,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        selectedEdgeIds: new Set(),
       });
     } catch (err) {
       set({ error: String(err), isLoading: false });
@@ -119,6 +126,19 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   selectAllObjectTypes: () =>
     set({ objectTypeFilter: new Set(ALL_OBJECT_TYPES) }),
 
+  toggleEdgeSelection: (edgeId: string) =>
+    set((state) => {
+      const newSelection = new Set(state.selectedEdgeIds);
+      if (newSelection.has(edgeId)) {
+        newSelection.delete(edgeId);
+      } else {
+        newSelection.add(edgeId);
+      }
+      return { selectedEdgeIds: newSelection };
+    }),
+
+  clearEdgeSelection: () => set({ selectedEdgeIds: new Set() }),
+
   disconnect: () =>
     set({
       schema: null,
@@ -127,6 +147,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
       schemaFilter: "all",
       focusedTableId: null,
       objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+      selectedEdgeIds: new Set(),
       availableSchemas: [],
       error: null,
     }),

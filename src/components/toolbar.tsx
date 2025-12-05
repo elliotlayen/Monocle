@@ -1,4 +1,4 @@
-import { useSchemaStore, ObjectType } from "@/stores/schemaStore";
+import { useSchemaStore, type ObjectType } from "@/stores/schemaStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -40,6 +40,7 @@ export function Toolbar() {
     schemaFilter,
     focusedTableId,
     objectTypeFilter,
+    selectedEdgeIds,
     availableSchemas,
     setSearchFilter,
     setSchemaFilter,
@@ -47,6 +48,7 @@ export function Toolbar() {
     clearFocus,
     toggleObjectType,
     selectAllObjectTypes,
+    clearEdgeSelection,
     disconnect,
   } = useSchemaStore();
 
@@ -165,6 +167,19 @@ export function Toolbar() {
       )}
 
       <div className="flex-1" />
+
+      {/* Deselect edges button */}
+      {selectedEdgeIds.size > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearEdgeSelection}
+          className="h-9 px-2"
+        >
+          <X className="w-4 h-4 mr-1" />
+          Deselect ({selectedEdgeIds.size})
+        </Button>
+      )}
 
       {/* Stats */}
       <TooltipProvider>
