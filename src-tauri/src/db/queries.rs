@@ -125,6 +125,27 @@ WHERE v.is_ms_shipped = 0
 ORDER BY vs.name, v.name, vc.column_id
 "#;
 
+pub const SCALAR_FUNCTIONS_QUERY: &str = r#"
+SELECT
+    s.name AS schema_name,
+    o.name AS function_name,
+    o.type_desc AS function_type,
+    ISNULL(p.name, '') AS parameter_name,
+    ISNULL(ty.name, '') AS parameter_type,
+    ISNULL(p.is_output, 0) AS is_output,
+    ISNULL(rt.name, '') AS return_type,
+    ISNULL(OBJECT_DEFINITION(o.object_id), '') AS function_definition
+FROM sys.objects o
+JOIN sys.schemas s ON o.schema_id = s.schema_id
+LEFT JOIN sys.parameters p ON o.object_id = p.object_id AND p.parameter_id > 0
+LEFT JOIN sys.types ty ON p.user_type_id = ty.user_type_id
+LEFT JOIN sys.parameters rp ON o.object_id = rp.object_id AND rp.parameter_id = 0
+LEFT JOIN sys.types rt ON rp.user_type_id = rt.user_type_id
+WHERE o.type = 'FN'
+  AND o.is_ms_shipped = 0
+ORDER BY s.name, o.name, p.parameter_id
+"#;
+
 pub fn format_data_type(
     type_name: &str,
     max_length: i16,

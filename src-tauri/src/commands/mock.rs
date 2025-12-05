@@ -1,6 +1,6 @@
 use crate::types::{
-    Column, ProcedureParameter, RelationshipEdge, SchemaGraph, StoredProcedure, TableNode, Trigger,
-    ViewNode,
+    Column, ProcedureParameter, RelationshipEdge, ScalarFunction, SchemaGraph, StoredProcedure,
+    TableNode, Trigger, ViewNode,
 };
 
 #[tauri::command]
@@ -524,6 +524,88 @@ END"#
                     .to_string(),
                 referenced_tables: vec!["dbo.Orders".to_string()],
                 affected_tables: vec!["dbo.Orders".to_string()],  // DELETEs from Orders, INSERTs to OrdersArchive (not in mock)
+            },
+        ],
+        scalar_functions: vec![
+            ScalarFunction {
+                id: "dbo.fn_CalculateDiscount".to_string(),
+                name: "fn_CalculateDiscount".to_string(),
+                schema: "dbo".to_string(),
+                function_type: "SQL_SCALAR_FUNCTION".to_string(),
+                parameters: vec![
+                    ProcedureParameter {
+                        name: "@Price".to_string(),
+                        data_type: "decimal(18,2)".to_string(),
+                        is_output: false,
+                    },
+                    ProcedureParameter {
+                        name: "@DiscountPercent".to_string(),
+                        data_type: "decimal(5,2)".to_string(),
+                        is_output: false,
+                    },
+                ],
+                return_type: "decimal(18,2)".to_string(),
+                definition: r#"CREATE FUNCTION fn_CalculateDiscount(@Price DECIMAL(18,2), @DiscountPercent DECIMAL(5,2))
+RETURNS DECIMAL(18,2)
+AS
+BEGIN
+    RETURN @Price * (1 - @DiscountPercent / 100);
+END"#
+                    .to_string(),
+                referenced_tables: vec![],
+                affected_tables: vec![],
+            },
+            ScalarFunction {
+                id: "dbo.fn_GetCustomerOrderTotal".to_string(),
+                name: "fn_GetCustomerOrderTotal".to_string(),
+                schema: "dbo".to_string(),
+                function_type: "SQL_SCALAR_FUNCTION".to_string(),
+                parameters: vec![ProcedureParameter {
+                    name: "@CustomerId".to_string(),
+                    data_type: "int".to_string(),
+                    is_output: false,
+                }],
+                return_type: "decimal(18,2)".to_string(),
+                definition: r#"CREATE FUNCTION fn_GetCustomerOrderTotal(@CustomerId INT)
+RETURNS DECIMAL(18,2)
+AS
+BEGIN
+    DECLARE @Total DECIMAL(18,2);
+    SELECT @Total = SUM(TotalAmount)
+    FROM dbo.Orders
+    WHERE CustomerId = @CustomerId;
+    RETURN ISNULL(@Total, 0);
+END"#
+                    .to_string(),
+                referenced_tables: vec!["dbo.Orders".to_string()],
+                affected_tables: vec![],
+            },
+            ScalarFunction {
+                id: "dbo.fn_FormatOrderStatus".to_string(),
+                name: "fn_FormatOrderStatus".to_string(),
+                schema: "dbo".to_string(),
+                function_type: "SQL_SCALAR_FUNCTION".to_string(),
+                parameters: vec![ProcedureParameter {
+                    name: "@Status".to_string(),
+                    data_type: "nvarchar(50)".to_string(),
+                    is_output: false,
+                }],
+                return_type: "nvarchar(100)".to_string(),
+                definition: r#"CREATE FUNCTION fn_FormatOrderStatus(@Status NVARCHAR(50))
+RETURNS NVARCHAR(100)
+AS
+BEGIN
+    RETURN CASE @Status
+        WHEN 'P' THEN 'Pending'
+        WHEN 'S' THEN 'Shipped'
+        WHEN 'D' THEN 'Delivered'
+        WHEN 'C' THEN 'Cancelled'
+        ELSE 'Unknown'
+    END;
+END"#
+                    .to_string(),
+                referenced_tables: vec![],
+                affected_tables: vec![],
             },
         ],
     })

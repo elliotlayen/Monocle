@@ -7,6 +7,7 @@ export const EDGE_COLORS: Record<EdgeType, string> = {
   procedureReads: "#8b5cf6",
   procedureWrites: "#ef4444",
   viewDependencies: "#10b981",
+  functionReads: "#06b6d4",
 };
 
 export const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
@@ -16,6 +17,7 @@ export const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
   procedureReads: "Procedure Reads",
   procedureWrites: "Procedure Writes",
   viewDependencies: "View Dependencies",
+  functionReads: "Function Reads",
 };
 
 // Consolidated labels for the color key (combines entries with same color)
@@ -23,6 +25,7 @@ export const EDGE_COLOR_KEY: Array<{ color: string; label: string }> = [
   { color: "#3b82f6", label: "Foreign Keys" },
   { color: "#f59e0b", label: "Trigger Dependencies" },
   { color: "#8b5cf6", label: "Procedure Reads" },
+  { color: "#06b6d4", label: "Function Reads" },
   { color: "#ef4444", label: "Trigger/Procedure Writes" },
   { color: "#10b981", label: "View Dependencies" },
 ];

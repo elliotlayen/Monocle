@@ -33,6 +33,7 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   views: "Views",
   triggers: "Triggers",
   storedProcedures: "Stored Procedures",
+  scalarFunctions: "Scalar Functions",
 };
 
 export function Toolbar() {
@@ -66,10 +67,10 @@ export function Toolbar() {
   if (!schema) return null;
 
   const selectedObjectCount = objectTypeFilter.size;
-  const allObjectsSelected = selectedObjectCount === 4;
+  const allObjectsSelected = selectedObjectCount === 5;
 
   const selectedEdgeCount = edgeTypeFilter.size;
-  const allEdgesSelected = selectedEdgeCount === 6;
+  const allEdgesSelected = selectedEdgeCount === 7;
 
   const hasActiveFilters =
     debouncedSearchFilter !== "" ||
@@ -220,6 +221,7 @@ export function Toolbar() {
                 <div>Views: {counts.breakdown.views.filtered} / {counts.breakdown.views.total}</div>
                 <div>Triggers: {counts.breakdown.triggers.filtered} / {counts.breakdown.triggers.total}</div>
                 <div>Procedures: {counts.breakdown.storedProcedures.filtered} / {counts.breakdown.storedProcedures.total}</div>
+                <div>Functions: {counts.breakdown.scalarFunctions.filtered} / {counts.breakdown.scalarFunctions.total}</div>
               </div>
             </TooltipContent>
           </Tooltip>

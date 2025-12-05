@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { SchemaGraph, ConnectionParams } from "@/types/schema";
 
-export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures";
+export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures" | "scalarFunctions";
 
 export type EdgeType =
   | "foreignKeys"
@@ -10,7 +10,8 @@ export type EdgeType =
   | "triggerWrites"
   | "procedureReads"
   | "procedureWrites"
-  | "viewDependencies";
+  | "viewDependencies"
+  | "functionReads";
 
 interface SchemaStore {
   // Internal
@@ -58,6 +59,7 @@ const ALL_OBJECT_TYPES: Set<ObjectType> = new Set([
   "views",
   "triggers",
   "storedProcedures",
+  "scalarFunctions",
 ]);
 
 const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
@@ -67,6 +69,7 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
   "procedureReads",
   "procedureWrites",
   "viewDependencies",
+  "functionReads",
 ]);
 
 export const useSchemaStore = create<SchemaStore>((set) => ({
@@ -93,7 +96,8 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
       const schema = await invoke<SchemaGraph>("load_schema_mock");
       const tableSchemas = schema.tables.map((t) => t.schema);
       const viewSchemas = schema.views.map((v) => v.schema);
-      const schemas = [...new Set([...tableSchemas, ...viewSchemas])];
+      const functionSchemas = schema.scalarFunctions?.map((f) => f.schema) || [];
+      const schemas = [...new Set([...tableSchemas, ...viewSchemas, ...functionSchemas])];
       set({
         schema,
         isLoading: false,
@@ -113,7 +117,8 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
       const schema = await invoke<SchemaGraph>("load_schema", { params });
       const tableSchemas = schema.tables.map((t) => t.schema);
       const viewSchemas = schema.views.map((v) => v.schema);
-      const schemas = [...new Set([...tableSchemas, ...viewSchemas])];
+      const functionSchemas = schema.scalarFunctions?.map((f) => f.schema) || [];
+      const schemas = [...new Set([...tableSchemas, ...viewSchemas, ...functionSchemas])];
       set({
         schema,
         isLoading: false,

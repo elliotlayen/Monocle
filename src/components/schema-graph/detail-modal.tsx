@@ -11,6 +11,7 @@ import {
   ViewNode,
   Trigger,
   StoredProcedure,
+  ScalarFunction,
   Column,
   ProcedureParameter,
 } from "@/types/schema";
@@ -21,7 +22,8 @@ export type DetailModalData =
   | { type: "table"; data: TableNode }
   | { type: "view"; data: ViewNode }
   | { type: "trigger"; data: Trigger }
-  | { type: "storedProcedure"; data: StoredProcedure };
+  | { type: "storedProcedure"; data: StoredProcedure }
+  | { type: "scalarFunction"; data: ScalarFunction };
 
 interface DetailModalProps {
   open: boolean;
@@ -48,6 +50,9 @@ export function DetailModal({
         )}
         {modalData.type === "storedProcedure" && (
           <StoredProcedureDetail procedure={modalData.data} />
+        )}
+        {modalData.type === "scalarFunction" && (
+          <ScalarFunctionDetail fn={modalData.data} />
         )}
       </DialogContent>
     </Dialog>
@@ -347,6 +352,75 @@ function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
           <h4 className="text-sm font-medium mb-2 flex-shrink-0">Definition</h4>
           <div className="flex-1 min-h-0">
             <SqlCodeBlock code={procedure.definition} maxHeight="100%" />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ScalarFunctionDetail({ fn }: { fn: ScalarFunction }) {
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center gap-2">
+          <span className="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 text-xs px-2 py-1 rounded">
+            Scalar Function
+          </span>
+          <span className="text-xs text-muted-foreground">{fn.schema}</span>
+        </div>
+        <DialogTitle className="text-xl">{fn.name}</DialogTitle>
+        <DialogDescription>
+          Returns {fn.returnType}
+          {fn.parameters.length > 0 &&
+            ` with ${fn.parameters.length} parameter${fn.parameters.length !== 1 ? "s" : ""}`}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="mt-4 flex-1 flex flex-col min-h-0 space-y-4">
+        {fn.parameters.length > 0 && (
+          <div className="flex-shrink-0">
+            <h4 className="text-sm font-medium mb-2">Parameters</h4>
+            <div className="border rounded-lg overflow-hidden max-h-[120px]">
+              <ScrollArea className="h-full max-h-[120px]">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                        Name
+                      </th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                        Type
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fn.parameters.map((param: ProcedureParameter, idx: number) => (
+                      <tr
+                        key={param.name}
+                        className={cn(
+                          idx % 2 === 0 ? "bg-background" : "bg-muted/50"
+                        )}
+                      >
+                        <td className="px-3 py-2 font-mono text-foreground">
+                          {param.name}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {param.dataType}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollArea>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col min-h-0">
+          <h4 className="text-sm font-medium mb-2 flex-shrink-0">Definition</h4>
+          <div className="flex-1 min-h-0">
+            <SqlCodeBlock code={fn.definition} maxHeight="100%" />
           </div>
         </div>
       </div>

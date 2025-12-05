@@ -12,6 +12,7 @@ interface FilteredCounts {
     views: { filtered: number; total: number };
     triggers: { filtered: number; total: number };
     storedProcedures: { filtered: number; total: number };
+    scalarFunctions: { filtered: number; total: number };
   };
 }
 
@@ -35,6 +36,7 @@ export function useFilteredCounts(
           views: { filtered: 0, total: 0 },
           triggers: { filtered: 0, total: 0 },
           storedProcedures: { filtered: 0, total: 0 },
+          scalarFunctions: { filtered: 0, total: 0 },
         },
       };
     }
@@ -52,6 +54,7 @@ export function useFilteredCounts(
     const showViews = objectTypeFilter.has("views");
     const showTriggers = objectTypeFilter.has("triggers");
     const showProcedures = objectTypeFilter.has("storedProcedures");
+    const showFunctions = objectTypeFilter.has("scalarFunctions");
 
     // Filter tables
     let filteredTables = showTables ? schema.tables : [];
@@ -134,6 +137,30 @@ export function useFilteredCounts(
         const referencedTables = p.referencedTables || [];
         const affectedTables = p.affectedTables || [];
         return [...referencedTables, ...affectedTables].some(
+          (tableId) => tableIds.has(tableId) || viewIds.has(tableId)
+        );
+      });
+    }
+
+    // Filter scalar functions
+    const scalarFunctions = schema.scalarFunctions || [];
+    let filteredFunctions = showFunctions ? scalarFunctions : [];
+    if (schemaFilter && schemaFilter !== "all") {
+      filteredFunctions = filteredFunctions.filter(
+        (f) => f.schema === schemaFilter
+      );
+    }
+    if (searchFilter) {
+      const lowerSearch = searchFilter.toLowerCase();
+      filteredFunctions = filteredFunctions.filter((f) =>
+        f.name.toLowerCase().includes(lowerSearch)
+      );
+    }
+    // For functions during focus, only count those connected to focused tables
+    if (focusedTableId) {
+      filteredFunctions = filteredFunctions.filter((f) => {
+        const referencedTables = f.referencedTables || [];
+        return referencedTables.some(
           (tableId) => tableIds.has(tableId) || viewIds.has(tableId)
         );
       });
@@ -224,11 +251,24 @@ export function useFilteredCounts(
       });
     }
 
+    // Function reads edges
+    let funcReadsCount = 0;
+    if (edgeTypeFilter.has("functionReads")) {
+      filteredFunctions.forEach((fn) => {
+        (fn.referencedTables || []).forEach((tableId) => {
+          if (tableIds.has(tableId) || viewIds.has(tableId)) {
+            funcReadsCount++;
+          }
+        });
+      });
+    }
+
     // Total edges (all edge types enabled, all objects visible)
     const allTables = schema.tables;
     const allViews = schema.views || [];
     const allTriggers = schema.triggers || [];
     const allProcedures = schema.storedProcedures || [];
+    const allFunctions = schema.scalarFunctions || [];
     const allTableIds = new Set(allTables.map((t) => t.id));
     const allViewIds = new Set(allViews.map((v) => v.id));
     const allAllNodeIds = new Set([...allTableIds, ...allViewIds]);
@@ -292,6 +332,14 @@ export function useFilteredCounts(
         }
       });
     });
+    // All function reads edges
+    allFunctions.forEach((fn) => {
+      (fn.referencedTables || []).forEach((tableId) => {
+        if (allTableIds.has(tableId) || allViewIds.has(tableId)) {
+          totalEdgeCount++;
+        }
+      });
+    });
 
     const filteredEdges =
       fkEdgeCount +
@@ -299,19 +347,22 @@ export function useFilteredCounts(
       triggerWritesCount +
       procReadsCount +
       procWritesCount +
-      viewDepCount;
+      viewDepCount +
+      funcReadsCount;
 
     const totalObjects =
       schema.tables.length +
       (schema.views?.length || 0) +
       (schema.triggers?.length || 0) +
-      (schema.storedProcedures?.length || 0);
+      (schema.storedProcedures?.length || 0) +
+      (schema.scalarFunctions?.length || 0);
 
     const filteredObjects =
       filteredTables.length +
       filteredViews.length +
       filteredTriggers.length +
-      filteredProcedures.length;
+      filteredProcedures.length +
+      filteredFunctions.length;
 
     return {
       filteredObjects,
@@ -323,6 +374,7 @@ export function useFilteredCounts(
         views: { filtered: filteredViews.length, total: schema.views?.length || 0 },
         triggers: { filtered: filteredTriggers.length, total: schema.triggers?.length || 0 },
         storedProcedures: { filtered: filteredProcedures.length, total: schema.storedProcedures?.length || 0 },
+        scalarFunctions: { filtered: filteredFunctions.length, total: schema.scalarFunctions?.length || 0 },
       },
     };
   }, [schema, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, focusedTableId]);

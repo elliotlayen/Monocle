@@ -3,7 +3,7 @@ import { useSchemaStore } from '@/stores/schemaStore';
 import { searchSchema } from '@/lib/search-utils';
 import type { SearchResult, GroupedSearchResults } from '@/types/search';
 import { Input } from '@/components/ui/input';
-import { Search, X, Table2, Eye, Zap, Code, Columns } from 'lucide-react';
+import { Search, X, Table2, Eye, Zap, Code, Columns, FunctionSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function getIconForType(type: SearchResult['type']) {
@@ -18,6 +18,8 @@ function getIconForType(type: SearchResult['type']) {
       return <Zap className="w-4 h-4 text-amber-600" />;
     case 'procedure':
       return <Code className="w-4 h-4 text-purple-600" />;
+    case 'function':
+      return <FunctionSquare className="w-4 h-4 text-cyan-600" />;
   }
 }
 
@@ -64,6 +66,13 @@ function flattenResults(results: GroupedSearchResults): Array<{
     flattened.push({ type: 'header', category: 'Procedures' });
     for (const procedure of results.procedures) {
       flattened.push({ type: 'result', result: procedure });
+    }
+  }
+
+  if (results.functions.length > 0) {
+    flattened.push({ type: 'header', category: 'Functions' });
+    for (const fn of results.functions) {
+      flattened.push({ type: 'result', result: fn });
     }
   }
 
@@ -144,6 +153,9 @@ export function SearchBar() {
           break;
         case 'procedure':
           // Procedures don't have focus, keep the filter active
+          break;
+        case 'function':
+          // Functions don't have focus, keep the filter active
           break;
       }
       setIsOpen(false);

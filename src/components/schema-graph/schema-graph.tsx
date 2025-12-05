@@ -19,12 +19,14 @@ import {
   ViewNode as ViewNodeType,
   Trigger,
   StoredProcedure,
+  ScalarFunction,
 } from "@/types/schema";
 import { ObjectType, EdgeType, useSchemaStore } from "@/stores/schemaStore";
 import { TableNode } from "./table-node";
 import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
 import { StoredProcedureNode } from "./stored-procedure-node";
+import { ScalarFunctionNode } from "./scalar-function-node";
 import { DetailModal, DetailModalData } from "./detail-modal";
 
 // Define custom node types outside component to prevent re-renders
@@ -33,6 +35,7 @@ const nodeTypes = {
   viewNode: ViewNode,
   triggerNode: TriggerNode,
   storedProcedureNode: StoredProcedureNode,
+  scalarFunctionNode: ScalarFunctionNode,
 };
 
 // MiniMap node color function - defined outside component for stable reference
@@ -42,6 +45,7 @@ function getMinimapNodeColor(node: Node): string {
   if (node.type === "viewNode") return "#10b981";
   if (node.type === "triggerNode") return "#f59e0b";
   if (node.type === "storedProcedureNode") return "#8b5cf6";
+  if (node.type === "scalarFunctionNode") return "#06b6d4";
   return "#64748b";
 }
 
@@ -60,6 +64,7 @@ interface ConvertOptions {
   onViewClick?: (view: ViewNodeType) => void;
   onTriggerClick?: (trigger: Trigger) => void;
   onProcedureClick?: (procedure: StoredProcedure) => void;
+  onFunctionClick?: (fn: ScalarFunction) => void;
 }
 
 // Pre-compute which columns have relationships (for conditional handle rendering)
@@ -111,6 +116,8 @@ function convertToFlowElements(
   const showTriggers = !objectTypeFilter || objectTypeFilter.has("triggers");
   const showProcedures =
     !objectTypeFilter || objectTypeFilter.has("storedProcedures");
+  const showFunctions =
+    !objectTypeFilter || objectTypeFilter.has("scalarFunctions");
 
   // Filter tables based on search and schema
   let filteredTables = showTables ? schema.tables : [];
@@ -151,18 +158,23 @@ function convertToFlowElements(
   const tableIds = new Set(filteredTables.map((t) => t.id));
   const viewIds = new Set(filteredViews.map((v) => v.id));
 
-  // Filter triggers and stored procedures based on schema filter and object type
+  // Filter triggers, stored procedures, and scalar functions based on schema filter and object type
   const triggers = schema.triggers || [];
   const storedProcedures = schema.storedProcedures || [];
+  const scalarFunctions = schema.scalarFunctions || [];
 
   let filteredTriggers = showTriggers
     ? triggers.filter((tr) => tableIds.has(tr.tableId))
     : [];
   let filteredProcedures = showProcedures ? storedProcedures : [];
+  let filteredFunctions = showFunctions ? scalarFunctions : [];
 
   if (schemaFilter && schemaFilter !== "all") {
     filteredProcedures = filteredProcedures.filter(
       (p) => p.schema === schemaFilter
+    );
+    filteredFunctions = filteredFunctions.filter(
+      (f) => f.schema === schemaFilter
     );
   }
 
@@ -173,6 +185,9 @@ function convertToFlowElements(
     );
     filteredProcedures = filteredProcedures.filter((p) =>
       p.name.toLowerCase().includes(lowerSearch)
+    );
+    filteredFunctions = filteredFunctions.filter((f) =>
+      f.name.toLowerCase().includes(lowerSearch)
     );
   }
 
@@ -239,6 +254,17 @@ function convertToFlowElements(
         .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
         .forEach((tId) => {
           addEdgeType(`${tId}-target`, "procedureWrites");
+        });
+    });
+  }
+
+  // Function reads - table header handles (only for filtered functions)
+  if (!edgeTypeFilter || edgeTypeFilter.has("functionReads")) {
+    filteredFunctions.forEach((fn) => {
+      (fn.referencedTables || [])
+        .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
+        .forEach((tId) => {
+          addEdgeType(`${tId}-source`, "functionReads");
         });
     });
   }
@@ -409,11 +435,29 @@ function convertToFlowElements(
     },
   }));
 
+  // Position scalar functions in a separate column after procedures
+  const functionStartX = procedureStartX + 320;
+
+  const functionNodes: Node[] = filteredFunctions.map((fn, index) => ({
+    id: fn.id,
+    type: "scalarFunctionNode",
+    position: {
+      x: functionStartX,
+      y: index * 180,
+    },
+    data: {
+      function: fn,
+      isDimmed: false,
+      onClick: () => options?.onFunctionClick?.(fn),
+    },
+  }));
+
   const nodes: Node[] = [
     ...tableNodes,
     ...viewNodes,
     ...triggerNodes,
     ...procedureNodes,
+    ...functionNodes,
   ];
 
   // Convert relationships to edges (only for visible tables)
@@ -661,6 +705,46 @@ function convertToFlowElements(
       });
   });
 
+  // Create edges from scalar functions to their referenced tables/views (reads)
+  const functionEdges: Edge[] = filteredFunctions.flatMap((fn) => {
+    return (fn.referencedTables || [])
+      .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
+      .map((tableId) => {
+        const edgeId = `func-edge-${fn.id}-${tableId}`;
+        const isDimmed = isFocusActive && tableId !== focusedTableId;
+        const isFocused = isFocusActive && !isDimmed;
+        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
+
+        return {
+          id: edgeId,
+          source: tableId,
+          sourceHandle: `${tableId}-source`,
+          target: fn.id,
+          targetHandle: `${fn.id}-target`,
+          type: "smoothstep",
+          style: {
+            stroke: isSelected ? "#0891b2" : (isDimmed ? "#67e8f9" : "#06b6d4"),
+            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
+            opacity: isDimmed ? 0.4 : 1,
+            cursor: isFocusActive ? "default" : "pointer",
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isSelected ? "#0891b2" : (isDimmed ? "#67e8f9" : "#06b6d4"),
+          },
+          label: fn.name,
+          labelStyle: {
+            fontSize: 10,
+            fill: isSelected ? "#155e75" : (isDimmed ? "#67e8f9" : "#0891b2"),
+          },
+          labelBgStyle: {
+            fill: "#ffffff",
+            fillOpacity: 0.8,
+          },
+        };
+      });
+  });
+
   // Create edges from view columns to their source table columns
   const allNodeIds = new Set([...tableIds, ...viewIds]);
   const viewEdges: Edge[] = filteredViews.flatMap((view) => {
@@ -720,6 +804,7 @@ function convertToFlowElements(
     ...(!edgeTypeFilter || edgeTypeFilter.has("triggerWrites") ? triggerAffectsEdges : []),
     ...(!edgeTypeFilter || edgeTypeFilter.has("procedureReads") ? procedureEdges : []),
     ...(!edgeTypeFilter || edgeTypeFilter.has("procedureWrites") ? procedureAffectsEdges : []),
+    ...(!edgeTypeFilter || edgeTypeFilter.has("functionReads") ? functionEdges : []),
     ...(!edgeTypeFilter || edgeTypeFilter.has("viewDependencies") ? viewEdges : []),
   ];
 
@@ -767,11 +852,17 @@ export function SchemaGraphView({
     setModalOpen(true);
   };
 
+  const handleFunctionClick = (fn: ScalarFunction) => {
+    setModalData({ type: "scalarFunction", data: fn });
+    setModalOpen(true);
+  };
+
   const options: ConvertOptions = {
     onTableClick: handleTableClick,
     onViewClick: handleViewClick,
     onTriggerClick: handleTriggerClick,
     onProcedureClick: handleProcedureClick,
+    onFunctionClick: handleFunctionClick,
   };
 
   // Memoize columns that need handles (only depends on schema relationships)

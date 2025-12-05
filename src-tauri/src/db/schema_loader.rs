@@ -4,12 +4,13 @@ use odbc_api::{buffers::TextRowSet, Cursor};
 use regex::Regex;
 
 use crate::db::{
-    create_connection, format_data_type, FOREIGN_KEYS_QUERY, STORED_PROCEDURES_QUERY,
-    TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY, VIEW_COLUMN_SOURCES_QUERY,
+    create_connection, format_data_type, FOREIGN_KEYS_QUERY, SCALAR_FUNCTIONS_QUERY,
+    STORED_PROCEDURES_QUERY, TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY,
+    VIEW_COLUMN_SOURCES_QUERY,
 };
 use crate::types::{
-    Column, ProcedureParameter, RelationshipEdge, SchemaGraph, StoredProcedure, TableNode, Trigger,
-    ViewNode,
+    Column, ProcedureParameter, RelationshipEdge, ScalarFunction, SchemaGraph, StoredProcedure,
+    TableNode, Trigger, ViewNode,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -53,12 +54,16 @@ pub fn load_schema_from_connection(connection_string: &str) -> Result<SchemaGrap
     // Load stored procedures with table reference parsing
     let stored_procedures = load_stored_procedures(&conn, &tables, &views)?;
 
+    // Load scalar functions with table reference parsing
+    let scalar_functions = load_scalar_functions(&conn, &tables, &views)?;
+
     Ok(SchemaGraph {
         tables,
         views,
         relationships,
         triggers,
         stored_procedures,
+        scalar_functions,
     })
 }
 
@@ -482,4 +487,69 @@ fn extract_table_references(
     }
 
     (read_refs.into_iter().collect(), write_refs.into_iter().collect())
+}
+
+fn load_scalar_functions(
+    conn: &odbc_api::Connection<'_>,
+    tables: &[TableNode],
+    views: &[ViewNode],
+) -> Result<Vec<ScalarFunction>, SchemaError> {
+    let mut functions: HashMap<String, ScalarFunction> = HashMap::new();
+
+    // Build lookup maps for table/view name resolution
+    let mut name_to_id: HashMap<String, String> = HashMap::new();
+    for table in tables {
+        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
+        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
+    }
+    for view in views {
+        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
+        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
+    }
+
+    if let Some(mut cursor) = conn.execute(SCALAR_FUNCTIONS_QUERY, ())? {
+        let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
+        let mut row_set_cursor = cursor.bind_buffer(&mut buffers)?;
+
+        while let Some(batch) = row_set_cursor.fetch()? {
+            for row_idx in 0..batch.num_rows() {
+                let schema_name = get_string_column(&batch, 0, row_idx)?;
+                let function_name = get_string_column(&batch, 1, row_idx)?;
+                let function_type = get_string_column(&batch, 2, row_idx)?;
+                let parameter_name = get_string_column(&batch, 3, row_idx).unwrap_or_default();
+                let parameter_type = get_string_column(&batch, 4, row_idx).unwrap_or_default();
+                let is_output = get_bool_column(&batch, 5, row_idx).unwrap_or(false);
+                let return_type = get_string_column(&batch, 6, row_idx).unwrap_or_default();
+                let definition = get_string_column(&batch, 7, row_idx).unwrap_or_default();
+
+                let function_id = format!("{}.{}", schema_name, function_name);
+
+                let function = functions.entry(function_id.clone()).or_insert_with(|| {
+                    let (referenced_tables, affected_tables) =
+                        extract_table_references(&definition, &name_to_id);
+                    ScalarFunction {
+                        id: function_id,
+                        name: function_name,
+                        schema: schema_name,
+                        function_type,
+                        parameters: Vec::new(),
+                        return_type: return_type.clone(),
+                        definition,
+                        referenced_tables,
+                        affected_tables,
+                    }
+                });
+
+                if !parameter_name.is_empty() {
+                    function.parameters.push(ProcedureParameter {
+                        name: parameter_name,
+                        data_type: parameter_type,
+                        is_output,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(functions.into_values().collect())
 }

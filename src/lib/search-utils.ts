@@ -6,6 +6,7 @@ import type {
   ColumnSearchResult,
   TriggerSearchResult,
   ProcedureSearchResult,
+  FunctionSearchResult,
 } from '@/types/search';
 
 const MAX_RESULTS_PER_CATEGORY = 10;
@@ -39,6 +40,7 @@ export function searchSchema(
       columns: [],
       triggers: [],
       procedures: [],
+      functions: [],
       totalCount: 0,
     };
   }
@@ -169,6 +171,26 @@ export function searchSchema(
     }
   }
 
+  // Search scalar functions
+  const functionResults: (FunctionSearchResult & { score: number })[] = [];
+  for (const fn of schema.scalarFunctions || []) {
+    const nameScore = getMatchScore(fn.name, trimmedQuery);
+    const schemaScore = getMatchScore(fn.schema, trimmedQuery);
+    const score = Math.max(nameScore, schemaScore);
+
+    if (score > 0) {
+      functionResults.push({
+        id: `function-${fn.id}`,
+        type: 'function',
+        functionId: fn.id,
+        schema: fn.schema,
+        label: fn.name,
+        sublabel: `${fn.schema} -> ${fn.returnType}`,
+        score,
+      });
+    }
+  }
+
   // Sort and limit results
   const tables = sortByScore(tableResults)
     .slice(0, maxPerCategory)
@@ -185,6 +207,9 @@ export function searchSchema(
   const procedures = sortByScore(procedureResults)
     .slice(0, maxPerCategory)
     .map(({ score, ...rest }) => rest);
+  const functions = sortByScore(functionResults)
+    .slice(0, maxPerCategory)
+    .map(({ score, ...rest }) => rest);
 
   return {
     tables,
@@ -192,11 +217,13 @@ export function searchSchema(
     columns,
     triggers,
     procedures,
+    functions,
     totalCount:
       tables.length +
       views.length +
       columns.length +
       triggers.length +
-      procedures.length,
+      procedures.length +
+      functions.length,
   };
 }

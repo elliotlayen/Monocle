@@ -1,4 +1,4 @@
-export type SearchResultType = 'table' | 'view' | 'column' | 'trigger' | 'procedure';
+export type SearchResultType = 'table' | 'view' | 'column' | 'trigger' | 'procedure' | 'function';
 
 export interface BaseSearchResult {
   id: string;
@@ -41,12 +41,19 @@ export interface ProcedureSearchResult extends BaseSearchResult {
   schema: string;
 }
 
+export interface FunctionSearchResult extends BaseSearchResult {
+  type: 'function';
+  functionId: string;
+  schema: string;
+}
+
 export type SearchResult =
   | TableSearchResult
   | ViewSearchResult
   | ColumnSearchResult
   | TriggerSearchResult
-  | ProcedureSearchResult;
+  | ProcedureSearchResult
+  | FunctionSearchResult;
 
 export interface GroupedSearchResults {
   tables: TableSearchResult[];
@@ -54,5 +61,6 @@ export interface GroupedSearchResults {
   columns: ColumnSearchResult[];
   triggers: TriggerSearchResult[];
   procedures: ProcedureSearchResult[];
+  functions: FunctionSearchResult[];
   totalCount: number;
 }

@@ -83,12 +83,27 @@ pub struct StoredProcedure {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ScalarFunction {
+    pub id: String,
+    pub name: String,
+    pub schema: String,
+    pub function_type: String,
+    pub parameters: Vec<ProcedureParameter>,
+    pub return_type: String,
+    pub definition: String,
+    pub referenced_tables: Vec<String>,
+    pub affected_tables: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SchemaGraph {
     pub tables: Vec<TableNode>,
     pub views: Vec<ViewNode>,
     pub relationships: Vec<RelationshipEdge>,
     pub triggers: Vec<Trigger>,
     pub stored_procedures: Vec<StoredProcedure>,
+    pub scalar_functions: Vec<ScalarFunction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

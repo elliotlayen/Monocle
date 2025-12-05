@@ -70,6 +70,19 @@ export interface StoredProcedure {
   affectedTables: string[]; // List of table/view IDs modified by the procedure (writes)
 }
 
+// Scalar function definition
+export interface ScalarFunction {
+  id: string; // Format: "schema.function_name"
+  name: string;
+  schema: string;
+  functionType: string; // e.g., "SQL_SCALAR_FUNCTION"
+  parameters: ProcedureParameter[];
+  returnType: string; // The return data type
+  definition: string; // SQL definition
+  referencedTables: string[]; // List of table/view IDs referenced in the function (reads)
+  affectedTables: string[]; // Usually empty for functions (read-only)
+}
+
 // Complete schema graph
 export interface SchemaGraph {
   tables: TableNode[];
@@ -77,6 +90,7 @@ export interface SchemaGraph {
   relationships: RelationshipEdge[];
   triggers: Trigger[];
   storedProcedures: StoredProcedure[];
+  scalarFunctions: ScalarFunction[];
 }
 
 // Connection parameters
