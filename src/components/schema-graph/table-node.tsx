@@ -32,7 +32,15 @@ function TableNodeComponent({ data }: NodeProps) {
         style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
       />
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2">
+      <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2 relative">
+        {/* Generic source handle for outgoing table-level connections (e.g., to triggers) */}
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={`${table.id}-source`}
+          className="!w-0 !h-0 !bg-transparent !border-0"
+          style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
+        />
         <span className="text-[10px] text-slate-400 uppercase tracking-wide block">
           {table.schema}
         </span>

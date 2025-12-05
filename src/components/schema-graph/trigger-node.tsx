@@ -29,7 +29,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
         !isDimmed && "hover:shadow-md"
       )}
     >
-      {/* Left handle for connection from table */}
+      {/* Left handle for connection FROM parent table */}
       <Handle
         type="target"
         position={Position.Left}

@@ -331,6 +331,7 @@ function convertToFlowElements(
       return {
         id: edgeId,
         source: trigger.tableId,
+        sourceHandle: `${trigger.tableId}-source`,
         target: trigger.id,
         type: "smoothstep",
         animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
@@ -400,10 +401,10 @@ function convertToFlowElements(
 
         return {
           id: edgeId,
-          source: procedure.id,
-          sourceHandle: `${procedure.id}-source`,
-          target: tableId,
-          targetHandle: `${tableId}-target`,
+          source: tableId,
+          sourceHandle: `${tableId}-source`,
+          target: procedure.id,
+          targetHandle: `${procedure.id}-target`,
           type: "smoothstep",
           animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
           style: {
@@ -445,10 +446,10 @@ function convertToFlowElements(
 
         return {
           id: edgeId,
-          source: view.id,
-          sourceHandle: `${view.id}-${col.name}-source`,
-          target: sourceTableId!,
-          targetHandle: `${sourceTableId}-${col.sourceColumn}-target`,
+          source: sourceTableId!,
+          sourceHandle: `${sourceTableId}-${col.sourceColumn}-source`,
+          target: view.id,
+          targetHandle: `${view.id}-${col.name}-target`,
           type: "smoothstep",
           animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
           style: {

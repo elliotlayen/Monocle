@@ -27,13 +27,13 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
         !isDimmed && "hover:shadow-md"
       )}
     >
-      {/* Source handle for outgoing connections to referenced tables */}
+      {/* Target handle for incoming connections from referenced tables */}
       <Handle
-        type="source"
-        position={Position.Right}
-        id={`${procedure.id}-source`}
+        type="target"
+        position={Position.Left}
+        id={`${procedure.id}-target`}
         className="!w-0 !h-0 !bg-transparent !border-0"
-        style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
+        style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
       />
       {/* Header */}
       <div className="bg-gradient-to-r from-violet-600 to-violet-500 text-white px-3 py-2">
