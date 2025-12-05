@@ -34,7 +34,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
         type="target"
         position={Position.Left}
         id={trigger.id}
-        className="!w-2 !h-2 !bg-amber-500 !border-2 !border-white"
+        className="!w-0 !h-0 !bg-transparent !border-0"
         style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
       />
       {/* Right handle for outgoing connections to referenced tables */}
@@ -42,7 +42,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
         type="source"
         position={Position.Right}
         id={`${trigger.id}-source`}
-        className="!w-2 !h-2 !bg-amber-500 !border-2 !border-white"
+        className="!w-0 !h-0 !bg-transparent !border-0"
         style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
       />
 

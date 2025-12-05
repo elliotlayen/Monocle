@@ -28,7 +28,7 @@ function TableNodeComponent({ data }: NodeProps) {
         type="target"
         position={Position.Left}
         id={`${table.id}-target`}
-        className="!w-2 !h-2 !bg-blue-500 !border-2 !border-white"
+        className="!w-0 !h-0 !bg-transparent !border-0"
         style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
       />
       {/* Header */}
@@ -70,7 +70,7 @@ function ColumnRow({ column, tableId }: ColumnRowProps) {
         type="target"
         position={Position.Left}
         id={`${handleId}-target`}
-        className="!w-2 !h-2 !bg-blue-500 !border-2 !border-white"
+        className="!w-0 !h-0 !bg-transparent !border-0"
         style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
       />
 
@@ -104,7 +104,7 @@ function ColumnRow({ column, tableId }: ColumnRowProps) {
         type="source"
         position={Position.Right}
         id={`${handleId}-source`}
-        className="!w-2 !h-2 !bg-blue-500 !border-2 !border-white"
+        className="!w-0 !h-0 !bg-transparent !border-0"
         style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
       />
     </div>

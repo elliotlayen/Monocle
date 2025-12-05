@@ -32,7 +32,7 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
         type="source"
         position={Position.Right}
         id={`${procedure.id}-source`}
-        className="!w-2 !h-2 !bg-violet-500 !border-2 !border-white"
+        className="!w-0 !h-0 !bg-transparent !border-0"
         style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
       />
       {/* Header */}

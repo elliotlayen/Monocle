@@ -293,10 +293,11 @@ function convertToFlowElements(
         sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
         targetHandle: `${rel.to}-${rel.toColumn}-target`,
         type: "smoothstep",
-        animated: !isDimmed || isSelected,
+        animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
         style: {
           stroke: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
           strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
+          strokeDasharray: "5,5",
           opacity: isSelected ? 1 : (isDimmed ? 0.4 : 1),
           cursor: "pointer",
         },
@@ -332,7 +333,7 @@ function convertToFlowElements(
         source: trigger.tableId,
         target: trigger.id,
         type: "smoothstep",
-        animated: isSelected,
+        animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
         style: {
           stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
           strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
@@ -369,7 +370,7 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected,
+          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
           style: {
             stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
             strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
@@ -404,7 +405,7 @@ function convertToFlowElements(
           target: tableId,
           targetHandle: `${tableId}-target`,
           type: "smoothstep",
-          animated: isSelected,
+          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
           style: {
             stroke: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
             strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
@@ -449,7 +450,7 @@ function convertToFlowElements(
           target: sourceTableId!,
           targetHandle: `${sourceTableId}-${col.sourceColumn}-target`,
           type: "smoothstep",
-          animated: isSelected,
+          animated: isSelected || (focusedTableId !== null && focusedTableId !== undefined && !isDimmed),
           style: {
             stroke: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
             strokeWidth: isSelected ? 4 : (isDimmed ? 1 : 2),
@@ -532,7 +533,7 @@ export function SchemaGraphView({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Update nodes when filters change
+  // Update nodes/edges when dependencies change, preserving node positions
   useEffect(() => {
     const { nodes: newNodes, edges: newEdges } = convertToFlowElements(
       schema,
@@ -543,7 +544,15 @@ export function SchemaGraphView({
       selectedEdgeIds,
       options
     );
-    setNodes(newNodes);
+
+    // Preserve existing node positions - only update data, not positions
+    setNodes((currentNodes) => {
+      const currentPositions = new Map(currentNodes.map(n => [n.id, n.position]));
+      return newNodes.map(node => ({
+        ...node,
+        position: currentPositions.get(node.id) ?? node.position,
+      }));
+    });
     setEdges(newEdges);
   }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, selectedEdgeIds, setNodes, setEdges]);
 
