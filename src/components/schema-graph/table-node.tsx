@@ -3,15 +3,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { TableNode as TableNodeType, Column } from "@/types/schema";
 import { EdgeType } from "@/stores/schemaStore";
 import { cn } from "@/lib/utils";
-
-const EDGE_COLORS: Record<EdgeType, string> = {
-  foreignKeys: "#3b82f6",
-  triggerDependencies: "#f59e0b",
-  triggerWrites: "#ef4444",
-  procedureReads: "#8b5cf6",
-  procedureWrites: "#ef4444",
-  viewDependencies: "#10b981",
-};
+import { EDGE_COLORS } from "@/constants/edge-colors";
 
 function HandleIndicators({ edgeTypes }: { edgeTypes?: Set<EdgeType> }) {
   if (!edgeTypes || edgeTypes.size === 0) return null;

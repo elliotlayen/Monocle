@@ -26,21 +26,13 @@ import {
 import { SettingsSheet } from "@/components/settings-sheet";
 import { SearchBar } from "@/components/search-bar";
 import { useFilteredCounts } from "@/hooks/useFilteredCounts";
+import { EDGE_TYPE_LABELS } from "@/constants/edge-colors";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
   views: "Views",
   triggers: "Triggers",
   storedProcedures: "Stored Procedures",
-};
-
-const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
-  foreignKeys: "Foreign Keys",
-  triggerDependencies: "Trigger Dependencies",
-  triggerWrites: "Trigger Writes",
-  procedureReads: "Procedure Reads",
-  procedureWrites: "Procedure Writes",
-  viewDependencies: "View Dependencies",
 };
 
 export function Toolbar() {
