@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useSchemaStore } from "@/stores/schemaStore";
+import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +12,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MockDataModal, type MockDataSize } from "@/components/mock-data-modal";
 import type { ConnectionParams } from "@/types/schema";
 
 export function ConnectionForm() {
-  const { loadSchema, loadMockSchema, isLoading, error } = useSchemaStore();
+  const { loadSchema, loadMockSchema, isLoading, error } = useSchemaStore(
+    useShallow((state) => ({
+      loadSchema: state.loadSchema,
+      loadMockSchema: state.loadMockSchema,
+      isLoading: state.isLoading,
+      error: state.error,
+    }))
+  );
 
   const [formData, setFormData] = useState<ConnectionParams>({
     server: "localhost",
@@ -23,6 +32,13 @@ export function ConnectionForm() {
     password: "",
     trustServerCertificate: true,
   });
+
+  const [mockModalOpen, setMockModalOpen] = useState(false);
+
+  const handleLoadMock = (size: MockDataSize) => {
+    loadMockSchema(size);
+    setMockModalOpen(false);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -117,19 +133,30 @@ export function ConnectionForm() {
               <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? "Connecting..." : "Connect"}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={loadMockSchema}
-                disabled={isLoading}
-                className="w-full"
-              >
-                Load Mock Data
-              </Button>
+              {import.meta.env.DEV && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setMockModalOpen(true)}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  Load Mock Data
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
       </Card>
+
+      {import.meta.env.DEV && (
+        <MockDataModal
+          open={mockModalOpen}
+          onOpenChange={setMockModalOpen}
+          onLoad={handleLoadMock}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   );
 }
