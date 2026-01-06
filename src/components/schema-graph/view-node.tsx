@@ -5,8 +5,14 @@ import { EdgeType } from "@/stores/schemaStore";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS } from "@/constants/edge-colors";
 
-function HandleIndicators({ edgeTypes }: { edgeTypes?: Set<EdgeType> }) {
-  if (!edgeTypes || edgeTypes.size === 0) return null;
+function HandleIndicators({
+  edgeTypes,
+  isCompact,
+}: {
+  edgeTypes?: Set<EdgeType>;
+  isCompact?: boolean;
+}) {
+  if (isCompact || !edgeTypes || edgeTypes.size === 0) return null;
   return (
     <div className="flex flex-col gap-0.5">
       {Array.from(edgeTypes).map((type) => (
@@ -24,13 +30,22 @@ interface ViewNodeData {
   view: ViewNodeType;
   isFocused?: boolean;
   isDimmed?: boolean;
+  isCompact?: boolean;
   columnsWithHandles?: Set<string>;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
   onClick?: () => void;
 }
 
 function ViewNodeComponent({ data }: NodeProps) {
-  const { view, isFocused, isDimmed, columnsWithHandles, handleEdgeTypes, onClick } = data as unknown as ViewNodeData;
+  const {
+    view,
+    isFocused,
+    isDimmed,
+    isCompact,
+    columnsWithHandles,
+    handleEdgeTypes,
+    onClick,
+  } = data as unknown as ViewNodeData;
 
   return (
     <div
@@ -55,7 +70,10 @@ function ViewNodeComponent({ data }: NodeProps) {
 
         {/* Left header indicators - fixed width for alignment */}
         <div className="w-4 flex-shrink-0">
-          <HandleIndicators edgeTypes={handleEdgeTypes?.get(`${view.id}-target`)} />
+          <HandleIndicators
+            edgeTypes={handleEdgeTypes?.get(`${view.id}-target`)}
+            isCompact={isCompact}
+          />
         </div>
 
         <div className="flex-1">
@@ -67,7 +85,10 @@ function ViewNodeComponent({ data }: NodeProps) {
 
         {/* Right header indicators - fixed width for alignment */}
         <div className="w-4 flex-shrink-0 flex justify-end">
-          <HandleIndicators edgeTypes={handleEdgeTypes?.get(`${view.id}-source`)} />
+          <HandleIndicators
+            edgeTypes={handleEdgeTypes?.get(`${view.id}-source`)}
+            isCompact={isCompact}
+          />
         </div>
 
         {/* Generic source handle for outgoing view-level connections - inside header */}
@@ -90,9 +111,15 @@ function ViewNodeComponent({ data }: NodeProps) {
             index={index}
             hasHandle={columnsWithHandles?.has(`${view.id}-${column.name}`) ?? true}
             handleEdgeTypes={handleEdgeTypes}
+            isCompact={isCompact}
           />
         ))}
       </div>
+      {isCompact && (
+        <div className="px-3 pb-2 text-[10px] text-muted-foreground">
+          {view.columns.length} column{view.columns.length !== 1 && "s"}
+        </div>
+      )}
     </div>
   );
 }
@@ -103,12 +130,44 @@ interface ColumnRowProps {
   index: number;
   hasHandle: boolean;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
+  isCompact?: boolean;
 }
 
-function ColumnRow({ column, viewId, hasHandle, handleEdgeTypes }: ColumnRowProps) {
+function ColumnRow({
+  column,
+  viewId,
+  hasHandle,
+  handleEdgeTypes,
+  isCompact,
+}: ColumnRowProps) {
   const handleId = `${viewId}-${column.name}`;
   const targetEdgeTypes = handleEdgeTypes?.get(`${handleId}-target`);
   const sourceEdgeTypes = handleEdgeTypes?.get(`${handleId}-source`);
+
+  if (isCompact) {
+    return (
+      <div className="relative h-3">
+        {hasHandle && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            id={`${handleId}-target`}
+            className="!w-0 !h-0 !bg-transparent !border-0"
+            style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
+          />
+        )}
+        {hasHandle && (
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={`${handleId}-source`}
+            className="!w-0 !h-0 !bg-transparent !border-0"
+            style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">

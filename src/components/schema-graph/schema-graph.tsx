@@ -22,12 +22,96 @@ import {
   ScalarFunction,
 } from "@/types/schema";
 import { ObjectType, EdgeType, useSchemaStore } from "@/stores/schemaStore";
+import { getSchemaIndex } from "@/lib/schema-index";
+import { useShallow } from "zustand/shallow";
 import { TableNode } from "./table-node";
 import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
 import { StoredProcedureNode } from "./stored-procedure-node";
 import { ScalarFunctionNode } from "./scalar-function-node";
 import { DetailModal, DetailModalData } from "./detail-modal";
+
+const GRID_COLS = 3;
+const NODE_WIDTH = 300;
+const NODE_HEIGHT = 250;
+const GAP_X = 120;
+const GAP_Y = 100;
+const TRIGGER_OFFSET_X = NODE_WIDTH + 60;
+const TRIGGER_GAP_Y = 120;
+const PROCEDURE_GAP_Y = 180;
+const PROCEDURE_OFFSET_X = NODE_WIDTH + GAP_X + 300;
+const FUNCTION_OFFSET_X = 320;
+const COMPACT_ZOOM = 0.6;
+const EDGE_LABEL_ZOOM = 0.8;
+
+const EDGE_STYLE: Record<
+  EdgeType,
+  {
+    base: string;
+    dimmed: string;
+    selected: string;
+    label: string;
+    labelDimmed: string;
+    labelSelected: string;
+  }
+> = {
+  foreignKeys: {
+    base: "#3b82f6",
+    dimmed: "#cbd5e1",
+    selected: "#1d4ed8",
+    label: "#475569",
+    labelDimmed: "#94a3b8",
+    labelSelected: "#1e40af",
+  },
+  triggerDependencies: {
+    base: "#f59e0b",
+    dimmed: "#fcd34d",
+    selected: "#d97706",
+    label: "#b45309",
+    labelDimmed: "#fcd34d",
+    labelSelected: "#92400e",
+  },
+  triggerWrites: {
+    base: "#ef4444",
+    dimmed: "#fca5a5",
+    selected: "#dc2626",
+    label: "#dc2626",
+    labelDimmed: "#fca5a5",
+    labelSelected: "#991b1b",
+  },
+  procedureReads: {
+    base: "#8b5cf6",
+    dimmed: "#c4b5fd",
+    selected: "#7c3aed",
+    label: "#7c3aed",
+    labelDimmed: "#c4b5fd",
+    labelSelected: "#5b21b6",
+  },
+  procedureWrites: {
+    base: "#ef4444",
+    dimmed: "#fca5a5",
+    selected: "#dc2626",
+    label: "#dc2626",
+    labelDimmed: "#fca5a5",
+    labelSelected: "#991b1b",
+  },
+  viewDependencies: {
+    base: "#10b981",
+    dimmed: "#6ee7b7",
+    selected: "#059669",
+    label: "#047857",
+    labelDimmed: "#6ee7b7",
+    labelSelected: "#065f46",
+  },
+  functionReads: {
+    base: "#06b6d4",
+    dimmed: "#67e8f9",
+    selected: "#0891b2",
+    label: "#0891b2",
+    labelDimmed: "#67e8f9",
+    labelSelected: "#155e75",
+  },
+};
 
 // Define custom node types outside component to prevent re-renders
 const nodeTypes = {
@@ -67,260 +151,26 @@ interface ConvertOptions {
   onFunctionClick?: (fn: ScalarFunction) => void;
 }
 
-// Pre-compute which columns have relationships (for conditional handle rendering)
-function computeColumnsWithHandles(schema: SchemaGraphType): Set<string> {
-  const cols = new Set<string>();
-
-  // Add columns from FK relationships
-  schema.relationships.forEach((rel) => {
-    cols.add(`${rel.from}-${rel.fromColumn}`);
-    cols.add(`${rel.to}-${rel.toColumn}`);
-  });
-
-  // Add columns from view column sources
-  (schema.views || []).forEach((view) => {
-    view.columns.forEach((col) => {
-      if (col.sourceTable && col.sourceColumn) {
-        // Add the view column
-        cols.add(`${view.id}-${col.name}`);
-        // Add the source table column (need to find table ID)
-        const allTables = schema.tables;
-        const allViews = schema.views || [];
-        const sourceTableId = [...allTables.map(t => t.id), ...allViews.map(v => v.id)].find(
-          (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
-        );
-        if (sourceTableId) {
-          cols.add(`${sourceTableId}-${col.sourceColumn}`);
-        }
-      }
-    });
-  });
-
-  return cols;
+interface EdgeMeta {
+  id: string;
+  type: EdgeType;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  label?: string;
 }
 
-// Convert SchemaGraph to React Flow format
-function convertToFlowElements(
+function buildBaseNodes(
   schema: SchemaGraphType,
-  focusedTableId?: string | null,
-  searchFilter?: string,
-  schemaFilter?: string,
-  objectTypeFilter?: Set<ObjectType>,
-  edgeTypeFilter?: Set<EdgeType>,
-  selectedEdgeIds?: Set<string>,
-  options?: ConvertOptions,
-  columnsWithHandles?: Set<string>
-): { nodes: Node[]; edges: Edge[]; handleEdgeTypes: Map<string, Set<EdgeType>> } {
-  const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
-  const showViews = !objectTypeFilter || objectTypeFilter.has("views");
-  const showTriggers = !objectTypeFilter || objectTypeFilter.has("triggers");
-  const showProcedures =
-    !objectTypeFilter || objectTypeFilter.has("storedProcedures");
-  const showFunctions =
-    !objectTypeFilter || objectTypeFilter.has("scalarFunctions");
-
-  // Filter tables based on search and schema
-  let filteredTables = showTables ? schema.tables : [];
-
-  if (searchFilter) {
-    const lowerSearch = searchFilter.toLowerCase();
-    filteredTables = filteredTables.filter(
-      (t) =>
-        t.name.toLowerCase().includes(lowerSearch) ||
-        t.schema.toLowerCase().includes(lowerSearch) ||
-        t.id.toLowerCase().includes(lowerSearch) ||
-        t.columns.some((col) => col.name.toLowerCase().includes(lowerSearch))
-    );
-  }
-
-  if (schemaFilter && schemaFilter !== "all") {
-    filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
-  }
-
-  // Filter views based on search and schema
-  let filteredViews = showViews ? (schema.views || []) : [];
-
-  if (searchFilter) {
-    const lowerSearch = searchFilter.toLowerCase();
-    filteredViews = filteredViews.filter(
-      (v) =>
-        v.name.toLowerCase().includes(lowerSearch) ||
-        v.schema.toLowerCase().includes(lowerSearch) ||
-        v.id.toLowerCase().includes(lowerSearch) ||
-        v.columns.some((col) => col.name.toLowerCase().includes(lowerSearch))
-    );
-  }
-
-  if (schemaFilter && schemaFilter !== "all") {
-    filteredViews = filteredViews.filter((v) => v.schema === schemaFilter);
-  }
-
-  const tableIds = new Set(filteredTables.map((t) => t.id));
-  const viewIds = new Set(filteredViews.map((v) => v.id));
-
-  // Filter triggers, stored procedures, and scalar functions based on schema filter and object type
-  const triggers = schema.triggers || [];
-  const storedProcedures = schema.storedProcedures || [];
-  const scalarFunctions = schema.scalarFunctions || [];
-
-  let filteredTriggers = showTriggers
-    ? triggers.filter((tr) => tableIds.has(tr.tableId))
-    : [];
-  let filteredProcedures = showProcedures ? storedProcedures : [];
-  let filteredFunctions = showFunctions ? scalarFunctions : [];
-
-  if (schemaFilter && schemaFilter !== "all") {
-    filteredProcedures = filteredProcedures.filter(
-      (p) => p.schema === schemaFilter
-    );
-    filteredFunctions = filteredFunctions.filter(
-      (f) => f.schema === schemaFilter
-    );
-  }
-
-  if (searchFilter) {
-    const lowerSearch = searchFilter.toLowerCase();
-    filteredTriggers = filteredTriggers.filter((tr) =>
-      tr.name.toLowerCase().includes(lowerSearch)
-    );
-    filteredProcedures = filteredProcedures.filter((p) =>
-      p.name.toLowerCase().includes(lowerSearch)
-    );
-    filteredFunctions = filteredFunctions.filter((f) =>
-      f.name.toLowerCase().includes(lowerSearch)
-    );
-  }
-
-  // Compute edge types for each handle (for color indicators)
-  // This must use the same filtering as edge creation to stay in sync
-  const handleEdgeTypes = new Map<string, Set<EdgeType>>();
-  const addEdgeType = (handleId: string, edgeType: EdgeType) => {
-    if (!handleEdgeTypes.has(handleId)) {
-      handleEdgeTypes.set(handleId, new Set());
-    }
-    handleEdgeTypes.get(handleId)!.add(edgeType);
-  };
-
-  // Foreign keys - column-level handles (only for visible tables)
-  if (!edgeTypeFilter || edgeTypeFilter.has("foreignKeys")) {
-    schema.relationships
-      .filter((rel) => tableIds.has(rel.from) && tableIds.has(rel.to))
-      .forEach((rel) => {
-        addEdgeType(`${rel.from}-${rel.fromColumn}-source`, "foreignKeys");
-        addEdgeType(`${rel.to}-${rel.toColumn}-target`, "foreignKeys");
-      });
-  }
-
-  // Trigger dependencies - table header handles (only for filtered triggers)
-  if (!edgeTypeFilter || edgeTypeFilter.has("triggerDependencies")) {
-    filteredTriggers
-      .filter((tr) => tableIds.has(tr.tableId))
-      .forEach((trigger) => {
-        addEdgeType(`${trigger.tableId}-source`, "triggerDependencies");
-        (trigger.referencedTables || [])
-          .filter((tId) => (tableIds.has(tId) || viewIds.has(tId)) && tId !== trigger.tableId)
-          .forEach((tId) => {
-            addEdgeType(`${tId}-target`, "triggerDependencies");
-          });
-      });
-  }
-
-  // Trigger writes - table header handles (only for filtered triggers)
-  if (!edgeTypeFilter || edgeTypeFilter.has("triggerWrites")) {
-    filteredTriggers.forEach((trigger) => {
-      (trigger.affectedTables || [])
-        .filter((tId) => (tableIds.has(tId) || viewIds.has(tId)) && tId !== trigger.tableId)
-        .forEach((tId) => {
-          addEdgeType(`${tId}-target`, "triggerWrites");
-        });
-    });
-  }
-
-  // Procedure reads - table header handles (only for filtered procedures)
-  if (!edgeTypeFilter || edgeTypeFilter.has("procedureReads")) {
-    filteredProcedures.forEach((procedure) => {
-      (procedure.referencedTables || [])
-        .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
-        .forEach((tId) => {
-          addEdgeType(`${tId}-source`, "procedureReads");
-        });
-    });
-  }
-
-  // Procedure writes - table header handles (only for filtered procedures)
-  if (!edgeTypeFilter || edgeTypeFilter.has("procedureWrites")) {
-    filteredProcedures.forEach((procedure) => {
-      (procedure.affectedTables || [])
-        .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
-        .forEach((tId) => {
-          addEdgeType(`${tId}-target`, "procedureWrites");
-        });
-    });
-  }
-
-  // Function reads - table header handles (only for filtered functions)
-  if (!edgeTypeFilter || edgeTypeFilter.has("functionReads")) {
-    filteredFunctions.forEach((fn) => {
-      (fn.referencedTables || [])
-        .filter((tId) => tableIds.has(tId) || viewIds.has(tId))
-        .forEach((tId) => {
-          addEdgeType(`${tId}-source`, "functionReads");
-        });
-    });
-  }
-
-  // View dependencies - column-level handles (only for filtered views)
-  if (!edgeTypeFilter || edgeTypeFilter.has("viewDependencies")) {
-    const visibleNodeIds = new Set([...tableIds, ...viewIds]);
-    filteredViews.forEach((view) => {
-      view.columns
-        .filter((col) => col.sourceTable && col.sourceColumn)
-        .forEach((col) => {
-          const sourceTableId = [...visibleNodeIds].find(
-            (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
-          );
-          if (sourceTableId) {
-            addEdgeType(`${sourceTableId}-${col.sourceColumn}-source`, "viewDependencies");
-            addEdgeType(`${view.id}-${col.name}-target`, "viewDependencies");
-          }
-        });
-    });
-  }
-
-  // Debug: Log handleEdgeTypes to understand indicator computation
-  if (handleEdgeTypes.size > 0) {
-    console.log('handleEdgeTypes:', Object.fromEntries([...handleEdgeTypes.entries()].map(([k, v]) => [k, [...v]])));
-  }
-
-  // Calculate focused neighbors
-  const focusedNeighbors = new Set<string>();
-  if (focusedTableId) {
-    schema.relationships.forEach((rel) => {
-      if (rel.from === focusedTableId) focusedNeighbors.add(rel.to);
-      if (rel.to === focusedTableId) focusedNeighbors.add(rel.from);
-    });
-  }
-
-  // Convert tables to nodes with grid layout
-  const GRID_COLS = 3;
-  const NODE_WIDTH = 300;
-  const NODE_HEIGHT = 250;
-  const GAP_X = 120;
-  const GAP_Y = 100;
-
-  // Track table and view positions for trigger placement
+  options: ConvertOptions,
+  columnsWithHandles: Set<string>
+): Node[] {
   const tablePositions: Record<string, { x: number; y: number }> = {};
 
-  const tableNodes: Node[] = filteredTables.map((table, index) => {
+  const tableNodes: Node[] = schema.tables.map((table, index) => {
     const col = index % GRID_COLS;
     const row = Math.floor(index / GRID_COLS);
-
-    const isDimmed =
-      focusedTableId !== null &&
-      focusedTableId !== undefined &&
-      table.id !== focusedTableId &&
-      !focusedNeighbors.has(table.id);
-
     const position = {
       x: col * (NODE_WIDTH + GAP_X),
       y: row * (NODE_HEIGHT + GAP_Y),
@@ -333,53 +183,44 @@ function convertToFlowElements(
       position,
       data: {
         table,
-        isFocused: table.id === focusedTableId,
-        isDimmed,
+        isFocused: false,
+        isDimmed: false,
+        isCompact: false,
         columnsWithHandles,
-        handleEdgeTypes,
+        handleEdgeTypes: undefined,
         onClick: () => options?.onTableClick?.(table),
       },
     };
   });
 
-  // Calculate starting row for views (after tables)
-  const tableRowCount = Math.ceil(filteredTables.length / GRID_COLS);
+  const tableRowCount = Math.ceil(schema.tables.length / GRID_COLS);
   const viewStartY = tableRowCount * (NODE_HEIGHT + GAP_Y);
 
-  // Convert views to nodes - positioned below tables
-  const viewNodes: Node[] = filteredViews.map((view, index) => {
+  const viewNodes: Node[] = (schema.views || []).map((view, index) => {
     const col = index % GRID_COLS;
     const row = Math.floor(index / GRID_COLS);
-
-    const isDimmed =
-      focusedTableId !== null &&
-      focusedTableId !== undefined &&
-      view.id !== focusedTableId &&
-      !focusedNeighbors.has(view.id);
-
-    const position = {
-      x: col * (NODE_WIDTH + GAP_X),
-      y: viewStartY + row * (NODE_HEIGHT + GAP_Y),
-    };
 
     return {
       id: view.id,
       type: "viewNode",
-      position,
+      position: {
+        x: col * (NODE_WIDTH + GAP_X),
+        y: viewStartY + row * (NODE_HEIGHT + GAP_Y),
+      },
       data: {
         view,
-        isFocused: view.id === focusedTableId,
-        isDimmed,
+        isFocused: false,
+        isDimmed: false,
+        isCompact: false,
         columnsWithHandles,
-        handleEdgeTypes,
+        handleEdgeTypes: undefined,
         onClick: () => options?.onViewClick?.(view),
       },
     };
   });
 
-  // Group triggers by table and position them
   const triggersByTable: Record<string, Trigger[]> = {};
-  filteredTriggers.forEach((trigger) => {
+  (schema.triggers || []).forEach((trigger) => {
     if (!triggersByTable[trigger.tableId]) {
       triggersByTable[trigger.tableId] = [];
     }
@@ -392,423 +233,273 @@ function convertToFlowElements(
     if (!tablePos) return;
 
     tableTriggers.forEach((trigger, idx) => {
-      const isDimmed =
-        focusedTableId !== null &&
-        focusedTableId !== undefined &&
-        trigger.tableId !== focusedTableId &&
-        !focusedNeighbors.has(trigger.tableId);
-
       triggerNodes.push({
         id: trigger.id,
         type: "triggerNode",
         position: {
-          x: tablePos.x + NODE_WIDTH + 60,
-          y: tablePos.y + idx * 120,
+          x: tablePos.x + TRIGGER_OFFSET_X,
+          y: tablePos.y + idx * TRIGGER_GAP_Y,
         },
         data: {
           trigger,
-          isDimmed,
+          isDimmed: false,
           onClick: () => options?.onTriggerClick?.(trigger),
         },
       });
     });
   });
 
-  // Position stored procedures in a separate column on the right
   const maxTableX = Math.max(
     ...Object.values(tablePositions).map((p) => p.x),
     0
   );
-  const procedureStartX = maxTableX + NODE_WIDTH + GAP_X + 300;
+  const procedureStartX = maxTableX + PROCEDURE_OFFSET_X;
 
-  const procedureNodes: Node[] = filteredProcedures.map((procedure, index) => ({
-    id: procedure.id,
-    type: "storedProcedureNode",
-    position: {
-      x: procedureStartX,
-      y: index * 180,
-    },
-    data: {
-      procedure,
-      isDimmed: false,
-      onClick: () => options?.onProcedureClick?.(procedure),
-    },
-  }));
+  const procedureNodes: Node[] = (schema.storedProcedures || []).map(
+    (procedure, index) => ({
+      id: procedure.id,
+      type: "storedProcedureNode",
+      position: {
+        x: procedureStartX,
+        y: index * PROCEDURE_GAP_Y,
+      },
+      data: {
+        procedure,
+        isDimmed: false,
+        onClick: () => options?.onProcedureClick?.(procedure),
+      },
+    })
+  );
 
-  // Position scalar functions in a separate column after procedures
-  const functionStartX = procedureStartX + 320;
+  const functionStartX = procedureStartX + FUNCTION_OFFSET_X;
 
-  const functionNodes: Node[] = filteredFunctions.map((fn, index) => ({
-    id: fn.id,
-    type: "scalarFunctionNode",
-    position: {
-      x: functionStartX,
-      y: index * 180,
-    },
-    data: {
-      function: fn,
-      isDimmed: false,
-      onClick: () => options?.onFunctionClick?.(fn),
-    },
-  }));
+  const functionNodes: Node[] = (schema.scalarFunctions || []).map(
+    (fn, index) => ({
+      id: fn.id,
+      type: "scalarFunctionNode",
+      position: {
+        x: functionStartX,
+        y: index * PROCEDURE_GAP_Y,
+      },
+      data: {
+        function: fn,
+        isDimmed: false,
+        onClick: () => options?.onFunctionClick?.(fn),
+      },
+    })
+  );
 
-  const nodes: Node[] = [
+  return [
     ...tableNodes,
     ...viewNodes,
     ...triggerNodes,
     ...procedureNodes,
     ...functionNodes,
   ];
+}
 
-  // Convert relationships to edges (only for visible tables)
-  const fkEdges: Edge[] = schema.relationships
-    .filter((rel) => tableIds.has(rel.from) && tableIds.has(rel.to))
-    .map((rel) => {
-      const isFocusActiveLocal = focusedTableId !== null && focusedTableId !== undefined;
-      const isDimmed =
-        isFocusActiveLocal &&
-        rel.from !== focusedTableId &&
-        rel.to !== focusedTableId;
-      const isFocused = isFocusActiveLocal && !isDimmed;
-      const isSelected = !isFocusActiveLocal && (selectedEdgeIds?.has(rel.id) ?? false);
+function buildBaseEdges(
+  schema: SchemaGraphType,
+  viewColumnSources: Map<string, { columnName: string; sourceTableId: string; sourceColumn: string }[]>
+): EdgeMeta[] {
+  const edges: EdgeMeta[] = [];
 
-      return {
-        id: rel.id,
-        source: rel.from,
-        target: rel.to,
-        sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
-        targetHandle: `${rel.to}-${rel.toColumn}-target`,
-        type: "smoothstep",
-        style: {
-          stroke: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
-          strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-          opacity: isDimmed ? 0.4 : 1,
-          cursor: isFocusActiveLocal ? "default" : "pointer",
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: isSelected ? "#1d4ed8" : (isDimmed ? "#cbd5e1" : "#3b82f6"),
-        },
-        label: `${rel.fromColumn} → ${rel.toColumn}`,
-        labelStyle: {
-          fontSize: 10,
-          fill: isSelected ? "#1e40af" : (isDimmed ? "#94a3b8" : "#475569"),
-        },
-        labelBgStyle: {
-          fill: "#ffffff",
-          fillOpacity: 0.8,
-        },
-      };
+  schema.relationships.forEach((rel) => {
+    edges.push({
+      id: rel.id,
+      type: "foreignKeys",
+      source: rel.from,
+      target: rel.to,
+      sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
+      targetHandle: `${rel.to}-${rel.toColumn}-target`,
+      label: `${rel.fromColumn} → ${rel.toColumn}`,
+    });
+  });
+
+  (schema.triggers || []).forEach((trigger) => {
+    edges.push({
+      id: `trigger-edge-${trigger.id}`,
+      type: "triggerDependencies",
+      source: trigger.tableId,
+      target: trigger.id,
+      sourceHandle: `${trigger.tableId}-source`,
+      label: trigger.name,
     });
 
-  // Create edges from triggers to their parent tables
-  const isFocusActive = focusedTableId !== null && focusedTableId !== undefined;
-  const triggerEdges: Edge[] = filteredTriggers
-    .filter((tr) => tableIds.has(tr.tableId))
-    .map((trigger) => {
-      const edgeId = `trigger-edge-${trigger.id}`;
-      const isDimmed = isFocusActive && trigger.tableId !== focusedTableId;
-      const isFocused = isFocusActive && !isDimmed;
-      const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
-
-      return {
-        id: edgeId,
-        source: trigger.tableId,
-        sourceHandle: `${trigger.tableId}-source`,
-        target: trigger.id,
-        type: "smoothstep",
-        style: {
-          stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
-          strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-          opacity: isDimmed ? 0.4 : 1,
-          cursor: isFocusActive ? "default" : "pointer",
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
-        },
+    (trigger.referencedTables || []).forEach((tableId) => {
+      if (tableId === trigger.tableId) return;
+      edges.push({
+        id: `trigger-ref-edge-${trigger.id}-${tableId}`,
+        type: "triggerDependencies",
+        source: trigger.id,
+        target: tableId,
+        sourceHandle: `${trigger.id}-source`,
+        targetHandle: `${tableId}-target`,
         label: trigger.name,
-        labelStyle: {
-          fontSize: 10,
-          fill: isSelected ? "#92400e" : (isDimmed ? "#fcd34d" : "#b45309"),
-        },
-        labelBgStyle: {
-          fill: "#ffffff",
-          fillOpacity: 0.8,
-        },
-      };
+      });
     });
 
-  // Create edges from triggers to their referenced tables/views (other than parent table)
-  const triggerRefEdges: Edge[] = filteredTriggers.flatMap((trigger) => {
-    return (trigger.referencedTables || [])
-      .filter((tableId) =>
-        (tableIds.has(tableId) || viewIds.has(tableId)) &&
-        tableId !== trigger.tableId  // Exclude parent table, already connected
-      )
-      .map((tableId) => {
-        const edgeId = `trigger-ref-edge-${trigger.id}-${tableId}`;
-        const isDimmed = isFocusActive && tableId !== focusedTableId;
-        const isFocused = isFocusActive && !isDimmed;
-        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
-
-        return {
-          id: edgeId,
-          source: trigger.id,
-          sourceHandle: `${trigger.id}-source`,
-          target: tableId,
-          targetHandle: `${tableId}-target`,
-          type: "smoothstep",
-          style: {
-            stroke: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
-            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            opacity: isDimmed ? 0.4 : 1,
-            cursor: isFocusActive ? "default" : "pointer",
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSelected ? "#d97706" : (isDimmed ? "#fcd34d" : "#f59e0b"),
-          },
-          label: trigger.name,
-          labelStyle: {
-            fontSize: 10,
-            fill: isSelected ? "#92400e" : (isDimmed ? "#fcd34d" : "#b45309"),
-          },
-          labelBgStyle: {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
-          },
-        };
+    (trigger.affectedTables || []).forEach((tableId) => {
+      if (tableId === trigger.tableId) return;
+      edges.push({
+        id: `trigger-affects-${trigger.id}-${tableId}`,
+        type: "triggerWrites",
+        source: trigger.id,
+        target: tableId,
+        sourceHandle: `${trigger.id}-source`,
+        targetHandle: `${tableId}-target`,
+        label: `${trigger.name} (writes)`,
       });
+    });
   });
 
-  // Create edges from stored procedures to their referenced tables/views (reads)
-  const procedureEdges: Edge[] = filteredProcedures.flatMap((procedure) => {
-    return (procedure.referencedTables || [])
-      .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
-      .map((tableId) => {
-        const edgeId = `proc-edge-${procedure.id}-${tableId}`;
-        const isDimmed = isFocusActive && tableId !== focusedTableId;
-        const isFocused = isFocusActive && !isDimmed;
-        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
-
-        return {
-          id: edgeId,
-          source: tableId,
-          sourceHandle: `${tableId}-source`,
-          target: procedure.id,
-          targetHandle: `${procedure.id}-target`,
-          type: "smoothstep",
-          style: {
-            stroke: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
-            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            opacity: isDimmed ? 0.4 : 1,
-            cursor: isFocusActive ? "default" : "pointer",
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSelected ? "#7c3aed" : (isDimmed ? "#c4b5fd" : "#8b5cf6"),
-          },
-          label: procedure.name,
-          labelStyle: {
-            fontSize: 10,
-            fill: isSelected ? "#5b21b6" : (isDimmed ? "#c4b5fd" : "#7c3aed"),
-          },
-          labelBgStyle: {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
-          },
-        };
+  (schema.storedProcedures || []).forEach((procedure) => {
+    (procedure.referencedTables || []).forEach((tableId) => {
+      edges.push({
+        id: `proc-edge-${procedure.id}-${tableId}`,
+        type: "procedureReads",
+        source: tableId,
+        target: procedure.id,
+        sourceHandle: `${tableId}-source`,
+        targetHandle: `${procedure.id}-target`,
+        label: procedure.name,
       });
+    });
+
+    (procedure.affectedTables || []).forEach((tableId) => {
+      edges.push({
+        id: `proc-affects-${procedure.id}-${tableId}`,
+        type: "procedureWrites",
+        source: procedure.id,
+        target: tableId,
+        sourceHandle: `${procedure.id}-source`,
+        targetHandle: `${tableId}-target`,
+        label: `${procedure.name} (writes)`,
+      });
+    });
   });
 
-  // Create "affects" edges from triggers to tables they write to (INSERT/UPDATE/DELETE)
-  const triggerAffectsEdges: Edge[] = filteredTriggers.flatMap((trigger) => {
-    return (trigger.affectedTables || [])
-      .filter((tableId) =>
-        (tableIds.has(tableId) || viewIds.has(tableId)) &&
-        tableId !== trigger.tableId  // Exclude parent table
-      )
-      .map((tableId) => {
-        const edgeId = `trigger-affects-${trigger.id}-${tableId}`;
-        const isDimmed = isFocusActive && tableId !== focusedTableId;
-        const isFocused = isFocusActive && !isDimmed;
-        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
-
-        return {
-          id: edgeId,
-          source: trigger.id,
-          sourceHandle: `${trigger.id}-source`,
-          target: tableId,
-          targetHandle: `${tableId}-target`,
-          type: "smoothstep",
-          style: {
-            stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
-            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            opacity: isDimmed ? 0.4 : 1,
-            cursor: isFocusActive ? "default" : "pointer",
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
-          },
-          label: `${trigger.name} (writes)`,
-          labelStyle: {
-            fontSize: 10,
-            fill: isSelected ? "#991b1b" : (isDimmed ? "#fca5a5" : "#dc2626"),
-          },
-          labelBgStyle: {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
-          },
-        };
+  (schema.scalarFunctions || []).forEach((fn) => {
+    (fn.referencedTables || []).forEach((tableId) => {
+      edges.push({
+        id: `func-edge-${fn.id}-${tableId}`,
+        type: "functionReads",
+        source: tableId,
+        target: fn.id,
+        sourceHandle: `${tableId}-source`,
+        targetHandle: `${fn.id}-target`,
+        label: fn.name,
       });
+    });
   });
 
-  // Create "affects" edges from stored procedures to tables they write to (INSERT/UPDATE/DELETE)
-  const procedureAffectsEdges: Edge[] = filteredProcedures.flatMap((procedure) => {
-    return (procedure.affectedTables || [])
-      .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
-      .map((tableId) => {
-        const edgeId = `proc-affects-${procedure.id}-${tableId}`;
-        const isDimmed = isFocusActive && tableId !== focusedTableId;
-        const isFocused = isFocusActive && !isDimmed;
-        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
-
-        return {
-          id: edgeId,
-          source: procedure.id,
-          sourceHandle: `${procedure.id}-source`,
-          target: tableId,
-          targetHandle: `${tableId}-target`,
-          type: "smoothstep",
-          style: {
-            stroke: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
-            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            opacity: isDimmed ? 0.4 : 1,
-            cursor: isFocusActive ? "default" : "pointer",
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSelected ? "#dc2626" : (isDimmed ? "#fca5a5" : "#ef4444"),
-          },
-          label: `${procedure.name} (writes)`,
-          labelStyle: {
-            fontSize: 10,
-            fill: isSelected ? "#991b1b" : (isDimmed ? "#fca5a5" : "#dc2626"),
-          },
-          labelBgStyle: {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
-          },
-        };
+  (schema.views || []).forEach((view) => {
+    const sources = viewColumnSources.get(view.id) ?? [];
+    sources.forEach((source) => {
+      edges.push({
+        id: `view-col-edge-${view.id}-${source.columnName}`,
+        type: "viewDependencies",
+        source: source.sourceTableId,
+        target: view.id,
+        sourceHandle: `${source.sourceTableId}-${source.sourceColumn}-source`,
+        targetHandle: `${view.id}-${source.columnName}-target`,
+        label: view.name,
       });
+    });
   });
 
-  // Create edges from scalar functions to their referenced tables/views (reads)
-  const functionEdges: Edge[] = filteredFunctions.flatMap((fn) => {
-    return (fn.referencedTables || [])
-      .filter((tableId) => tableIds.has(tableId) || viewIds.has(tableId))
-      .map((tableId) => {
-        const edgeId = `func-edge-${fn.id}-${tableId}`;
-        const isDimmed = isFocusActive && tableId !== focusedTableId;
-        const isFocused = isFocusActive && !isDimmed;
-        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
+  return edges;
+}
 
-        return {
-          id: edgeId,
-          source: tableId,
-          sourceHandle: `${tableId}-source`,
-          target: fn.id,
-          targetHandle: `${fn.id}-target`,
-          type: "smoothstep",
-          style: {
-            stroke: isSelected ? "#0891b2" : (isDimmed ? "#67e8f9" : "#06b6d4"),
-            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            opacity: isDimmed ? 0.4 : 1,
-            cursor: isFocusActive ? "default" : "pointer",
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSelected ? "#0891b2" : (isDimmed ? "#67e8f9" : "#06b6d4"),
-          },
-          label: fn.name,
-          labelStyle: {
+function buildEdgeState(
+  edges: EdgeMeta[],
+  edgeTypeFilter: Set<EdgeType> | undefined,
+  visibleNodeIds: Set<string>,
+  focusedTableId: string | null | undefined,
+  selectedEdgeIds: Set<string>,
+  hoveredEdgeId: string | null,
+  showLabels: boolean
+): { edges: Edge[]; handleEdgeTypes: Map<string, Set<EdgeType>> } {
+  const handleEdgeTypes = new Map<string, Set<EdgeType>>();
+  const addHandle = (handleId: string | undefined, type: EdgeType) => {
+    if (!handleId) return;
+    if (!handleEdgeTypes.has(handleId)) {
+      handleEdgeTypes.set(handleId, new Set());
+    }
+    handleEdgeTypes.get(handleId)!.add(type);
+  };
+
+  const isFocusActive = Boolean(focusedTableId);
+
+  const nextEdges = edges.map((edge) => {
+    const nodesVisible =
+      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target);
+    const typeVisible = !edgeTypeFilter || edgeTypeFilter.has(edge.type);
+    const isVisible = nodesVisible && typeVisible;
+
+    if (isVisible) {
+      addHandle(edge.sourceHandle, edge.type);
+      addHandle(edge.targetHandle, edge.type);
+    }
+
+    const isDimmed =
+      isFocusActive &&
+      edge.source !== focusedTableId &&
+      edge.target !== focusedTableId;
+    const isFocused = isFocusActive && !isDimmed;
+    const isSelected = !isFocusActive && selectedEdgeIds.has(edge.id);
+
+    const colors = EDGE_STYLE[edge.type];
+    const stroke = isSelected
+      ? colors.selected
+      : isDimmed
+      ? colors.dimmed
+      : colors.base;
+    const strokeWidth = isSelected ? 4 : isFocused ? 3 : isDimmed ? 1 : 2;
+    const labelColor = isSelected
+      ? colors.labelSelected
+      : isDimmed
+      ? colors.labelDimmed
+      : colors.label;
+    const isHovered = hoveredEdgeId === edge.id;
+    const shouldShowLabel = (showLabels || isSelected || isHovered) && !isDimmed;
+    const label = shouldShowLabel ? edge.label : undefined;
+
+    return {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: "smoothstep",
+      hidden: !isVisible,
+      style: {
+        stroke,
+        strokeWidth,
+        opacity: isDimmed ? 0.4 : 1,
+        cursor: isFocusActive ? "default" : "pointer",
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: stroke,
+      },
+      label,
+      labelStyle: label
+        ? {
             fontSize: 10,
-            fill: isSelected ? "#155e75" : (isDimmed ? "#67e8f9" : "#0891b2"),
-          },
-          labelBgStyle: {
+            fill: labelColor,
+          }
+        : undefined,
+      labelBgStyle: label
+        ? {
             fill: "#ffffff",
             fillOpacity: 0.8,
-          },
-        };
-      });
+          }
+        : undefined,
+    };
   });
 
-  // Create edges from view columns to their source table columns
-  const allNodeIds = new Set([...tableIds, ...viewIds]);
-  const viewEdges: Edge[] = filteredViews.flatMap((view) => {
-    return view.columns
-      .filter((col) => col.sourceTable && col.sourceColumn)
-      .map((col) => {
-        // Find the source table ID by matching table name
-        const sourceTableId = [...allNodeIds].find(
-          (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
-        );
-        return { col, sourceTableId };
-      })
-      .filter(({ sourceTableId }) => sourceTableId !== undefined)
-      .map(({ col, sourceTableId }) => {
-        const edgeId = `view-col-edge-${view.id}-${col.name}`;
-        const isDimmed =
-          isFocusActive &&
-          view.id !== focusedTableId &&
-          sourceTableId !== focusedTableId;
-        const isFocused = isFocusActive && !isDimmed;
-        const isSelected = !isFocusActive && (selectedEdgeIds?.has(edgeId) ?? false);
-
-        return {
-          id: edgeId,
-          source: sourceTableId!,
-          sourceHandle: `${sourceTableId}-${col.sourceColumn}-source`,
-          target: view.id,
-          targetHandle: `${view.id}-${col.name}-target`,
-          type: "smoothstep",
-          style: {
-            stroke: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
-            strokeWidth: isSelected ? 4 : (isFocused ? 3 : (isDimmed ? 1 : 2)),
-            opacity: isDimmed ? 0.4 : 1,
-            cursor: isFocusActive ? "default" : "pointer",
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSelected ? "#059669" : (isDimmed ? "#6ee7b7" : "#10b981"),
-          },
-          label: view.name,
-          labelStyle: {
-            fontSize: 10,
-            fill: isSelected ? "#065f46" : (isDimmed ? "#6ee7b7" : "#047857"),
-          },
-          labelBgStyle: {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
-          },
-        };
-      });
-  });
-
-  // Apply edge type filter
-  const edges: Edge[] = [
-    ...(!edgeTypeFilter || edgeTypeFilter.has("foreignKeys") ? fkEdges : []),
-    ...(!edgeTypeFilter || edgeTypeFilter.has("triggerDependencies") ? [...triggerEdges, ...triggerRefEdges] : []),
-    ...(!edgeTypeFilter || edgeTypeFilter.has("triggerWrites") ? triggerAffectsEdges : []),
-    ...(!edgeTypeFilter || edgeTypeFilter.has("procedureReads") ? procedureEdges : []),
-    ...(!edgeTypeFilter || edgeTypeFilter.has("procedureWrites") ? procedureAffectsEdges : []),
-    ...(!edgeTypeFilter || edgeTypeFilter.has("functionReads") ? functionEdges : []),
-    ...(!edgeTypeFilter || edgeTypeFilter.has("viewDependencies") ? viewEdges : []),
-  ];
-
-  return { nodes, edges, handleEdgeTypes };
+  return { edges: nextEdges, handleEdgeTypes };
 }
 
 export function SchemaGraphView({
@@ -821,11 +512,22 @@ export function SchemaGraphView({
 }: SchemaGraphProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
-  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection } = useSchemaStore();
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection } =
+    useSchemaStore(
+      useShallow((state) => ({
+        selectedEdgeIds: state.selectedEdgeIds,
+        toggleEdgeSelection: state.toggleEdgeSelection,
+        clearEdgeSelection: state.clearEdgeSelection,
+      }))
+    );
+
+  const [zoom, setZoom] = useState(0.8);
+  const isCompact = zoom < COMPACT_ZOOM;
+  const showEdgeLabels = zoom >= EDGE_LABEL_ZOOM;
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
-      // Don't allow selection when focus is active - focused edges are already highlighted
       if (focusedTableId) return;
       toggleEdgeSelection(edge.id);
     },
@@ -838,88 +540,234 @@ export function SchemaGraphView({
     }
   }, [selectedEdgeIds.size, clearEdgeSelection]);
 
-  const handleTableClick = (table: TableNodeType) => {
+  const onEdgeMouseEnter = useCallback(
+    (_event: unknown, edge: Edge) => {
+      setHoveredEdgeId(edge.id);
+    },
+    []
+  );
+
+  const onEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const onMove = useCallback((_event: unknown, viewport: { zoom: number }) => {
+    setZoom((prev) =>
+      Math.abs(prev - viewport.zoom) > 0.01 ? viewport.zoom : prev
+    );
+  }, []);
+
+  const handleTableClick = useCallback((table: TableNodeType) => {
     setModalData({ type: "table", data: table });
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleViewClick = (view: ViewNodeType) => {
+  const handleViewClick = useCallback((view: ViewNodeType) => {
     setModalData({ type: "view", data: view });
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleTriggerClick = (trigger: Trigger) => {
+  const handleTriggerClick = useCallback((trigger: Trigger) => {
     setModalData({ type: "trigger", data: trigger });
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleProcedureClick = (procedure: StoredProcedure) => {
+  const handleProcedureClick = useCallback((procedure: StoredProcedure) => {
     setModalData({ type: "storedProcedure", data: procedure });
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleFunctionClick = (fn: ScalarFunction) => {
+  const handleFunctionClick = useCallback((fn: ScalarFunction) => {
     setModalData({ type: "scalarFunction", data: fn });
     setModalOpen(true);
-  };
+  }, []);
 
-  const options: ConvertOptions = {
-    onTableClick: handleTableClick,
-    onViewClick: handleViewClick,
-    onTriggerClick: handleTriggerClick,
-    onProcedureClick: handleProcedureClick,
-    onFunctionClick: handleFunctionClick,
-  };
-
-  // Memoize columns that need handles (only depends on schema relationships)
-  const columnsWithHandles = useMemo(
-    () => computeColumnsWithHandles(schema),
-    [schema]
+  const options: ConvertOptions = useMemo(
+    () => ({
+      onTableClick: handleTableClick,
+      onViewClick: handleViewClick,
+      onTriggerClick: handleTriggerClick,
+      onProcedureClick: handleProcedureClick,
+      onFunctionClick: handleFunctionClick,
+    }),
+    [
+      handleTableClick,
+      handleViewClick,
+      handleTriggerClick,
+      handleProcedureClick,
+      handleFunctionClick,
+    ]
   );
 
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(
+  const schemaIndex = useMemo(() => getSchemaIndex(schema), [schema]);
+  const baseNodes = useMemo(
     () =>
-      convertToFlowElements(
-        schema,
-        focusedTableId,
-        searchFilter,
-        schemaFilter,
-        objectTypeFilter,
-        edgeTypeFilter,
-        selectedEdgeIds,
-        options,
-        columnsWithHandles
-      ),
-    [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds, columnsWithHandles]
+      buildBaseNodes(schema, options, schemaIndex.columnsWithHandles),
+    [schema, options, schemaIndex.columnsWithHandles]
+  );
+  const baseEdges = useMemo(
+    () => buildBaseEdges(schema, schemaIndex.viewColumnSources),
+    [schema, schemaIndex.viewColumnSources]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(baseNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  // Update nodes/edges when dependencies change, preserving node positions
   useEffect(() => {
-    const { nodes: newNodes, edges: newEdges } = convertToFlowElements(
-      schema,
-      focusedTableId,
-      searchFilter,
-      schemaFilter,
-      objectTypeFilter,
-      edgeTypeFilter,
-      selectedEdgeIds,
-      options,
-      columnsWithHandles
-    );
+    setNodes(baseNodes);
+  }, [baseNodes, setNodes]);
 
-    // Preserve existing node positions - only update data, not positions
-    setNodes((currentNodes) => {
-      const currentPositions = new Map(currentNodes.map(n => [n.id, n.position]));
-      return newNodes.map(node => ({
-        ...node,
-        position: currentPositions.get(node.id) ?? node.position,
-      }));
-    });
-    setEdges(newEdges);
-  }, [schema, focusedTableId, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, selectedEdgeIds, columnsWithHandles, setNodes, setEdges]);
+  useEffect(() => {
+    const lowerSearch = searchFilter?.trim().toLowerCase() ?? "";
+    const hasSearch = lowerSearch.length > 0;
+    const matchesSearch = (map: Map<string, string>, id: string) => {
+      if (!hasSearch) return true;
+      const text = map.get(id);
+      return text ? text.includes(lowerSearch) : false;
+    };
+
+    const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
+    const showViews = !objectTypeFilter || objectTypeFilter.has("views");
+    const showTriggers = !objectTypeFilter || objectTypeFilter.has("triggers");
+    const showProcedures =
+      !objectTypeFilter || objectTypeFilter.has("storedProcedures");
+    const showFunctions =
+      !objectTypeFilter || objectTypeFilter.has("scalarFunctions");
+
+    let filteredTables = showTables ? schema.tables : [];
+    if (hasSearch) {
+      filteredTables = filteredTables.filter((t) =>
+        matchesSearch(schemaIndex.tableSearch, t.id)
+      );
+    }
+    if (schemaFilter && schemaFilter !== "all") {
+      filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
+    }
+
+    let filteredViews = showViews ? (schema.views || []) : [];
+    if (hasSearch) {
+      filteredViews = filteredViews.filter((v) =>
+        matchesSearch(schemaIndex.viewSearch, v.id)
+      );
+    }
+    if (schemaFilter && schemaFilter !== "all") {
+      filteredViews = filteredViews.filter((v) => v.schema === schemaFilter);
+    }
+
+    const visibleTableIds = new Set(filteredTables.map((t) => t.id));
+    const visibleViewIds = new Set(filteredViews.map((v) => v.id));
+
+    let filteredTriggers = showTriggers
+      ? (schema.triggers || []).filter((tr) => visibleTableIds.has(tr.tableId))
+      : [];
+    if (hasSearch) {
+      filteredTriggers = filteredTriggers.filter((tr) =>
+        matchesSearch(schemaIndex.triggerSearch, tr.id)
+      );
+    }
+
+    let filteredProcedures = showProcedures ? (schema.storedProcedures || []) : [];
+    let filteredFunctions = showFunctions ? (schema.scalarFunctions || []) : [];
+
+    if (schemaFilter && schemaFilter !== "all") {
+      filteredProcedures = filteredProcedures.filter(
+        (p) => p.schema === schemaFilter
+      );
+      filteredFunctions = filteredFunctions.filter(
+        (f) => f.schema === schemaFilter
+      );
+    }
+    if (hasSearch) {
+      filteredProcedures = filteredProcedures.filter((p) =>
+        matchesSearch(schemaIndex.procedureSearch, p.id)
+      );
+      filteredFunctions = filteredFunctions.filter((f) =>
+        matchesSearch(schemaIndex.functionSearch, f.id)
+      );
+    }
+
+    const visibleTriggerIds = new Set(filteredTriggers.map((t) => t.id));
+    const visibleProcedureIds = new Set(filteredProcedures.map((p) => p.id));
+    const visibleFunctionIds = new Set(filteredFunctions.map((f) => f.id));
+
+    const visibleNodeIds = new Set<string>([
+      ...visibleTableIds,
+      ...visibleViewIds,
+      ...visibleTriggerIds,
+      ...visibleProcedureIds,
+      ...visibleFunctionIds,
+    ]);
+
+    const focusedNeighbors = focusedTableId
+      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
+      : new Set<string>();
+
+    const { edges: nextEdges, handleEdgeTypes } = buildEdgeState(
+      baseEdges,
+      edgeTypeFilter,
+      visibleNodeIds,
+      focusedTableId ?? null,
+      selectedEdgeIds,
+      hoveredEdgeId,
+      showEdgeLabels
+    );
+    setEdges(nextEdges);
+
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        const isVisible = visibleNodeIds.has(node.id);
+        let isFocused = false;
+        let isDimmed = false;
+
+        if (focusedTableId) {
+          if (node.type === "tableNode" || node.type === "viewNode") {
+            isFocused = node.id === focusedTableId;
+            isDimmed = !isFocused && !focusedNeighbors.has(node.id);
+          } else if (node.type === "triggerNode") {
+            const trigger = (node.data as { trigger?: Trigger }).trigger;
+            if (trigger) {
+              isDimmed =
+                trigger.tableId !== focusedTableId &&
+                !focusedNeighbors.has(trigger.tableId);
+            }
+          }
+        }
+
+        const nextData: Record<string, unknown> = {
+          ...(node.data as Record<string, unknown>),
+          isFocused,
+          isDimmed,
+        };
+
+        if (node.type === "tableNode" || node.type === "viewNode") {
+          nextData.columnsWithHandles = schemaIndex.columnsWithHandles;
+          nextData.handleEdgeTypes = handleEdgeTypes;
+          nextData.isCompact = isCompact;
+        }
+
+        return {
+          ...node,
+          hidden: !isVisible,
+          data: nextData,
+        };
+      })
+    );
+  }, [
+    baseEdges,
+    edgeTypeFilter,
+    focusedTableId,
+    isCompact,
+    schema,
+    schemaFilter,
+    schemaIndex,
+    searchFilter,
+    selectedEdgeIds,
+    hoveredEdgeId,
+    setEdges,
+    setNodes,
+    showEdgeLabels,
+    objectTypeFilter,
+  ]);
 
   return (
     <div className="w-full h-full">
@@ -929,7 +777,10 @@ export function SchemaGraphView({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onEdgeClick={onEdgeClick}
+        onEdgeMouseEnter={onEdgeMouseEnter}
+        onEdgeMouseLeave={onEdgeMouseLeave}
         onPaneClick={onPaneClick}
+        onMove={onMove}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -940,12 +791,17 @@ export function SchemaGraphView({
         onlyRenderVisibleElements={true}
         nodesConnectable={false}
       >
-        <Background className="!bg-background [&>pattern>circle]:!fill-border" gap={20} />
+        <Background
+          className="!bg-background [&>pattern>circle]:!fill-border"
+          gap={20}
+        />
         <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
         <MiniMap
           nodeColor={getMinimapNodeColor}
-          maskColor="rgba(0, 0, 0, 0.1)"
-          className="!bg-background !border-border"
+          maskColor="var(--minimap-mask)"
+          className="!bg-background"
+          pannable
+          zoomable
         />
       </ReactFlow>
       <DetailModal
