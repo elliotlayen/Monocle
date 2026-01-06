@@ -1,4 +1,5 @@
 import { useSchemaStore, type ObjectType, type EdgeType } from "@/stores/schemaStore";
+import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -53,7 +54,25 @@ export function Toolbar() {
     selectAllEdgeTypes,
     clearEdgeSelection,
     disconnect,
-  } = useSchemaStore();
+  } = useSchemaStore(
+    useShallow((state) => ({
+      schema: state.schema,
+      focusedTableId: state.focusedTableId,
+      objectTypeFilter: state.objectTypeFilter,
+      edgeTypeFilter: state.edgeTypeFilter,
+      selectedEdgeIds: state.selectedEdgeIds,
+      debouncedSearchFilter: state.debouncedSearchFilter,
+      schemaFilter: state.schemaFilter,
+      setFocusedTable: state.setFocusedTable,
+      clearFocus: state.clearFocus,
+      toggleObjectType: state.toggleObjectType,
+      selectAllObjectTypes: state.selectAllObjectTypes,
+      toggleEdgeType: state.toggleEdgeType,
+      selectAllEdgeTypes: state.selectAllEdgeTypes,
+      clearEdgeSelection: state.clearEdgeSelection,
+      disconnect: state.disconnect,
+    }))
+  );
 
   const counts = useFilteredCounts(
     schema,
@@ -247,7 +266,7 @@ export function Toolbar() {
       <SettingsSheet />
 
       {/* Disconnect */}
-      <Button variant="outline" size="sm" onClick={disconnect} className="h-9">
+      <Button variant="destructive" size="sm" onClick={disconnect} className="h-9 bg-red-600 hover:bg-red-700">
         Disconnect
       </Button>
     </div>

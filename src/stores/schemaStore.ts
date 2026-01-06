@@ -14,9 +14,6 @@ export type EdgeType =
   | "functionReads";
 
 interface SchemaStore {
-  // Internal
-  _debounceTimer: ReturnType<typeof setTimeout> | null;
-
   // State
   schema: SchemaGraph | null;
   isLoading: boolean;
@@ -38,9 +35,10 @@ interface SchemaStore {
   availableSchemas: string[];
 
   // Actions
-  loadMockSchema: () => Promise<void>;
+  loadMockSchema: (size: string) => Promise<void>;
   loadSchema: (params: ConnectionParams) => Promise<void>;
   setSearchFilter: (search: string) => void;
+  setDebouncedSearchFilter: (search: string) => void;
   setSchemaFilter: (schema: string) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
@@ -73,9 +71,6 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
 ]);
 
 export const useSchemaStore = create<SchemaStore>((set) => ({
-  // Internal debounce timer
-  _debounceTimer: null as ReturnType<typeof setTimeout> | null,
-
   // Initial state
   schema: null,
   isLoading: false,
@@ -90,10 +85,10 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   selectedEdgeIds: new Set(),
   availableSchemas: [],
 
-  loadMockSchema: async () => {
+  loadMockSchema: async (size: string) => {
     set({ isLoading: true, error: null });
     try {
-      const schema = await invoke<SchemaGraph>("load_schema_mock");
+      const schema = await invoke<SchemaGraph>("load_schema_mock", { size });
       const tableSchemas = schema.tables.map((t) => t.schema);
       const viewSchemas = schema.views.map((v) => v.schema);
       const functionSchemas = schema.scalarFunctions?.map((f) => f.schema) || [];
@@ -138,18 +133,10 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
     }
   },
 
-  setSearchFilter: (search: string) =>
-    set((state) => {
-      // Clear existing timer
-      if (state._debounceTimer) {
-        clearTimeout(state._debounceTimer);
-      }
-      // Set new timer for debounced value
-      const timer = setTimeout(() => {
-        set({ debouncedSearchFilter: search });
-      }, 150);
-      return { searchFilter: search, _debounceTimer: timer };
-    }),
+  setSearchFilter: (search: string) => set({ searchFilter: search }),
+
+  setDebouncedSearchFilter: (search: string) =>
+    set({ debouncedSearchFilter: search }),
 
   setSchemaFilter: (schema: string) => set({ schemaFilter: schema }),
 

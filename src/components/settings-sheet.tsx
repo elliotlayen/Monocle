@@ -16,11 +16,18 @@ import {
 } from "@/components/ui/select";
 import { useTheme } from "@/providers/theme-provider";
 import { useSchemaStore } from "@/stores/schemaStore";
+import { useShallow } from "zustand/shallow";
 import { EDGE_COLOR_KEY } from "@/constants/edge-colors";
 
 export function SettingsSheet() {
   const { theme, setTheme } = useTheme();
-  const { schemaFilter, availableSchemas, setSchemaFilter } = useSchemaStore();
+  const { schemaFilter, availableSchemas, setSchemaFilter } = useSchemaStore(
+    useShallow((state) => ({
+      schemaFilter: state.schemaFilter,
+      availableSchemas: state.availableSchemas,
+      setSchemaFilter: state.setSchemaFilter,
+    }))
+  );
 
   return (
     <Sheet>

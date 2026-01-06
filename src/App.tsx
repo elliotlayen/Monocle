@@ -1,4 +1,5 @@
 import { useSchemaStore } from "@/stores/schemaStore";
+import { useShallow } from "zustand/shallow";
 import { ConnectionForm } from "@/components/connection-form";
 import { Toolbar } from "@/components/toolbar";
 import { SchemaGraphView } from "@/components/schema-graph";
@@ -12,7 +13,17 @@ function App() {
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
-  } = useSchemaStore();
+  } = useSchemaStore(
+    useShallow((state) => ({
+      schema: state.schema,
+      isConnected: state.isConnected,
+      debouncedSearchFilter: state.debouncedSearchFilter,
+      schemaFilter: state.schemaFilter,
+      focusedTableId: state.focusedTableId,
+      objectTypeFilter: state.objectTypeFilter,
+      edgeTypeFilter: state.edgeTypeFilter,
+    }))
+  );
 
   if (!isConnected || !schema) {
     return <ConnectionForm />;
