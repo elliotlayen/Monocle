@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { SchemaGraph } from "@/types/schema";
 import { ObjectType, EdgeType } from "@/stores/schemaStore";
+import { getSchemaIndex } from "@/lib/schema-index";
 
 interface FilteredCounts {
   filteredObjects: number;
@@ -41,14 +42,19 @@ export function useFilteredCounts(
       };
     }
 
+    const schemaIndex = getSchemaIndex(schema);
+    const lowerSearch = searchFilter.trim().toLowerCase();
+    const hasSearch = lowerSearch.length > 0;
+    const matchesSearch = (map: Map<string, string>, id: string) => {
+      if (!hasSearch) return true;
+      const text = map.get(id);
+      return text ? text.includes(lowerSearch) : false;
+    };
+
     // Calculate focused neighbors (tables/views connected to focused table)
-    const focusedNeighbors = new Set<string>();
-    if (focusedTableId) {
-      schema.relationships.forEach((rel) => {
-        if (rel.from === focusedTableId) focusedNeighbors.add(rel.to);
-        if (rel.to === focusedTableId) focusedNeighbors.add(rel.from);
-      });
-    }
+    const focusedNeighbors = focusedTableId
+      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
+      : new Set<string>();
 
     const showTables = objectTypeFilter.has("tables");
     const showViews = objectTypeFilter.has("views");
@@ -58,14 +64,9 @@ export function useFilteredCounts(
 
     // Filter tables
     let filteredTables = showTables ? schema.tables : [];
-    if (searchFilter) {
-      const lowerSearch = searchFilter.toLowerCase();
-      filteredTables = filteredTables.filter(
-        (t) =>
-          t.name.toLowerCase().includes(lowerSearch) ||
-          t.schema.toLowerCase().includes(lowerSearch) ||
-          t.id.toLowerCase().includes(lowerSearch) ||
-          t.columns.some((col) => col.name.toLowerCase().includes(lowerSearch))
+    if (hasSearch) {
+      filteredTables = filteredTables.filter((t) =>
+        matchesSearch(schemaIndex.tableSearch, t.id)
       );
     }
     if (schemaFilter && schemaFilter !== "all") {
@@ -80,14 +81,9 @@ export function useFilteredCounts(
 
     // Filter views
     let filteredViews = showViews ? (schema.views || []) : [];
-    if (searchFilter) {
-      const lowerSearch = searchFilter.toLowerCase();
-      filteredViews = filteredViews.filter(
-        (v) =>
-          v.name.toLowerCase().includes(lowerSearch) ||
-          v.schema.toLowerCase().includes(lowerSearch) ||
-          v.id.toLowerCase().includes(lowerSearch) ||
-          v.columns.some((col) => col.name.toLowerCase().includes(lowerSearch))
+    if (hasSearch) {
+      filteredViews = filteredViews.filter((v) =>
+        matchesSearch(schemaIndex.viewSearch, v.id)
       );
     }
     if (schemaFilter && schemaFilter !== "all") {
@@ -102,17 +98,15 @@ export function useFilteredCounts(
 
     const tableIds = new Set(filteredTables.map((t) => t.id));
     const viewIds = new Set(filteredViews.map((v) => v.id));
-    const allNodeIds = new Set([...tableIds, ...viewIds]);
 
     // Filter triggers
     const triggers = schema.triggers || [];
     let filteredTriggers = showTriggers
       ? triggers.filter((tr) => tableIds.has(tr.tableId))
       : [];
-    if (searchFilter) {
-      const lowerSearch = searchFilter.toLowerCase();
+    if (hasSearch) {
       filteredTriggers = filteredTriggers.filter((tr) =>
-        tr.name.toLowerCase().includes(lowerSearch)
+        matchesSearch(schemaIndex.triggerSearch, tr.id)
       );
     }
     // Focus filter already applied via tableIds
@@ -125,10 +119,9 @@ export function useFilteredCounts(
         (p) => p.schema === schemaFilter
       );
     }
-    if (searchFilter) {
-      const lowerSearch = searchFilter.toLowerCase();
+    if (hasSearch) {
       filteredProcedures = filteredProcedures.filter((p) =>
-        p.name.toLowerCase().includes(lowerSearch)
+        matchesSearch(schemaIndex.procedureSearch, p.id)
       );
     }
     // For procedures during focus, only count those connected to focused tables
@@ -150,10 +143,9 @@ export function useFilteredCounts(
         (f) => f.schema === schemaFilter
       );
     }
-    if (searchFilter) {
-      const lowerSearch = searchFilter.toLowerCase();
+    if (hasSearch) {
       filteredFunctions = filteredFunctions.filter((f) =>
-        f.name.toLowerCase().includes(lowerSearch)
+        matchesSearch(schemaIndex.functionSearch, f.id)
       );
     }
     // For functions during focus, only count those connected to focused tables
@@ -237,15 +229,10 @@ export function useFilteredCounts(
     let viewDepCount = 0;
     if (edgeTypeFilter.has("viewDependencies")) {
       filteredViews.forEach((view) => {
-        view.columns.forEach((col) => {
-          if (col.sourceTable && col.sourceColumn) {
-            const sourceTableId = [...allNodeIds].find(
-              (id) =>
-                id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
-            );
-            if (sourceTableId) {
-              viewDepCount++;
-            }
+        const sources = schemaIndex.viewColumnSources.get(view.id) ?? [];
+        sources.forEach((source) => {
+          if (tableIds.has(source.sourceTableId) || viewIds.has(source.sourceTableId)) {
+            viewDepCount++;
           }
         });
       });
@@ -271,7 +258,6 @@ export function useFilteredCounts(
     const allFunctions = schema.scalarFunctions || [];
     const allTableIds = new Set(allTables.map((t) => t.id));
     const allViewIds = new Set(allViews.map((v) => v.id));
-    const allAllNodeIds = new Set([...allTableIds, ...allViewIds]);
 
     let totalEdgeCount = 0;
     // All FK edges
@@ -320,17 +306,8 @@ export function useFilteredCounts(
       });
     });
     // All view dep edges
-    allViews.forEach((view) => {
-      view.columns.forEach((col) => {
-        if (col.sourceTable && col.sourceColumn) {
-          const sourceTableId = [...allAllNodeIds].find(
-            (id) => id.endsWith(`.${col.sourceTable}`) || id === col.sourceTable
-          );
-          if (sourceTableId) {
-            totalEdgeCount++;
-          }
-        }
-      });
+    schemaIndex.viewColumnSources.forEach((sources) => {
+      totalEdgeCount += sources.length;
     });
     // All function reads edges
     allFunctions.forEach((fn) => {

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSchemaStore } from '@/stores/schemaStore';
+import { useShallow } from 'zustand/shallow';
 import { searchSchema } from '@/lib/search-utils';
 import type { SearchResult, GroupedSearchResults } from '@/types/search';
 import { Input } from '@/components/ui/input';
@@ -88,7 +89,21 @@ export function SearchBar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const { schema, searchFilter, setSearchFilter, setFocusedTable } = useSchemaStore();
+  const {
+    schema,
+    searchFilter,
+    setSearchFilter,
+    setDebouncedSearchFilter,
+    setFocusedTable,
+  } = useSchemaStore(
+    useShallow((state) => ({
+      schema: state.schema,
+      searchFilter: state.searchFilter,
+      setSearchFilter: state.setSearchFilter,
+      setDebouncedSearchFilter: state.setDebouncedSearchFilter,
+      setFocusedTable: state.setFocusedTable,
+    }))
+  );
 
   // Debounce search query
   useEffect(() => {
@@ -97,6 +112,7 @@ export function SearchBar() {
     }
     debounceTimerRef.current = setTimeout(() => {
       setDebouncedQuery(searchFilter);
+      setDebouncedSearchFilter(searchFilter);
     }, 150);
 
     return () => {
@@ -104,7 +120,7 @@ export function SearchBar() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [searchFilter]);
+  }, [searchFilter, setDebouncedSearchFilter]);
 
   // Compute search results
   const results = useMemo<GroupedSearchResults | null>(() => {
