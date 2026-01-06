@@ -3,610 +3,422 @@ use crate::types::{
     TableNode, Trigger, ViewNode,
 };
 
+struct MockConfig {
+    tables: usize,
+    views: usize,
+    relationships: usize,
+    triggers: usize,
+    procedures: usize,
+    functions: usize,
+}
+
+impl MockConfig {
+    fn from_size(size: &str) -> Self {
+        match size {
+            "small" => MockConfig {
+                tables: 10,
+                views: 3,
+                relationships: 15,
+                triggers: 5,
+                procedures: 5,
+                functions: 5,
+            },
+            "medium" => MockConfig {
+                tables: 100,
+                views: 20,
+                relationships: 150,
+                triggers: 30,
+                procedures: 20,
+                functions: 20,
+            },
+            "large" => MockConfig {
+                tables: 500,
+                views: 50,
+                relationships: 750,
+                triggers: 100,
+                procedures: 50,
+                functions: 50,
+            },
+            "stress" => MockConfig {
+                tables: 2000,
+                views: 200,
+                relationships: 3000,
+                triggers: 300,
+                procedures: 150,
+                functions: 150,
+            },
+            _ => MockConfig {
+                tables: 10,
+                views: 3,
+                relationships: 15,
+                triggers: 5,
+                procedures: 5,
+                functions: 5,
+            },
+        }
+    }
+}
+
+const SCHEMAS: [&str; 4] = ["dbo", "sales", "inventory", "hr"];
+
+const TABLE_PREFIXES: [&str; 20] = [
+    "Customer", "Order", "Product", "Category", "Employee", "Department", "Invoice", "Payment",
+    "Shipment", "Supplier", "Warehouse", "Stock", "Account", "Transaction", "Report", "Log",
+    "Audit", "Config", "Setting", "User",
+];
+
+const TABLE_SUFFIXES: [&str; 10] = [
+    "", "s", "Detail", "History", "Archive", "Temp", "Backup", "Master", "Ref", "Lookup",
+];
+
+const COLUMN_NAMES: [&str; 30] = [
+    "Id", "Name", "Description", "Status", "Type", "Code", "Value", "Amount", "Quantity", "Price",
+    "Date", "CreatedAt", "UpdatedAt", "DeletedAt", "IsActive", "IsDeleted", "Priority", "Sequence",
+    "Notes", "Comments", "Email", "Phone", "Address", "City", "Country", "PostalCode", "Rating",
+    "Score", "Level", "Version",
+];
+
+const DATA_TYPES: [&str; 10] = [
+    "int",
+    "bigint",
+    "nvarchar(100)",
+    "nvarchar(255)",
+    "decimal(18,2)",
+    "datetime2",
+    "bit",
+    "uniqueidentifier",
+    "float",
+    "nvarchar(max)",
+];
+
+fn simple_hash(seed: usize, index: usize) -> usize {
+    let mut h = seed.wrapping_add(index);
+    h = h.wrapping_mul(2654435761);
+    h ^= h >> 16;
+    h
+}
+
+fn generate_tables(config: &MockConfig) -> Vec<TableNode> {
+    let mut tables = Vec::with_capacity(config.tables);
+
+    for i in 0..config.tables {
+        let schema_idx = i % SCHEMAS.len();
+        let prefix_idx = simple_hash(i, 0) % TABLE_PREFIXES.len();
+        let suffix_idx = simple_hash(i, 1) % TABLE_SUFFIXES.len();
+
+        let schema = SCHEMAS[schema_idx].to_string();
+        let name = format!(
+            "{}{}{}",
+            TABLE_PREFIXES[prefix_idx], TABLE_SUFFIXES[suffix_idx], i
+        );
+        let id = format!("{}.{}", schema, name);
+
+        let num_columns = 3 + (simple_hash(i, 2) % 8);
+        let mut columns = Vec::with_capacity(num_columns);
+
+        columns.push(Column {
+            name: "Id".to_string(),
+            data_type: "int".to_string(),
+            is_nullable: false,
+            is_primary_key: true,
+            ..Default::default()
+        });
+
+        for c in 1..num_columns {
+            let col_idx = simple_hash(i * 100 + c, 3) % COLUMN_NAMES.len();
+            let type_idx = simple_hash(i * 100 + c, 4) % DATA_TYPES.len();
+
+            columns.push(Column {
+                name: format!("{}{}", COLUMN_NAMES[col_idx], c),
+                data_type: DATA_TYPES[type_idx].to_string(),
+                is_nullable: simple_hash(i * 100 + c, 5) % 2 == 0,
+                is_primary_key: false,
+                ..Default::default()
+            });
+        }
+
+        tables.push(TableNode {
+            id,
+            name,
+            schema,
+            columns,
+        });
+    }
+
+    tables
+}
+
+fn generate_relationships(tables: &[TableNode], config: &MockConfig) -> Vec<RelationshipEdge> {
+    if tables.len() < 2 {
+        return vec![];
+    }
+
+    let mut relationships = Vec::with_capacity(config.relationships);
+    let max_rels = config.relationships.min(tables.len() * 2);
+
+    for i in 0..max_rels {
+        let from_idx = simple_hash(i, 10) % tables.len();
+        let mut to_idx = simple_hash(i, 11) % tables.len();
+
+        if to_idx == from_idx {
+            to_idx = (to_idx + 1) % tables.len();
+        }
+
+        let from_table = &tables[from_idx];
+        let to_table = &tables[to_idx];
+
+        let fk_col_name = format!("{}Id", to_table.name.trim_end_matches(char::is_numeric));
+
+        relationships.push(RelationshipEdge {
+            id: format!("FK_{}_{}_{}", from_table.name, to_table.name, i),
+            from: from_table.id.clone(),
+            to: to_table.id.clone(),
+            from_column: fk_col_name,
+            to_column: "Id".to_string(),
+        });
+    }
+
+    relationships
+}
+
+fn generate_views(tables: &[TableNode], config: &MockConfig) -> Vec<ViewNode> {
+    if tables.is_empty() {
+        return vec![];
+    }
+
+    let mut views = Vec::with_capacity(config.views);
+
+    for i in 0..config.views {
+        let schema_idx = i % SCHEMAS.len();
+        let schema = SCHEMAS[schema_idx].to_string();
+        let name = format!("vw_Report{}", i);
+        let id = format!("{}.{}", schema, name);
+
+        let num_source_tables = 1 + (simple_hash(i, 20) % 3).min(tables.len());
+        let mut referenced_tables = Vec::with_capacity(num_source_tables);
+        let mut columns = Vec::new();
+
+        for t in 0..num_source_tables {
+            let table_idx = simple_hash(i * 10 + t, 21) % tables.len();
+            let table = &tables[table_idx];
+            referenced_tables.push(table.id.clone());
+
+            for col in table.columns.iter().take(3) {
+                columns.push(Column {
+                    name: format!("{}_{}", table.name, col.name),
+                    data_type: col.data_type.clone(),
+                    is_nullable: col.is_nullable,
+                    is_primary_key: false,
+                    source_table: Some(table.name.clone()),
+                    source_column: Some(col.name.clone()),
+                });
+                if columns.len() >= 8 {
+                    break;
+                }
+            }
+            if columns.len() >= 8 {
+                break;
+            }
+        }
+
+        let definition = format!(
+            "CREATE VIEW {} AS\nSELECT * FROM {} -- Mock view",
+            name,
+            referenced_tables.first().unwrap_or(&"unknown".to_string())
+        );
+
+        views.push(ViewNode {
+            id,
+            name,
+            schema,
+            columns,
+            definition,
+            referenced_tables,
+        });
+    }
+
+    views
+}
+
+fn generate_triggers(tables: &[TableNode], config: &MockConfig) -> Vec<Trigger> {
+    if tables.is_empty() {
+        return vec![];
+    }
+
+    let mut triggers = Vec::with_capacity(config.triggers);
+    let trigger_types = ["AFTER", "INSTEAD OF"];
+
+    for i in 0..config.triggers {
+        let table_idx = simple_hash(i, 30) % tables.len();
+        let table = &tables[table_idx];
+
+        let name = format!("TR_{}_{}", table.name, i);
+        let trigger_type = trigger_types[simple_hash(i, 31) % trigger_types.len()].to_string();
+
+        let fires_on_insert = simple_hash(i, 32) % 2 == 0;
+        let fires_on_update = simple_hash(i, 33) % 2 == 0 || !fires_on_insert;
+        let fires_on_delete = simple_hash(i, 34) % 3 == 0;
+
+        let mut affected_tables = vec![];
+        if simple_hash(i, 35) % 2 == 0 && tables.len() > 1 {
+            let affected_idx = (table_idx + 1 + simple_hash(i, 36)) % tables.len();
+            affected_tables.push(tables[affected_idx].id.clone());
+        }
+
+        triggers.push(Trigger {
+            id: format!("{}.{}", table.id, name),
+            name: name.clone(),
+            schema: table.schema.clone(),
+            table_id: table.id.clone(),
+            trigger_type,
+            is_disabled: simple_hash(i, 37) % 5 == 0,
+            fires_on_insert,
+            fires_on_update,
+            fires_on_delete,
+            definition: format!(
+                "CREATE TRIGGER {} ON {} -- Mock trigger {}",
+                name, table.id, i
+            ),
+            referenced_tables: vec![],
+            affected_tables,
+        });
+    }
+
+    triggers
+}
+
+fn generate_procedures(tables: &[TableNode], config: &MockConfig) -> Vec<StoredProcedure> {
+    let mut procedures = Vec::with_capacity(config.procedures);
+    let proc_prefixes = ["Get", "Update", "Delete", "Insert", "Calculate", "Process", "Validate"];
+
+    for i in 0..config.procedures {
+        let schema_idx = i % SCHEMAS.len();
+        let schema = SCHEMAS[schema_idx].to_string();
+        let prefix = proc_prefixes[simple_hash(i, 40) % proc_prefixes.len()];
+        let name = format!("{}Data{}", prefix, i);
+        let id = format!("{}.{}", schema, name);
+
+        let num_params = 1 + (simple_hash(i, 41) % 4);
+        let mut parameters = Vec::with_capacity(num_params);
+
+        for p in 0..num_params {
+            let param_name_idx = simple_hash(i * 10 + p, 42) % COLUMN_NAMES.len();
+            let type_idx = simple_hash(i * 10 + p, 43) % DATA_TYPES.len();
+
+            parameters.push(ProcedureParameter {
+                name: format!("@{}", COLUMN_NAMES[param_name_idx]),
+                data_type: DATA_TYPES[type_idx].to_string(),
+                is_output: p == num_params - 1 && simple_hash(i, 44) % 3 == 0,
+            });
+        }
+
+        let mut referenced_tables = vec![];
+        let mut affected_tables = vec![];
+
+        if !tables.is_empty() {
+            let read_count = simple_hash(i, 45) % 3;
+            for r in 0..read_count {
+                let table_idx = simple_hash(i * 10 + r, 46) % tables.len();
+                referenced_tables.push(tables[table_idx].id.clone());
+            }
+
+            if prefix == "Update" || prefix == "Delete" || prefix == "Insert" {
+                let write_count = 1 + simple_hash(i, 47) % 2;
+                for w in 0..write_count {
+                    let table_idx = simple_hash(i * 10 + w, 48) % tables.len();
+                    affected_tables.push(tables[table_idx].id.clone());
+                }
+            }
+        }
+
+        procedures.push(StoredProcedure {
+            id,
+            name: name.clone(),
+            schema,
+            procedure_type: "SQL_STORED_PROCEDURE".to_string(),
+            parameters,
+            definition: format!("CREATE PROCEDURE {} -- Mock procedure {}", name, i),
+            referenced_tables,
+            affected_tables,
+        });
+    }
+
+    procedures
+}
+
+fn generate_functions(tables: &[TableNode], config: &MockConfig) -> Vec<ScalarFunction> {
+    let mut functions = Vec::with_capacity(config.functions);
+    let fn_prefixes = ["fn_Get", "fn_Calculate", "fn_Format", "fn_Validate", "fn_Convert"];
+    let return_types = [
+        "int",
+        "decimal(18,2)",
+        "nvarchar(100)",
+        "bit",
+        "datetime2",
+    ];
+
+    for i in 0..config.functions {
+        let schema_idx = i % SCHEMAS.len();
+        let schema = SCHEMAS[schema_idx].to_string();
+        let prefix = fn_prefixes[simple_hash(i, 50) % fn_prefixes.len()];
+        let name = format!("{}Value{}", prefix, i);
+        let id = format!("{}.{}", schema, name);
+
+        let num_params = 1 + (simple_hash(i, 51) % 3);
+        let mut parameters = Vec::with_capacity(num_params);
+
+        for p in 0..num_params {
+            let param_name_idx = simple_hash(i * 10 + p, 52) % COLUMN_NAMES.len();
+            let type_idx = simple_hash(i * 10 + p, 53) % DATA_TYPES.len();
+
+            parameters.push(ProcedureParameter {
+                name: format!("@{}", COLUMN_NAMES[param_name_idx]),
+                data_type: DATA_TYPES[type_idx].to_string(),
+                is_output: false,
+            });
+        }
+
+        let return_type = return_types[simple_hash(i, 54) % return_types.len()].to_string();
+
+        let mut referenced_tables = vec![];
+        if !tables.is_empty() && simple_hash(i, 55) % 2 == 0 {
+            let table_idx = simple_hash(i, 56) % tables.len();
+            referenced_tables.push(tables[table_idx].id.clone());
+        }
+
+        functions.push(ScalarFunction {
+            id,
+            name: name.clone(),
+            schema,
+            function_type: "SQL_SCALAR_FUNCTION".to_string(),
+            parameters,
+            return_type,
+            definition: format!("CREATE FUNCTION {} -- Mock function {}", name, i),
+            referenced_tables,
+            affected_tables: vec![],
+        });
+    }
+
+    functions
+}
+
 #[tauri::command]
-pub fn load_schema_mock() -> Result<SchemaGraph, String> {
-    let customers = TableNode {
-        id: "dbo.Customers".to_string(),
-        name: "Customers".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "Id".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: true,
-                ..Default::default()
-            },
-            Column {
-                name: "Name".to_string(),
-                data_type: "nvarchar(100)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "Email".to_string(),
-                data_type: "nvarchar(255)".to_string(),
-                is_nullable: true,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "CreatedAt".to_string(),
-                data_type: "datetime2".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-        ],
-    };
+pub fn load_schema_mock(size: String) -> Result<SchemaGraph, String> {
+    let config = MockConfig::from_size(&size);
 
-    let orders = TableNode {
-        id: "dbo.Orders".to_string(),
-        name: "Orders".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "Id".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: true,
-                ..Default::default()
-            },
-            Column {
-                name: "CustomerId".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "OrderDate".to_string(),
-                data_type: "datetime2".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "TotalAmount".to_string(),
-                data_type: "decimal(18,2)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "Status".to_string(),
-                data_type: "nvarchar(50)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-        ],
-    };
-
-    let products = TableNode {
-        id: "dbo.Products".to_string(),
-        name: "Products".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "Id".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: true,
-                ..Default::default()
-            },
-            Column {
-                name: "Name".to_string(),
-                data_type: "nvarchar(200)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "Price".to_string(),
-                data_type: "decimal(18,2)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "CategoryId".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: true,
-                is_primary_key: false,
-                ..Default::default()
-            },
-        ],
-    };
-
-    let order_items = TableNode {
-        id: "dbo.OrderItems".to_string(),
-        name: "OrderItems".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "Id".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: true,
-                ..Default::default()
-            },
-            Column {
-                name: "OrderId".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "ProductId".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "Quantity".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "UnitPrice".to_string(),
-                data_type: "decimal(18,2)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-        ],
-    };
-
-    let categories = TableNode {
-        id: "dbo.Categories".to_string(),
-        name: "Categories".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "Id".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: true,
-                ..Default::default()
-            },
-            Column {
-                name: "Name".to_string(),
-                data_type: "nvarchar(100)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                ..Default::default()
-            },
-            Column {
-                name: "Description".to_string(),
-                data_type: "nvarchar(500)".to_string(),
-                is_nullable: true,
-                is_primary_key: false,
-                ..Default::default()
-            },
-        ],
-    };
-
-    let order_summary_view = ViewNode {
-        id: "dbo.vw_OrderSummary".to_string(),
-        name: "vw_OrderSummary".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "OrderId".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Orders".to_string()),
-                source_column: Some("Id".to_string()),
-            },
-            Column {
-                name: "CustomerName".to_string(),
-                data_type: "nvarchar(100)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Customers".to_string()),
-                source_column: Some("Name".to_string()),
-            },
-            Column {
-                name: "OrderDate".to_string(),
-                data_type: "datetime2".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Orders".to_string()),
-                source_column: Some("OrderDate".to_string()),
-            },
-            Column {
-                name: "TotalAmount".to_string(),
-                data_type: "decimal(18,2)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Orders".to_string()),
-                source_column: Some("TotalAmount".to_string()),
-            },
-            Column {
-                name: "ItemCount".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("OrderItems".to_string()),
-                source_column: Some("Id".to_string()),
-            },
-        ],
-        definition: r#"CREATE VIEW vw_OrderSummary AS
-SELECT o.Id AS OrderId, c.Name AS CustomerName, o.OrderDate, o.TotalAmount,
-       COUNT(oi.Id) AS ItemCount
-FROM dbo.Orders o
-JOIN dbo.Customers c ON o.CustomerId = c.Id
-LEFT JOIN dbo.OrderItems oi ON o.Id = oi.OrderId
-GROUP BY o.Id, c.Name, o.OrderDate, o.TotalAmount"#
-            .to_string(),
-        referenced_tables: vec![
-            "dbo.Orders".to_string(),
-            "dbo.Customers".to_string(),
-            "dbo.OrderItems".to_string(),
-        ],
-    };
-
-    let product_catalog_view = ViewNode {
-        id: "dbo.vw_ProductCatalog".to_string(),
-        name: "vw_ProductCatalog".to_string(),
-        schema: "dbo".to_string(),
-        columns: vec![
-            Column {
-                name: "ProductId".to_string(),
-                data_type: "int".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Products".to_string()),
-                source_column: Some("Id".to_string()),
-            },
-            Column {
-                name: "ProductName".to_string(),
-                data_type: "nvarchar(200)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Products".to_string()),
-                source_column: Some("Name".to_string()),
-            },
-            Column {
-                name: "CategoryName".to_string(),
-                data_type: "nvarchar(100)".to_string(),
-                is_nullable: true,
-                is_primary_key: false,
-                source_table: Some("Categories".to_string()),
-                source_column: Some("Name".to_string()),
-            },
-            Column {
-                name: "Price".to_string(),
-                data_type: "decimal(18,2)".to_string(),
-                is_nullable: false,
-                is_primary_key: false,
-                source_table: Some("Products".to_string()),
-                source_column: Some("Price".to_string()),
-            },
-        ],
-        definition: r#"CREATE VIEW vw_ProductCatalog AS
-SELECT p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.Price
-FROM dbo.Products p
-LEFT JOIN dbo.Categories c ON p.CategoryId = c.Id"#
-            .to_string(),
-        referenced_tables: vec![
-            "dbo.Products".to_string(),
-            "dbo.Categories".to_string(),
-        ],
-    };
+    let tables = generate_tables(&config);
+    let relationships = generate_relationships(&tables, &config);
+    let views = generate_views(&tables, &config);
+    let triggers = generate_triggers(&tables, &config);
+    let stored_procedures = generate_procedures(&tables, &config);
+    let scalar_functions = generate_functions(&tables, &config);
 
     Ok(SchemaGraph {
-        tables: vec![customers, orders, products, order_items, categories],
-        views: vec![order_summary_view, product_catalog_view],
-        relationships: vec![
-            RelationshipEdge {
-                id: "FK_Orders_Customers".to_string(),
-                from: "dbo.Orders".to_string(),
-                to: "dbo.Customers".to_string(),
-                from_column: "CustomerId".to_string(),
-                to_column: "Id".to_string(),
-            },
-            RelationshipEdge {
-                id: "FK_OrderItems_Orders".to_string(),
-                from: "dbo.OrderItems".to_string(),
-                to: "dbo.Orders".to_string(),
-                from_column: "OrderId".to_string(),
-                to_column: "Id".to_string(),
-            },
-            RelationshipEdge {
-                id: "FK_OrderItems_Products".to_string(),
-                from: "dbo.OrderItems".to_string(),
-                to: "dbo.Products".to_string(),
-                from_column: "ProductId".to_string(),
-                to_column: "Id".to_string(),
-            },
-            RelationshipEdge {
-                id: "FK_Products_Categories".to_string(),
-                from: "dbo.Products".to_string(),
-                to: "dbo.Categories".to_string(),
-                from_column: "CategoryId".to_string(),
-                to_column: "Id".to_string(),
-            },
-        ],
-        triggers: vec![
-            Trigger {
-                id: "dbo.Orders.TR_Orders_Audit".to_string(),
-                name: "TR_Orders_Audit".to_string(),
-                schema: "dbo".to_string(),
-                table_id: "dbo.Orders".to_string(),
-                trigger_type: "AFTER".to_string(),
-                is_disabled: false,
-                fires_on_insert: true,
-                fires_on_update: true,
-                fires_on_delete: false,
-                definition: r#"CREATE TRIGGER TR_Orders_Audit
-ON dbo.Orders
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    INSERT INTO dbo.AuditLog (TableName, Action, RecordId, ChangedAt)
-    SELECT 'Orders',
-           CASE WHEN EXISTS(SELECT 1 FROM deleted) THEN 'UPDATE' ELSE 'INSERT' END,
-           i.Id,
-           GETDATE()
-    FROM inserted i;
-END"#
-                    .to_string(),
-                referenced_tables: vec![],
-                affected_tables: vec!["dbo.Customers".to_string()],  // Writes to Customers table
-            },
-            Trigger {
-                id: "dbo.Products.TR_Products_UpdatePrice".to_string(),
-                name: "TR_Products_UpdatePrice".to_string(),
-                schema: "dbo".to_string(),
-                table_id: "dbo.Products".to_string(),
-                trigger_type: "AFTER".to_string(),
-                is_disabled: false,
-                fires_on_insert: false,
-                fires_on_update: true,
-                fires_on_delete: false,
-                definition: r#"CREATE TRIGGER TR_Products_UpdatePrice
-ON dbo.Products
-AFTER UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    IF UPDATE(Price)
-    BEGIN
-        INSERT INTO dbo.PriceHistory (ProductId, OldPrice, NewPrice, ChangedAt)
-        SELECT d.Id, d.Price, i.Price, GETDATE()
-        FROM deleted d
-        INNER JOIN inserted i ON d.Id = i.Id
-        WHERE d.Price <> i.Price;
-    END
-END"#
-                    .to_string(),
-                referenced_tables: vec![],
-                affected_tables: vec!["dbo.OrderItems".to_string()],  // Updates OrderItems prices
-            },
-            Trigger {
-                id: "dbo.Customers.TR_Customers_ValidateEmail".to_string(),
-                name: "TR_Customers_ValidateEmail".to_string(),
-                schema: "dbo".to_string(),
-                table_id: "dbo.Customers".to_string(),
-                trigger_type: "INSTEAD OF".to_string(),
-                is_disabled: true,
-                fires_on_insert: true,
-                fires_on_update: true,
-                fires_on_delete: false,
-                definition: r#"CREATE TRIGGER TR_Customers_ValidateEmail
-ON dbo.Customers
-INSTEAD OF INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    -- Validate email format before insert/update
-    IF EXISTS (SELECT 1 FROM inserted WHERE Email NOT LIKE '%@%.%')
-    BEGIN
-        RAISERROR('Invalid email format', 16, 1);
-        RETURN;
-    END
-    -- Perform the actual insert/update
-    INSERT INTO dbo.Customers (Name, Email, CreatedAt)
-    SELECT Name, Email, CreatedAt FROM inserted;
-END"#
-                    .to_string(),
-                referenced_tables: vec![],
-                affected_tables: vec!["dbo.Customers".to_string()],  // Writes to its own table
-            },
-        ],
-        stored_procedures: vec![
-            StoredProcedure {
-                id: "dbo.GetOrdersByCustomer".to_string(),
-                name: "GetOrdersByCustomer".to_string(),
-                schema: "dbo".to_string(),
-                procedure_type: "SQL_STORED_PROCEDURE".to_string(),
-                parameters: vec![
-                    ProcedureParameter {
-                        name: "@CustomerId".to_string(),
-                        data_type: "int".to_string(),
-                        is_output: false,
-                    },
-                    ProcedureParameter {
-                        name: "@StartDate".to_string(),
-                        data_type: "datetime2".to_string(),
-                        is_output: false,
-                    },
-                    ProcedureParameter {
-                        name: "@EndDate".to_string(),
-                        data_type: "datetime2".to_string(),
-                        is_output: false,
-                    },
-                ],
-                definition: r#"CREATE PROCEDURE GetOrdersByCustomer
-    @CustomerId INT,
-    @StartDate DATETIME2 = NULL,
-    @EndDate DATETIME2 = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT o.Id, o.OrderDate, o.TotalAmount, o.Status
-    FROM dbo.Orders o
-    WHERE o.CustomerId = @CustomerId
-      AND (@StartDate IS NULL OR o.OrderDate >= @StartDate)
-      AND (@EndDate IS NULL OR o.OrderDate <= @EndDate)
-    ORDER BY o.OrderDate DESC;
-END"#
-                    .to_string(),
-                referenced_tables: vec!["dbo.Orders".to_string()],
-                affected_tables: vec![],  // Read-only procedure
-            },
-            StoredProcedure {
-                id: "dbo.CalculateOrderTotal".to_string(),
-                name: "CalculateOrderTotal".to_string(),
-                schema: "dbo".to_string(),
-                procedure_type: "SQL_STORED_PROCEDURE".to_string(),
-                parameters: vec![
-                    ProcedureParameter {
-                        name: "@OrderId".to_string(),
-                        data_type: "int".to_string(),
-                        is_output: false,
-                    },
-                    ProcedureParameter {
-                        name: "@Total".to_string(),
-                        data_type: "decimal".to_string(),
-                        is_output: true,
-                    },
-                ],
-                definition: r#"CREATE PROCEDURE CalculateOrderTotal
-    @OrderId INT,
-    @Total DECIMAL(18,2) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT @Total = SUM(Quantity * UnitPrice)
-    FROM dbo.OrderItems
-    WHERE OrderId = @OrderId;
-END"#
-                    .to_string(),
-                referenced_tables: vec!["dbo.OrderItems".to_string()],
-                affected_tables: vec!["dbo.Orders".to_string()],  // Updates Orders.TotalAmount
-            },
-            StoredProcedure {
-                id: "dbo.ArchiveOldOrders".to_string(),
-                name: "ArchiveOldOrders".to_string(),
-                schema: "dbo".to_string(),
-                procedure_type: "SQL_STORED_PROCEDURE".to_string(),
-                parameters: vec![ProcedureParameter {
-                    name: "@DaysOld".to_string(),
-                    data_type: "int".to_string(),
-                    is_output: false,
-                }],
-                definition: r#"CREATE PROCEDURE ArchiveOldOrders
-    @DaysOld INT = 365
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRANSACTION;
-
-    INSERT INTO dbo.OrdersArchive
-    SELECT * FROM dbo.Orders
-    WHERE OrderDate < DATEADD(DAY, -@DaysOld, GETDATE());
-
-    DELETE FROM dbo.Orders
-    WHERE OrderDate < DATEADD(DAY, -@DaysOld, GETDATE());
-
-    COMMIT TRANSACTION;
-END"#
-                    .to_string(),
-                referenced_tables: vec!["dbo.Orders".to_string()],
-                affected_tables: vec!["dbo.Orders".to_string()],  // DELETEs from Orders, INSERTs to OrdersArchive (not in mock)
-            },
-        ],
-        scalar_functions: vec![
-            ScalarFunction {
-                id: "dbo.fn_CalculateDiscount".to_string(),
-                name: "fn_CalculateDiscount".to_string(),
-                schema: "dbo".to_string(),
-                function_type: "SQL_SCALAR_FUNCTION".to_string(),
-                parameters: vec![
-                    ProcedureParameter {
-                        name: "@Price".to_string(),
-                        data_type: "decimal(18,2)".to_string(),
-                        is_output: false,
-                    },
-                    ProcedureParameter {
-                        name: "@DiscountPercent".to_string(),
-                        data_type: "decimal(5,2)".to_string(),
-                        is_output: false,
-                    },
-                ],
-                return_type: "decimal(18,2)".to_string(),
-                definition: r#"CREATE FUNCTION fn_CalculateDiscount(@Price DECIMAL(18,2), @DiscountPercent DECIMAL(5,2))
-RETURNS DECIMAL(18,2)
-AS
-BEGIN
-    RETURN @Price * (1 - @DiscountPercent / 100);
-END"#
-                    .to_string(),
-                referenced_tables: vec![],
-                affected_tables: vec![],
-            },
-            ScalarFunction {
-                id: "dbo.fn_GetCustomerOrderTotal".to_string(),
-                name: "fn_GetCustomerOrderTotal".to_string(),
-                schema: "dbo".to_string(),
-                function_type: "SQL_SCALAR_FUNCTION".to_string(),
-                parameters: vec![ProcedureParameter {
-                    name: "@CustomerId".to_string(),
-                    data_type: "int".to_string(),
-                    is_output: false,
-                }],
-                return_type: "decimal(18,2)".to_string(),
-                definition: r#"CREATE FUNCTION fn_GetCustomerOrderTotal(@CustomerId INT)
-RETURNS DECIMAL(18,2)
-AS
-BEGIN
-    DECLARE @Total DECIMAL(18,2);
-    SELECT @Total = SUM(TotalAmount)
-    FROM dbo.Orders
-    WHERE CustomerId = @CustomerId;
-    RETURN ISNULL(@Total, 0);
-END"#
-                    .to_string(),
-                referenced_tables: vec!["dbo.Orders".to_string()],
-                affected_tables: vec![],
-            },
-            ScalarFunction {
-                id: "dbo.fn_FormatOrderStatus".to_string(),
-                name: "fn_FormatOrderStatus".to_string(),
-                schema: "dbo".to_string(),
-                function_type: "SQL_SCALAR_FUNCTION".to_string(),
-                parameters: vec![ProcedureParameter {
-                    name: "@Status".to_string(),
-                    data_type: "nvarchar(50)".to_string(),
-                    is_output: false,
-                }],
-                return_type: "nvarchar(100)".to_string(),
-                definition: r#"CREATE FUNCTION fn_FormatOrderStatus(@Status NVARCHAR(50))
-RETURNS NVARCHAR(100)
-AS
-BEGIN
-    RETURN CASE @Status
-        WHEN 'P' THEN 'Pending'
-        WHEN 'S' THEN 'Shipped'
-        WHEN 'D' THEN 'Delivered'
-        WHEN 'C' THEN 'Cancelled'
-        ELSE 'Unknown'
-    END;
-END"#
-                    .to_string(),
-                referenced_tables: vec![],
-                affected_tables: vec![],
-            },
-        ],
+        tables,
+        views,
+        relationships,
+        triggers,
+        stored_procedures,
+        scalar_functions,
     })
 }
