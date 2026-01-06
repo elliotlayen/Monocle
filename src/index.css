@@ -43,6 +43,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
+  overscroll-behavior: none;
 }
 
 #root {
@@ -121,6 +122,8 @@ html, body, #root {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --minimap-mask: rgba(0, 0, 0, 0.1);
+  --minimap-mask-hover: rgba(0, 0, 0, 0.25);
 }
 
 .dark {
@@ -155,6 +158,8 @@ html, body, #root {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --minimap-mask: rgba(255, 255, 255, 0.15);
+  --minimap-mask-hover: rgba(255, 255, 255, 0.25);
 }
 
 @layer base {
@@ -164,4 +169,24 @@ html, body, #root {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Minimap hover enhancement */
+.react-flow__minimap {
+  transition: opacity 0.2s ease;
+  opacity: 0.7;
+  border: 1px solid var(--muted-foreground);
+}
+
+.react-flow__minimap:hover {
+  opacity: 1;
+  z-index: 10;
+}
+
+.react-flow__minimap-mask {
+  transition: fill 0.2s ease;
+}
+
+.react-flow__minimap:hover .react-flow__minimap-mask {
+  fill: var(--minimap-mask-hover) !important;
 }
