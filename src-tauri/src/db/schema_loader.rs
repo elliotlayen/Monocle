@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use odbc_api::{buffers::TextRowSet, Cursor};
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::db::{
@@ -42,20 +43,22 @@ pub fn load_schema_from_connection(connection_string: &str) -> Result<SchemaGrap
     // Populate view column sources (from SQL Server dependency metadata)
     load_view_column_sources(&conn, &mut views)?;
 
+    let name_to_id = build_name_lookup(&tables, &views);
+
     // Populate view references (needs tables to be loaded first)
-    load_views_with_references(&mut views, &tables);
+    load_views_with_references(&mut views, &name_to_id);
 
     // Load foreign key relationships
     let relationships = load_foreign_keys(&conn)?;
 
     // Load triggers with table reference parsing
-    let triggers = load_triggers(&conn, &tables, &views)?;
+    let triggers = load_triggers(&conn, &name_to_id)?;
 
     // Load stored procedures with table reference parsing
-    let stored_procedures = load_stored_procedures(&conn, &tables, &views)?;
+    let stored_procedures = load_stored_procedures(&conn, &name_to_id)?;
 
     // Load scalar functions with table reference parsing
-    let scalar_functions = load_scalar_functions(&conn, &tables, &views)?;
+    let scalar_functions = load_scalar_functions(&conn, &name_to_id)?;
 
     Ok(SchemaGraph {
         tables,
@@ -218,20 +221,8 @@ fn load_view_column_sources(
 
 fn load_views_with_references(
     views: &mut [ViewNode],
-    tables: &[TableNode],
+    name_to_id: &HashMap<String, String>,
 ) {
-    // Build lookup maps for table/view name resolution
-    let mut name_to_id: HashMap<String, String> = HashMap::new();
-    for table in tables {
-        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
-        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
-    }
-    // Also add views themselves as potential targets
-    for view in views.iter() {
-        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
-        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
-    }
-
     // Extract table references from each view's definition
     // Views only read, so we just use the read references
     for view in views.iter_mut() {
@@ -303,21 +294,9 @@ fn get_bool_column(batch: &TextRowSet, col: usize, row: usize) -> Result<bool, S
 
 fn load_triggers(
     conn: &odbc_api::Connection<'_>,
-    tables: &[TableNode],
-    views: &[ViewNode],
+    name_to_id: &HashMap<String, String>,
 ) -> Result<Vec<Trigger>, SchemaError> {
     let mut triggers = Vec::new();
-
-    // Build lookup maps for table/view name resolution
-    let mut name_to_id: HashMap<String, String> = HashMap::new();
-    for table in tables {
-        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
-        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
-    }
-    for view in views {
-        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
-        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
-    }
 
     if let Some(mut cursor) = conn.execute(TRIGGERS_QUERY, ())? {
         let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
@@ -339,7 +318,8 @@ fn load_triggers(
                 let trigger_id = format!("{}.{}.{}", schema_name, table_name, trigger_name);
 
                 // Extract table references from the trigger definition
-                let (referenced_tables, affected_tables) = extract_table_references(&definition, &name_to_id);
+                let (referenced_tables, affected_tables) =
+                    extract_table_references(&definition, name_to_id);
 
                 triggers.push(Trigger {
                     id: trigger_id,
@@ -364,21 +344,9 @@ fn load_triggers(
 
 fn load_stored_procedures(
     conn: &odbc_api::Connection<'_>,
-    tables: &[TableNode],
-    views: &[ViewNode],
+    name_to_id: &HashMap<String, String>,
 ) -> Result<Vec<StoredProcedure>, SchemaError> {
     let mut procedures: HashMap<String, StoredProcedure> = HashMap::new();
-
-    // Build lookup maps for table/view name resolution
-    let mut name_to_id: HashMap<String, String> = HashMap::new();
-    for table in tables {
-        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
-        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
-    }
-    for view in views {
-        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
-        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
-    }
 
     if let Some(mut cursor) = conn.execute(STORED_PROCEDURES_QUERY, ())? {
         let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
@@ -397,7 +365,8 @@ fn load_stored_procedures(
                 let procedure_id = format!("{}.{}", schema_name, procedure_name);
 
                 let procedure = procedures.entry(procedure_id.clone()).or_insert_with(|| {
-                    let (referenced_tables, affected_tables) = extract_table_references(&definition, &name_to_id);
+                    let (referenced_tables, affected_tables) =
+                        extract_table_references(&definition, name_to_id);
                     StoredProcedure {
                         id: procedure_id,
                         name: procedure_name,
@@ -426,6 +395,21 @@ fn load_stored_procedures(
 
 /// Extract table/view references from SQL definition
 /// Returns (read_tables, write_tables) - tables read from vs. tables written to
+static READ_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        Regex::new(r"(?i)\bFROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?").unwrap(),
+        Regex::new(r"(?i)\bJOIN\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?").unwrap(),
+    ]
+});
+
+static WRITE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        Regex::new(r"(?i)\bINSERT\s+INTO\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?").unwrap(),
+        Regex::new(r"(?i)\bUPDATE\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?").unwrap(),
+        Regex::new(r"(?i)\bDELETE\s+FROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?").unwrap(),
+    ]
+});
+
 fn extract_table_references(
     definition: &str,
     name_to_id: &HashMap<String, String>,
@@ -433,54 +417,41 @@ fn extract_table_references(
     let mut read_refs: HashSet<String> = HashSet::new();
     let mut write_refs: HashSet<String> = HashSet::new();
 
-    // Read patterns: FROM, JOIN
-    let read_patterns = [
-        r"(?i)\bFROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
-        r"(?i)\bJOIN\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
-    ];
-
-    // Write patterns: INSERT INTO, UPDATE, DELETE FROM
-    let write_patterns = [
-        r"(?i)\bINSERT\s+INTO\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
-        r"(?i)\bUPDATE\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
-        r"(?i)\bDELETE\s+FROM\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?",
-    ];
+    if definition.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
 
     // Process read patterns
-    for pattern in read_patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            for cap in re.captures_iter(definition) {
-                let schema = cap.get(1).map(|m| m.as_str());
-                if let Some(table) = cap.get(2).map(|m| m.as_str()) {
-                    let lookup_key = if let Some(s) = schema {
-                        format!("{}.{}", s, table).to_lowercase()
-                    } else {
-                        table.to_lowercase()
-                    };
+    for pattern in READ_PATTERNS.iter() {
+        for cap in pattern.captures_iter(definition) {
+            let schema = cap.get(1).map(|m| m.as_str());
+            if let Some(table) = cap.get(2).map(|m| m.as_str()) {
+                let lookup_key = if let Some(s) = schema {
+                    format!("{}.{}", s, table).to_lowercase()
+                } else {
+                    table.to_lowercase()
+                };
 
-                    if let Some(id) = name_to_id.get(&lookup_key) {
-                        read_refs.insert(id.clone());
-                    }
+                if let Some(id) = name_to_id.get(&lookup_key) {
+                    read_refs.insert(id.clone());
                 }
             }
         }
     }
 
     // Process write patterns
-    for pattern in write_patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            for cap in re.captures_iter(definition) {
-                let schema = cap.get(1).map(|m| m.as_str());
-                if let Some(table) = cap.get(2).map(|m| m.as_str()) {
-                    let lookup_key = if let Some(s) = schema {
-                        format!("{}.{}", s, table).to_lowercase()
-                    } else {
-                        table.to_lowercase()
-                    };
+    for pattern in WRITE_PATTERNS.iter() {
+        for cap in pattern.captures_iter(definition) {
+            let schema = cap.get(1).map(|m| m.as_str());
+            if let Some(table) = cap.get(2).map(|m| m.as_str()) {
+                let lookup_key = if let Some(s) = schema {
+                    format!("{}.{}", s, table).to_lowercase()
+                } else {
+                    table.to_lowercase()
+                };
 
-                    if let Some(id) = name_to_id.get(&lookup_key) {
-                        write_refs.insert(id.clone());
-                    }
+                if let Some(id) = name_to_id.get(&lookup_key) {
+                    write_refs.insert(id.clone());
                 }
             }
         }
@@ -491,21 +462,9 @@ fn extract_table_references(
 
 fn load_scalar_functions(
     conn: &odbc_api::Connection<'_>,
-    tables: &[TableNode],
-    views: &[ViewNode],
+    name_to_id: &HashMap<String, String>,
 ) -> Result<Vec<ScalarFunction>, SchemaError> {
     let mut functions: HashMap<String, ScalarFunction> = HashMap::new();
-
-    // Build lookup maps for table/view name resolution
-    let mut name_to_id: HashMap<String, String> = HashMap::new();
-    for table in tables {
-        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
-        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
-    }
-    for view in views {
-        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
-        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
-    }
 
     if let Some(mut cursor) = conn.execute(SCALAR_FUNCTIONS_QUERY, ())? {
         let mut buffers = TextRowSet::for_cursor(1000, &mut cursor, Some(8192))?;
@@ -526,7 +485,7 @@ fn load_scalar_functions(
 
                 let function = functions.entry(function_id.clone()).or_insert_with(|| {
                     let (referenced_tables, affected_tables) =
-                        extract_table_references(&definition, &name_to_id);
+                        extract_table_references(&definition, name_to_id);
                     ScalarFunction {
                         id: function_id,
                         name: function_name,
@@ -552,4 +511,22 @@ fn load_scalar_functions(
     }
 
     Ok(functions.into_values().collect())
+}
+
+fn build_name_lookup(
+    tables: &[TableNode],
+    views: &[ViewNode],
+) -> HashMap<String, String> {
+    let mut name_to_id: HashMap<String, String> = HashMap::new();
+
+    for table in tables {
+        name_to_id.insert(table.name.to_lowercase(), table.id.clone());
+        name_to_id.insert(table.id.to_lowercase(), table.id.clone());
+    }
+    for view in views {
+        name_to_id.insert(view.name.to_lowercase(), view.id.clone());
+        name_to_id.insert(view.id.to_lowercase(), view.id.clone());
+    }
+
+    name_to_id
 }
