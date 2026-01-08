@@ -2,6 +2,7 @@ import { useSchemaStore } from "@/stores/schemaStore";
 import { useShallow } from "zustand/shallow";
 import { ConnectionForm } from "@/components/connection-form";
 import { Toolbar } from "@/components/toolbar";
+import { StatusBar } from "@/components/status-bar";
 import { SchemaGraphView } from "@/components/schema-graph";
 
 function App() {
@@ -42,6 +43,7 @@ function App() {
           edgeTypeFilter={edgeTypeFilter}
         />
       </main>
+      <StatusBar />
     </div>
   );
 }

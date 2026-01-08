@@ -19,6 +19,7 @@ interface SchemaStore {
   isLoading: boolean;
   error: string | null;
   isConnected: boolean;
+  connectionInfo: { server: string; database: string } | null;
 
   // Filters
   searchFilter: string;
@@ -76,6 +77,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   isLoading: false,
   error: null,
   isConnected: false,
+  connectionInfo: null,
   searchFilter: "",
   debouncedSearchFilter: "",
   schemaFilter: "all",
@@ -97,6 +99,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         schema,
         isLoading: false,
         isConnected: true,
+        connectionInfo: { server: "localhost", database: "MockDB" },
         availableSchemas: schemas,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
@@ -118,6 +121,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         schema,
         isLoading: false,
         isConnected: true,
+        connectionInfo: { server: params.server, database: params.database },
         availableSchemas: schemas,
         // Reset filters on new connection
         searchFilter: "",
@@ -192,6 +196,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
     set({
       schema: null,
       isConnected: false,
+      connectionInfo: null,
       searchFilter: "",
       debouncedSearchFilter: "",
       schemaFilter: "all",

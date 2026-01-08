@@ -15,6 +15,15 @@ interface FilteredCounts {
     storedProcedures: { filtered: number; total: number };
     scalarFunctions: { filtered: number; total: number };
   };
+  edgeBreakdown: {
+    foreignKeys: { filtered: number; total: number };
+    triggerDependencies: { filtered: number; total: number };
+    triggerWrites: { filtered: number; total: number };
+    procedureReads: { filtered: number; total: number };
+    procedureWrites: { filtered: number; total: number };
+    viewDependencies: { filtered: number; total: number };
+    functionReads: { filtered: number; total: number };
+  };
 }
 
 export function useFilteredCounts(
@@ -38,6 +47,15 @@ export function useFilteredCounts(
           triggers: { filtered: 0, total: 0 },
           storedProcedures: { filtered: 0, total: 0 },
           scalarFunctions: { filtered: 0, total: 0 },
+        },
+        edgeBreakdown: {
+          foreignKeys: { filtered: 0, total: 0 },
+          triggerDependencies: { filtered: 0, total: 0 },
+          triggerWrites: { filtered: 0, total: 0 },
+          procedureReads: { filtered: 0, total: 0 },
+          procedureWrites: { filtered: 0, total: 0 },
+          viewDependencies: { filtered: 0, total: 0 },
+          functionReads: { filtered: 0, total: 0 },
         },
       };
     }
@@ -259,64 +277,78 @@ export function useFilteredCounts(
     const allTableIds = new Set(allTables.map((t) => t.id));
     const allViewIds = new Set(allViews.map((v) => v.id));
 
-    let totalEdgeCount = 0;
-    // All FK edges
-    totalEdgeCount += schema.relationships.filter(
+    // Calculate total counts per edge type
+    const totalFkEdges = schema.relationships.filter(
       (rel) => allTableIds.has(rel.from) && allTableIds.has(rel.to)
     ).length;
-    // All trigger dep edges
+
+    let totalTriggerDepEdges = 0;
     allTriggers.forEach((trigger) => {
       if (allTableIds.has(trigger.tableId)) {
-        totalEdgeCount++; // parent edge
+        totalTriggerDepEdges++;
       }
       (trigger.referencedTables || []).forEach((tableId) => {
         if (
           (allTableIds.has(tableId) || allViewIds.has(tableId)) &&
           tableId !== trigger.tableId
         ) {
-          totalEdgeCount++;
+          totalTriggerDepEdges++;
         }
       });
     });
-    // All trigger writes edges
+
+    let totalTriggerWritesEdges = 0;
     allTriggers.forEach((trigger) => {
       (trigger.affectedTables || []).forEach((tableId) => {
         if (
           (allTableIds.has(tableId) || allViewIds.has(tableId)) &&
           tableId !== trigger.tableId
         ) {
-          totalEdgeCount++;
+          totalTriggerWritesEdges++;
         }
       });
     });
-    // All proc reads edges
+
+    let totalProcReadsEdges = 0;
     allProcedures.forEach((procedure) => {
       (procedure.referencedTables || []).forEach((tableId) => {
         if (allTableIds.has(tableId) || allViewIds.has(tableId)) {
-          totalEdgeCount++;
+          totalProcReadsEdges++;
         }
       });
     });
-    // All proc writes edges
+
+    let totalProcWritesEdges = 0;
     allProcedures.forEach((procedure) => {
       (procedure.affectedTables || []).forEach((tableId) => {
         if (allTableIds.has(tableId) || allViewIds.has(tableId)) {
-          totalEdgeCount++;
+          totalProcWritesEdges++;
         }
       });
     });
-    // All view dep edges
+
+    let totalViewDepEdges = 0;
     schemaIndex.viewColumnSources.forEach((sources) => {
-      totalEdgeCount += sources.length;
+      totalViewDepEdges += sources.length;
     });
-    // All function reads edges
+
+    let totalFuncReadsEdges = 0;
     allFunctions.forEach((fn) => {
       (fn.referencedTables || []).forEach((tableId) => {
         if (allTableIds.has(tableId) || allViewIds.has(tableId)) {
-          totalEdgeCount++;
+          totalFuncReadsEdges++;
         }
       });
     });
+
+    const totalEdgeCount =
+      totalFkEdges +
+      totalTriggerDepEdges +
+      totalTriggerWritesEdges +
+      totalProcReadsEdges +
+      totalProcWritesEdges +
+      totalViewDepEdges +
+      totalFuncReadsEdges;
 
     const filteredEdges =
       fkEdgeCount +
@@ -352,6 +384,15 @@ export function useFilteredCounts(
         triggers: { filtered: filteredTriggers.length, total: schema.triggers?.length || 0 },
         storedProcedures: { filtered: filteredProcedures.length, total: schema.storedProcedures?.length || 0 },
         scalarFunctions: { filtered: filteredFunctions.length, total: schema.scalarFunctions?.length || 0 },
+      },
+      edgeBreakdown: {
+        foreignKeys: { filtered: fkEdgeCount, total: totalFkEdges },
+        triggerDependencies: { filtered: triggerDepCount, total: totalTriggerDepEdges },
+        triggerWrites: { filtered: triggerWritesCount, total: totalTriggerWritesEdges },
+        procedureReads: { filtered: procReadsCount, total: totalProcReadsEdges },
+        procedureWrites: { filtered: procWritesCount, total: totalProcWritesEdges },
+        viewDependencies: { filtered: viewDepCount, total: totalViewDepEdges },
+        functionReads: { filtered: funcReadsCount, total: totalFuncReadsEdges },
       },
     };
   }, [schema, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, focusedTableId]);
