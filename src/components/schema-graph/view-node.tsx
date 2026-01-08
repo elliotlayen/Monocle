@@ -18,7 +18,7 @@ function HandleIndicators({
       {Array.from(edgeTypes).map((type) => (
         <div
           key={type}
-          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          className="w-1.5 h-1.5 rounded-full shrink-0"
           style={{ backgroundColor: EDGE_COLORS[type] }}
         />
       ))}
@@ -69,7 +69,7 @@ function ViewNodeComponent({ data }: NodeProps) {
         />
 
         {/* Left header indicators - fixed width for alignment */}
-        <div className="w-4 flex-shrink-0">
+        <div className="w-4 shrink-0">
           <HandleIndicators
             edgeTypes={handleEdgeTypes?.get(`${view.id}-target`)}
             isCompact={isCompact}
@@ -84,7 +84,7 @@ function ViewNodeComponent({ data }: NodeProps) {
         </div>
 
         {/* Right header indicators - fixed width for alignment */}
-        <div className="w-4 flex-shrink-0 flex justify-end">
+        <div className="w-4 shrink-0 flex justify-end">
           <HandleIndicators
             edgeTypes={handleEdgeTypes?.get(`${view.id}-source`)}
             isCompact={isCompact}
@@ -183,25 +183,25 @@ function ColumnRow({
       )}
 
       {/* Left edge type indicators - fixed width for alignment */}
-      <div className="w-4 flex-shrink-0">
+      <div className="w-4 shrink-0">
         <HandleIndicators edgeTypes={targetEdgeTypes} />
       </div>
 
       {/* Column info */}
       <div className="flex items-center gap-2 flex-1 overflow-hidden">
         <span className="text-xs text-foreground truncate">{column.name}</span>
-        <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-auto">
+        <span className="text-[10px] text-muted-foreground shrink-0 ml-auto">
           {column.dataType}
         </span>
         {column.isNullable && (
-          <span className="text-amber-500 text-xs font-bold flex-shrink-0">
+          <span className="text-amber-500 text-xs font-bold shrink-0">
             ?
           </span>
         )}
       </div>
 
       {/* Right edge type indicators - fixed width for alignment */}
-      <div className="w-4 flex-shrink-0 flex justify-end">
+      <div className="w-4 shrink-0 flex justify-end">
         <HandleIndicators edgeTypes={sourceEdgeTypes} />
       </div>
 

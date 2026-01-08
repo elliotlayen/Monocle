@@ -233,7 +233,7 @@ function TriggerDetail({ trigger }: { trigger: Trigger }) {
       </DialogHeader>
 
       <div className="mt-4 flex-1 flex flex-col min-h-0 space-y-4">
-        <div className="flex gap-4 flex-shrink-0">
+        <div className="flex gap-4 shrink-0">
           <div>
             <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
               Type
@@ -264,7 +264,7 @@ function TriggerDetail({ trigger }: { trigger: Trigger }) {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0">
-          <h4 className="text-sm font-medium mb-2 flex-shrink-0">Definition</h4>
+          <h4 className="text-sm font-medium mb-2 shrink-0">Definition</h4>
           <div className="flex-1 min-h-0">
             <SqlCodeBlock code={trigger.definition} maxHeight="100%" />
           </div>
@@ -296,7 +296,7 @@ function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
 
       <div className="mt-4 flex-1 flex flex-col min-h-0 space-y-4">
         {procedure.parameters.length > 0 && (
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <h4 className="text-sm font-medium mb-2">Parameters</h4>
             <div className="border rounded-lg overflow-hidden max-h-[120px]">
               <ScrollArea className="h-full max-h-[120px]">
@@ -349,7 +349,7 @@ function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
         )}
 
         <div className="flex-1 flex flex-col min-h-0">
-          <h4 className="text-sm font-medium mb-2 flex-shrink-0">Definition</h4>
+          <h4 className="text-sm font-medium mb-2 shrink-0">Definition</h4>
           <div className="flex-1 min-h-0">
             <SqlCodeBlock code={procedure.definition} maxHeight="100%" />
           </div>
@@ -379,7 +379,7 @@ function ScalarFunctionDetail({ fn }: { fn: ScalarFunction }) {
 
       <div className="mt-4 flex-1 flex flex-col min-h-0 space-y-4">
         {fn.parameters.length > 0 && (
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <h4 className="text-sm font-medium mb-2">Parameters</h4>
             <div className="border rounded-lg overflow-hidden max-h-[120px]">
               <ScrollArea className="h-full max-h-[120px]">
@@ -418,7 +418,7 @@ function ScalarFunctionDetail({ fn }: { fn: ScalarFunction }) {
         )}
 
         <div className="flex-1 flex flex-col min-h-0">
-          <h4 className="text-sm font-medium mb-2 flex-shrink-0">Definition</h4>
+          <h4 className="text-sm font-medium mb-2 shrink-0">Definition</h4>
           <div className="flex-1 min-h-0">
             <SqlCodeBlock code={fn.definition} maxHeight="100%" />
           </div>

@@ -318,7 +318,7 @@ export function SearchBar() {
                       isSelected && 'bg-accent'
                     )}
                   >
-                    <div className="flex-shrink-0">{getIconForType(result.type)}</div>
+                    <div className="shrink-0">{getIconForType(result.type)}</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate" style={{ color: getColorForType(result.type) }}>
                         {result.label}
