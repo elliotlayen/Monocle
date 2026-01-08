@@ -1,7 +1,7 @@
 use odbc_api::{Connection, ConnectionOptions, Environment};
 use std::sync::OnceLock;
 
-use crate::types::ConnectionParams;
+use crate::types::{AuthType, ConnectionParams};
 
 static ODBC_ENV: OnceLock<Environment> = OnceLock::new();
 
@@ -18,13 +18,18 @@ pub fn build_connection_string(params: &ConnectionParams) -> String {
         ""
     };
 
+    let auth_part = match params.auth_type {
+        AuthType::Windows => "Trusted_Connection=Yes;".to_string(),
+        AuthType::SqlServer => {
+            let username = params.username.as_deref().unwrap_or("");
+            let password = params.password.as_deref().unwrap_or("");
+            format!("Uid={};Pwd={};", username, password)
+        }
+    };
+
     format!(
-        "Driver={{ODBC Driver 18 for SQL Server}};Server={};Database={};Uid={};Pwd={};{}",
-        params.server,
-        params.database,
-        params.username,
-        params.password,
-        trust_cert
+        "Driver={{ODBC Driver 18 for SQL Server}};Server={};Database={};{}{}",
+        params.server, params.database, auth_part, trust_cert
     )
 }
 

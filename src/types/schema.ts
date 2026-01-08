@@ -93,11 +93,21 @@ export interface SchemaGraph {
   scalarFunctions: ScalarFunction[];
 }
 
+// Authentication type
+export type AuthType = "sqlServer" | "windows";
+
+// Data source info from ODBC
+export interface DataSourceInfo {
+  name: string;
+  description: string;
+}
+
 // Connection parameters
 export interface ConnectionParams {
   server: string;
   database: string;
-  username: string;
-  password: string;
+  authType: AuthType;
+  username?: string;
+  password?: string;
   trustServerCertificate?: boolean;
 }

@@ -106,13 +106,32 @@ pub struct SchemaGraph {
     pub scalar_functions: Vec<ScalarFunction>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuthType {
+    #[default]
+    SqlServer,
+    Windows,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionParams {
     pub server: String,
     pub database: String,
-    pub username: String,
-    pub password: String,
+    #[serde(default)]
+    pub auth_type: AuthType,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
     #[serde(default)]
     pub trust_server_certificate: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataSourceInfo {
+    pub name: String,
+    pub description: String,
 }
