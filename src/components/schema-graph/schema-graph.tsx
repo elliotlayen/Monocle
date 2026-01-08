@@ -730,6 +730,22 @@ export function SchemaGraphView({
                 trigger.tableId !== focusedTableId &&
                 !focusedNeighbors.has(trigger.tableId);
             }
+          } else if (node.type === "storedProcedureNode") {
+            const procedure = (node.data as { procedure?: StoredProcedure }).procedure;
+            if (procedure) {
+              const refs = [...(procedure.referencedTables || []), ...(procedure.affectedTables || [])];
+              isDimmed = !refs.some(
+                (tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId)
+              );
+            }
+          } else if (node.type === "scalarFunctionNode") {
+            const fn = (node.data as { function?: ScalarFunction }).function;
+            if (fn) {
+              const refs = fn.referencedTables || [];
+              isDimmed = !refs.some(
+                (tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId)
+              );
+            }
           }
         }
 
