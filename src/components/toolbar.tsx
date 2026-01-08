@@ -2,32 +2,29 @@ import { useSchemaStore, type ObjectType, type EdgeType } from "@/stores/schemaS
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { Database, ChevronDown, Layers, GitBranch, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Target, Box, Network } from "lucide-react";
 import { SettingsSheet } from "@/components/settings-sheet";
 import { SearchBar } from "@/components/search-bar";
-import { useFilteredCounts } from "@/hooks/useFilteredCounts";
-import { EDGE_TYPE_LABELS } from "@/constants/edge-colors";
+import { EDGE_TYPE_LABELS, EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
@@ -43,232 +40,224 @@ export function Toolbar() {
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
-    selectedEdgeIds,
-    debouncedSearchFilter,
-    schemaFilter,
     setFocusedTable,
     clearFocus,
     toggleObjectType,
     selectAllObjectTypes,
     toggleEdgeType,
     selectAllEdgeTypes,
-    clearEdgeSelection,
-    disconnect,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
       edgeTypeFilter: state.edgeTypeFilter,
-      selectedEdgeIds: state.selectedEdgeIds,
-      debouncedSearchFilter: state.debouncedSearchFilter,
-      schemaFilter: state.schemaFilter,
       setFocusedTable: state.setFocusedTable,
       clearFocus: state.clearFocus,
       toggleObjectType: state.toggleObjectType,
       selectAllObjectTypes: state.selectAllObjectTypes,
       toggleEdgeType: state.toggleEdgeType,
       selectAllEdgeTypes: state.selectAllEdgeTypes,
-      clearEdgeSelection: state.clearEdgeSelection,
-      disconnect: state.disconnect,
     }))
-  );
-
-  const counts = useFilteredCounts(
-    schema,
-    debouncedSearchFilter,
-    schemaFilter,
-    objectTypeFilter,
-    edgeTypeFilter,
-    focusedTableId
   );
 
   if (!schema) return null;
 
-  const selectedObjectCount = objectTypeFilter.size;
-  const allObjectsSelected = selectedObjectCount === 5;
+  const allObjectsSelected = objectTypeFilter.size === 5;
+  const allEdgesSelected = edgeTypeFilter.size === 7;
 
-  const selectedEdgeCount = edgeTypeFilter.size;
-  const allEdgesSelected = selectedEdgeCount === 7;
+  // Dynamic label helpers
+  const getObjectsLabel = () => {
+    if (allObjectsSelected) return null;
+    if (objectTypeFilter.size > 1) return `${objectTypeFilter.size} Objects`;
+    const type = Array.from(objectTypeFilter)[0];
+    return OBJECT_TYPE_LABELS[type];
+  };
 
-  const hasActiveFilters =
-    debouncedSearchFilter !== "" ||
-    schemaFilter !== "all" ||
-    focusedTableId !== null ||
-    !allObjectsSelected ||
-    !allEdgesSelected;
+  const getEdgesLabel = () => {
+    if (allEdgesSelected) return null;
+    if (edgeTypeFilter.size > 1) return `${edgeTypeFilter.size} Edges`;
+    const type = Array.from(edgeTypeFilter)[0];
+    return EDGE_TYPE_LABELS[type];
+  };
+
+  const getFocusLabel = () => {
+    if (!focusedTableId) return null;
+    return focusedTableId;
+  };
+
+  const objectsLabel = getObjectsLabel();
+  const edgesLabel = getEdgesLabel();
+  const focusLabel = getFocusLabel();
+
+  // Group objects by type for the focus popover
+  const objectsByType = {
+    tables: schema.tables,
+    views: schema.views,
+    triggers: schema.triggers,
+    storedProcedures: schema.storedProcedures,
+    scalarFunctions: schema.scalarFunctions,
+  };
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 bg-background border-b border-border shadow-sm">
-      {/* App title */}
-      <div className="flex items-center gap-2 mr-2">
-        <Database className="w-5 h-5 text-blue-600" />
-        <div className="flex flex-col">
-          <span className="font-semibold text-foreground leading-tight">Relova</span>
-          <span className="text-[10px] text-muted-foreground leading-tight">By Elliot Layen</span>
-        </div>
+    <div className="relative flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
+      {/* Left: Monocle branding */}
+      <span className="font-semibold text-base">Monocle</span>
+
+      {/* Center: Search (absolutely centered with explicit width) */}
+      <div className="absolute left-1/2 -translate-x-1/2 w-[448px]">
+        <SearchBar />
       </div>
-
-      <div className="w-px h-6 bg-border" />
-
-      {/* Search */}
-      <SearchBar />
-
-      {/* Object type filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 h-9 px-3 text-sm border border-input rounded-md bg-background hover:bg-accent">
-            <span>
-              {allObjectsSelected ? "All Objects" : `${selectedObjectCount} Object${selectedObjectCount !== 1 ? "s" : ""}`}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-48">
-          {!allObjectsSelected && (
-            <>
-              <DropdownMenuItem onSelect={selectAllObjectTypes}>
-                All Objects
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {(Object.keys(OBJECT_TYPE_LABELS) as ObjectType[]).map((type) => (
-            <DropdownMenuCheckboxItem
-              key={type}
-              checked={objectTypeFilter.has(type)}
-              onCheckedChange={() => toggleObjectType(type)}
-            >
-              {OBJECT_TYPE_LABELS[type]}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Edge type filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 h-9 px-3 text-sm border border-input rounded-md bg-background hover:bg-accent">
-            <span>
-              {allEdgesSelected ? "All Edges" : `${selectedEdgeCount} Edge${selectedEdgeCount !== 1 ? "s" : ""}`}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56">
-          {!allEdgesSelected && (
-            <>
-              <DropdownMenuItem onSelect={selectAllEdgeTypes}>
-                All Edges
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {(Object.keys(EDGE_TYPE_LABELS) as EdgeType[]).map((type) => (
-            <DropdownMenuCheckboxItem
-              key={type}
-              checked={edgeTypeFilter.has(type)}
-              onCheckedChange={() => toggleEdgeType(type)}
-            >
-              {EDGE_TYPE_LABELS[type]}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Focus mode */}
-      <Select
-        value={focusedTableId || "none"}
-        onValueChange={(v) => setFocusedTable(v === "none" ? null : v)}
-      >
-        <SelectTrigger className="w-[180px] h-9">
-          <SelectValue placeholder="Focus: None" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">Focus: None</SelectItem>
-          {schema.tables.map((t) => (
-            <SelectItem key={t.id} value={t.id}>
-              {t.id}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {focusedTableId && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={clearFocus}
-          className="h-9 px-2"
-        >
-          <X className="w-4 h-4 mr-1" />
-          Clear
-        </Button>
-      )}
 
       <div className="flex-1" />
 
-      {/* Deselect edges button */}
-      {selectedEdgeIds.size > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={clearEdgeSelection}
-          className="h-9 px-2"
-        >
-          <X className="w-4 h-4 mr-1" />
-          Deselect ({selectedEdgeIds.size})
-        </Button>
-      )}
-
-      {/* Stats */}
-      <TooltipProvider>
-        <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="slate" className="gap-1 cursor-default">
-                <Layers className="w-3 h-3" />
-                {hasActiveFilters
-                  ? `${counts.filteredObjects} / ${counts.totalObjects} Objects`
-                  : `${counts.totalObjects} Objects`}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-xs">
-                <div className="font-medium mb-1">Objects</div>
-                <div>Tables: {counts.breakdown.tables.filtered} / {counts.breakdown.tables.total}</div>
-                <div>Views: {counts.breakdown.views.filtered} / {counts.breakdown.views.total}</div>
-                <div>Triggers: {counts.breakdown.triggers.filtered} / {counts.breakdown.triggers.total}</div>
-                <div>Procedures: {counts.breakdown.storedProcedures.filtered} / {counts.breakdown.storedProcedures.total}</div>
-                <div>Functions: {counts.breakdown.scalarFunctions.filtered} / {counts.breakdown.scalarFunctions.total}</div>
+      {/* Right: Button group + Settings */}
+      <div className="flex items-center gap-2">
+        {/* Button group */}
+        <TooltipProvider>
+        <div className="flex">
+          {/* Focus button */}
+          <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`rounded-r-none border-r-0 gap-1.5 ${focusLabel ? "bg-accent" : ""}`}
+                  >
+                    <Target className="w-4 h-4" />
+                    {focusLabel && <span className="max-w-24 truncate">{focusLabel}</span>}
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Focus</TooltipContent>
+            </Tooltip>
+            <PopoverContent className="w-56 p-0" align="end">
+              <div className="px-3 py-2 text-sm font-semibold border-b">Focus</div>
+              <div className="max-h-80 overflow-y-auto">
+                {focusedTableId && (
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent border-b"
+                    onClick={clearFocus}
+                  >
+                    Clear Focus
+                  </button>
+                )}
+                {(["tables", "views", "triggers", "storedProcedures", "scalarFunctions"] as const).map((type) => {
+                  const items = objectsByType[type];
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={type}>
+                      <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50">
+                        {OBJECT_TYPE_LABELS[type]}
+                      </div>
+                      {items.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`w-full px-3 py-1.5 text-left text-sm hover:bg-accent ${
+                            focusedTableId === item.id ? "bg-accent" : ""
+                          }`}
+                          style={{ color: OBJECT_COLORS[type] }}
+                          onClick={() => setFocusedTable(item.id)}
+                        >
+                          {item.id}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="blue" className="gap-1 cursor-default">
-                <GitBranch className="w-3 h-3" />
-                {hasActiveFilters
-                  ? `${counts.filteredEdges} / ${counts.totalEdges} Edges`
-                  : `${counts.totalEdges} Edges`}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              {hasActiveFilters
-                ? `${counts.filteredEdges} of ${counts.totalEdges} edges visible`
-                : `${counts.totalEdges} edges`}
-            </TooltipContent>
-          </Tooltip>
+            </PopoverContent>
+          </Popover>
+
+          {/* Objects button */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`rounded-none border-r-0 gap-1.5 ${objectsLabel ? "bg-accent" : ""}`}
+                  >
+                    <Box className="w-4 h-4" />
+                    {objectsLabel && <span>{objectsLabel}</span>}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Objects</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent className="w-48" align="end">
+              <DropdownMenuLabel>Objects</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {!allObjectsSelected && (
+                <>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); selectAllObjectTypes(); }}>
+                    All Objects
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {(Object.keys(OBJECT_TYPE_LABELS) as ObjectType[]).map((type) => (
+                <DropdownMenuCheckboxItem
+                  key={type}
+                  checked={objectTypeFilter.has(type)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => toggleObjectType(type)}
+                >
+                  <span style={{ color: OBJECT_COLORS[type] }}>{OBJECT_TYPE_LABELS[type]}</span>
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Edges button */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`rounded-l-none gap-1.5 ${edgesLabel ? "bg-accent" : ""}`}
+                  >
+                    <Network className="w-4 h-4" />
+                    {edgesLabel && <span>{edgesLabel}</span>}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Edges</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel>Edges</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {!allEdgesSelected && (
+                <>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); selectAllEdgeTypes(); }}>
+                    All Edges
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {(Object.keys(EDGE_TYPE_LABELS) as EdgeType[]).map((type) => (
+                <DropdownMenuCheckboxItem
+                  key={type}
+                  checked={edgeTypeFilter.has(type)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => toggleEdgeType(type)}
+                >
+                  <span style={{ color: EDGE_COLORS[type] }}>{EDGE_TYPE_LABELS[type]}</span>
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </TooltipProvider>
+        </TooltipProvider>
 
-      {/* Settings */}
-      <SettingsSheet />
-
-      {/* Disconnect */}
-      <Button variant="destructive" size="sm" onClick={disconnect} className="h-9 bg-red-600 hover:bg-red-700">
-        Disconnect
-      </Button>
+        {/* Settings */}
+        <SettingsSheet />
+      </div>
     </div>
   );
 }
