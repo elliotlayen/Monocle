@@ -1,4 +1,4 @@
-import { Settings } from "lucide-react";
+import { Settings, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -7,6 +7,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -17,30 +23,36 @@ import {
 import { useTheme } from "@/providers/theme-provider";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { useShallow } from "zustand/shallow";
-import { EDGE_COLOR_KEY } from "@/constants/edge-colors";
 
 export function SettingsSheet() {
   const { theme, setTheme } = useTheme();
-  const { schemaFilter, availableSchemas, setSchemaFilter } = useSchemaStore(
+  const { schemaFilter, availableSchemas, setSchemaFilter, disconnect } = useSchemaStore(
     useShallow((state) => ({
       schemaFilter: state.schemaFilter,
       availableSchemas: state.availableSchemas,
       setSchemaFilter: state.setSchemaFilter,
+      disconnect: state.disconnect,
     }))
   );
 
   return (
+    <TooltipProvider>
     <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 px-2">
-          <Settings className="w-4 h-4" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 px-2">
+              <Settings className="w-4 h-4" />
+            </Button>
+          </SheetTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Settings</TooltipContent>
+      </Tooltip>
+      <SheetContent className="flex flex-col">
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
         </SheetHeader>
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 space-y-6 flex-1">
           <div className="space-y-2">
             <label className="text-sm font-medium">Schema Filter</label>
             <Select value={schemaFilter} onValueChange={setSchemaFilter}>
@@ -78,25 +90,22 @@ export function SettingsSheet() {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Edge Colors</label>
-            <div className="space-y-1.5">
-              {EDGE_COLOR_KEY.map(({ color, label }) => (
-                <div key={label} className="flex items-center gap-2">
-                  <div
-                    className="w-4 h-0.5 rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className="text-sm text-muted-foreground">{label}</span>
-                </div>
-              ))}
+        </div>
+
+        <div className="pt-6 mt-auto border-t border-border space-y-4">
+          <Button variant="destructive" className="w-full" onClick={disconnect}>
+            Disconnect
+          </Button>
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-primary" />
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm">Monocle</span>
+              <span className="text-xs text-muted-foreground">By Elliot Layen</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Colors used for relationship edges in the graph
-            </p>
           </div>
         </div>
       </SheetContent>
     </Sheet>
+    </TooltipProvider>
   );
 }
