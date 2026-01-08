@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSchemaStore, type ObjectType, type EdgeType } from "@/stores/schemaStore";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Target, Box, Network } from "lucide-react";
+import { Target, Box, Network, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { SettingsSheet } from "@/components/settings-sheet";
 import { SearchBar } from "@/components/search-bar";
 import { EDGE_TYPE_LABELS, EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
@@ -61,7 +63,14 @@ export function Toolbar() {
     }))
   );
 
+  const [focusSearch, setFocusSearch] = useState("");
+
   if (!schema) return null;
+
+  const filterItems = (items: { id: string }[]) =>
+    items.filter((item) =>
+      item.id.toLowerCase().includes(focusSearch.toLowerCase())
+    );
 
   const allObjectsSelected = objectTypeFilter.size === 5;
   const allEdgesSelected = edgeTypeFilter.size === 7;
@@ -117,7 +126,7 @@ export function Toolbar() {
         <TooltipProvider>
         <div className="flex">
           {/* Focus button */}
-          <Popover>
+          <Popover onOpenChange={(open) => !open && setFocusSearch("")}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <PopoverTrigger asChild>
@@ -134,7 +143,18 @@ export function Toolbar() {
               <TooltipContent>Focus</TooltipContent>
             </Tooltip>
             <PopoverContent className="w-56 p-0" align="end">
-              <div className="px-3 py-2 text-sm font-semibold border-b">Focus</div>
+              <div className="p-2 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search..."
+                    value={focusSearch}
+                    onChange={(e) => setFocusSearch(e.target.value)}
+                    className="pl-8 h-8"
+                    autoFocus
+                  />
+                </div>
+              </div>
               <div className="max-h-80 overflow-y-auto">
                 {focusedTableId && (
                   <button
@@ -145,14 +165,14 @@ export function Toolbar() {
                   </button>
                 )}
                 {(["tables", "views", "triggers", "storedProcedures", "scalarFunctions"] as const).map((type) => {
-                  const items = objectsByType[type];
-                  if (items.length === 0) return null;
+                  const filteredItems = filterItems(objectsByType[type]);
+                  if (filteredItems.length === 0) return null;
                   return (
                     <div key={type}>
                       <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50">
                         {OBJECT_TYPE_LABELS[type]}
                       </div>
-                      {items.map((item) => (
+                      {filteredItems.map((item) => (
                         <button
                           key={item.id}
                           className={`w-full px-3 py-1.5 text-left text-sm hover:bg-accent ${
@@ -167,6 +187,14 @@ export function Toolbar() {
                     </div>
                   );
                 })}
+                {focusSearch &&
+                  (["tables", "views", "triggers", "storedProcedures", "scalarFunctions"] as const).every(
+                    (type) => filterItems(objectsByType[type]).length === 0
+                  ) && (
+                    <div className="px-3 py-4 text-sm text-center text-muted-foreground">
+                      No matches found
+                    </div>
+                  )}
               </div>
             </PopoverContent>
           </Popover>
