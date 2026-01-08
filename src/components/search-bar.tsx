@@ -6,21 +6,34 @@ import type { SearchResult, GroupedSearchResults } from '@/types/search';
 import { Input } from '@/components/ui/input';
 import { Search, X, Table2, Eye, Zap, Code, Columns, FunctionSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { OBJECT_COLORS } from '@/constants/edge-colors';
+
+function getColorForType(type: SearchResult['type']): string {
+  switch (type) {
+    case 'table': return OBJECT_COLORS.tables;
+    case 'view': return OBJECT_COLORS.views;
+    case 'column': return OBJECT_COLORS.tables;
+    case 'trigger': return OBJECT_COLORS.triggers;
+    case 'procedure': return OBJECT_COLORS.storedProcedures;
+    case 'function': return OBJECT_COLORS.scalarFunctions;
+  }
+}
 
 function getIconForType(type: SearchResult['type']) {
+  const color = getColorForType(type);
   switch (type) {
     case 'table':
-      return <Table2 className="w-4 h-4 text-slate-600" />;
+      return <Table2 className="w-4 h-4" style={{ color }} />;
     case 'view':
-      return <Eye className="w-4 h-4 text-emerald-600" />;
+      return <Eye className="w-4 h-4" style={{ color }} />;
     case 'column':
-      return <Columns className="w-4 h-4 text-blue-600" />;
+      return <Columns className="w-4 h-4" style={{ color }} />;
     case 'trigger':
-      return <Zap className="w-4 h-4 text-amber-600" />;
+      return <Zap className="w-4 h-4" style={{ color }} />;
     case 'procedure':
-      return <Code className="w-4 h-4 text-purple-600" />;
+      return <Code className="w-4 h-4" style={{ color }} />;
     case 'function':
-      return <FunctionSquare className="w-4 h-4 text-cyan-600" />;
+      return <FunctionSquare className="w-4 h-4" style={{ color }} />;
   }
 }
 
@@ -202,13 +215,14 @@ export function SearchBar() {
           e.preventDefault();
           setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
           break;
-        case 'Enter':
+        case 'Enter': {
           e.preventDefault();
           const selectedItem = selectableItems[selectedIndex];
           if (selectedItem?.result) {
             handleSelectResult(selectedItem.result as SearchResult);
           }
           break;
+        }
         case 'Escape':
           e.preventDefault();
           setIsOpen(false);
@@ -240,12 +254,12 @@ export function SearchBar() {
   };
 
   return (
-    <div className="relative flex-1 max-w-xs">
+    <div className="relative flex-1 max-w-md">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
       <Input
         ref={inputRef}
         type="text"
-        placeholder="Search tables, columns..."
+        placeholder="Search"
         value={searchFilter}
         onChange={(e) => setSearchFilter(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -306,7 +320,9 @@ export function SearchBar() {
                   >
                     <div className="flex-shrink-0">{getIconForType(result.type)}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{result.label}</div>
+                      <div className="text-sm font-medium truncate" style={{ color: getColorForType(result.type) }}>
+                        {result.label}
+                      </div>
                       {result.sublabel && (
                         <div className="text-xs text-muted-foreground truncate">
                           {result.sublabel}
