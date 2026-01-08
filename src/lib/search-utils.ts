@@ -194,22 +194,22 @@ export function searchSchema(
   // Sort and limit results
   const tables = sortByScore(tableResults)
     .slice(0, maxPerCategory)
-    .map(({ score, ...rest }) => rest);
+    .map(({ score: _score, ...rest }) => rest);
   const views = sortByScore(viewResults)
     .slice(0, maxPerCategory)
-    .map(({ score, ...rest }) => rest);
+    .map(({ score: _score, ...rest }) => rest);
   const columns = sortByScore(columnResults)
     .slice(0, maxPerCategory)
-    .map(({ score, ...rest }) => rest);
+    .map(({ score: _score, ...rest }) => rest);
   const triggers = sortByScore(triggerResults)
     .slice(0, maxPerCategory)
-    .map(({ score, ...rest }) => rest);
+    .map(({ score: _score, ...rest }) => rest);
   const procedures = sortByScore(procedureResults)
     .slice(0, maxPerCategory)
-    .map(({ score, ...rest }) => rest);
+    .map(({ score: _score, ...rest }) => rest);
   const functions = sortByScore(functionResults)
     .slice(0, maxPerCategory)
-    .map(({ score, ...rest }) => rest);
+    .map(({ score: _score, ...rest }) => rest);
 
   return {
     tables,

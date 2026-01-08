@@ -98,7 +98,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
     for (const col of view.columns) {
       if (!col.sourceTable || !col.sourceColumn) continue;
 
-      const normalizedSource = col.sourceTable.replace(/[\[\]]/g, "");
+      const normalizedSource = col.sourceTable.replace(/[[\]]/g, "");
       const sourceKey = normalizedSource.toLowerCase();
       let sourceTableId = nameToId.get(sourceKey);
       if (!sourceTableId) {
