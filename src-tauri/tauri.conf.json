@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "Monocle",
-        "titleBarStyle": "visible",
-        "width": 800,
-        "height": 600,
+        "titleBarStyle": "Visible",
+        "width": 1280,
+        "height": 720,
         "minWidth": 1280,
         "minHeight": 720
       }
