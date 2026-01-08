@@ -1,4 +1,4 @@
-# Relova
+# Monocle
 
 A desktop application for visualizing SQL Server database schemas. Connect to any SQL Server database and explore tables, views, relationships, triggers, stored procedures, and functions in an interactive graph.
 

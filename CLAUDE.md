@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Relova is a Tauri desktop application for visualizing SQL Server database schemas. It connects to SQL Server via ODBC, loads table/column/foreign key metadata, and renders an interactive relationship graph similar to Supabase's schema visualizer.
+Monocle is a Tauri desktop application for visualizing SQL Server database schemas. It connects to SQL Server via ODBC, loads table/column/foreign key metadata, and renders an interactive relationship graph similar to Supabase's schema visualizer.
 
 ## Common Commands
 
