@@ -20,6 +20,8 @@ pub enum SchemaError {
     Odbc(#[from] odbc_api::Error),
     #[error("Failed to parse column data: {0}")]
     Parse(String),
+    #[error("Driver error: {0}")]
+    Driver(String),
 }
 
 impl serde::Serialize for SchemaError {
