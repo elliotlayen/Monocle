@@ -90,7 +90,7 @@ export const createInitialSchemaState = () => ({
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
-  selectedEdgeIds: new Set(),
+  selectedEdgeIds: new Set<string>(),
   availableSchemas: [],
 });
 
@@ -158,7 +158,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         focusedTableId: null,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
-        selectedEdgeIds: new Set(),
+        selectedEdgeIds: new Set<string>(),
       });
       return true;
     } catch (err) {
@@ -238,7 +238,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       return { selectedEdgeIds: newSelection };
     }),
 
-  clearEdgeSelection: () => set({ selectedEdgeIds: new Set() }),
+  clearEdgeSelection: () => set({ selectedEdgeIds: new Set<string>() }),
 
   disconnect: () =>
     set({
@@ -251,7 +251,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       focusedTableId: null,
       objectTypeFilter: new Set(ALL_OBJECT_TYPES),
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
-      selectedEdgeIds: new Set(),
+      selectedEdgeIds: new Set<string>(),
       availableSchemas: [],
       error: null,
     }),
