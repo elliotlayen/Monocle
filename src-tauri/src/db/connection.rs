@@ -81,3 +81,29 @@ fn parse_server(server: &str) -> (String, u16) {
 
     (server.to_string(), DEFAULT_PORT)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_server;
+
+    #[test]
+    fn parse_server_with_comma() {
+        let (host, port) = parse_server("sql.example.com,1444");
+        assert_eq!(host, "sql.example.com");
+        assert_eq!(port, 1444);
+    }
+
+    #[test]
+    fn parse_server_with_colon() {
+        let (host, port) = parse_server("sql.example.com:1555");
+        assert_eq!(host, "sql.example.com");
+        assert_eq!(port, 1555);
+    }
+
+    #[test]
+    fn parse_server_defaults_port() {
+        let (host, port) = parse_server("localhost");
+        assert_eq!(host, "localhost");
+        assert_eq!(port, 1433);
+    }
+}

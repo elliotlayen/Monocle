@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { settingsService } from "@/features/settings/services/settings-service";
 
-type Theme = "dark" | "light" | "system";
+export type Theme = "dark" | "light" | "system";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -26,7 +27,7 @@ export function ThemeProvider({
   storageKey = "monocle-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
+  const [theme, setThemeState] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
 
@@ -49,6 +50,25 @@ export function ThemeProvider({
   }, [theme]);
 
   useEffect(() => {
+    let isMounted = true;
+    settingsService
+      .getSettings()
+      .then((settings) => {
+        if (!isMounted || !settings.theme) return;
+        if (settings.theme === "dark" || settings.theme === "light" || settings.theme === "system") {
+          localStorage.setItem(storageKey, settings.theme);
+          setThemeState(settings.theme);
+        }
+      })
+      .catch(() => {
+        // Ignore settings load failures
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (theme !== "system") return;
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -67,7 +87,10 @@ export function ThemeProvider({
     theme,
     setTheme: (theme: Theme) => {
       localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+      setThemeState(theme);
+      settingsService.saveSettings({ theme }).catch(() => {
+        // Ignore settings persistence failures
+      });
     },
   };
 

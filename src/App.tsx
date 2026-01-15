@@ -1,10 +1,12 @@
-import { useSchemaStore } from "@/stores/schemaStore";
+import { useEffect } from "react";
+import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
-import { ConnectionForm } from "@/components/connection-form";
-import { Toolbar } from "@/components/toolbar";
+import { ConnectionForm } from "@/features/connection/components/connection-form";
+import { Toolbar } from "@/features/toolbar/components/toolbar";
 import { StatusBar } from "@/components/status-bar";
-import { SchemaGraphView } from "@/components/schema-graph";
+import { SchemaGraphView } from "@/features/schema-graph/components";
 import { UpdateChecker } from "@/components/update-checker";
+import { settingsService } from "@/features/settings/services/settings-service";
 
 function App() {
   const {
@@ -15,6 +17,7 @@ function App() {
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
+    hydrateSettings,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
@@ -24,8 +27,25 @@ function App() {
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
       edgeTypeFilter: state.edgeTypeFilter,
+      hydrateSettings: state.hydrateSettings,
     }))
   );
+
+  useEffect(() => {
+    let isMounted = true;
+    settingsService
+      .getSettings()
+      .then((settings) => {
+        if (!isMounted) return;
+        hydrateSettings(settings);
+      })
+      .catch(() => {
+        // Ignore settings load failures
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [hydrateSettings]);
 
   if (!isConnected || !schema) {
     return (

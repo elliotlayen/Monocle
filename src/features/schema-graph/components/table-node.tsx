@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ViewNode as ViewNodeType, Column } from "@/types/schema";
-import { EdgeType } from "@/stores/schemaStore";
+import { TableNode as TableNodeType, Column } from "../types";
+import { EdgeType } from "../store";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS } from "@/constants/edge-colors";
 
@@ -26,8 +26,8 @@ function HandleIndicators({
   );
 }
 
-interface ViewNodeData {
-  view: ViewNodeType;
+interface TableNodeData {
+  table: TableNodeType;
   isFocused?: boolean;
   isDimmed?: boolean;
   isCompact?: boolean;
@@ -36,34 +36,34 @@ interface ViewNodeData {
   onClick?: () => void;
 }
 
-function ViewNodeComponent({ data }: NodeProps) {
+function TableNodeComponent({ data }: NodeProps) {
   const {
-    view,
+    table,
     isFocused,
     isDimmed,
     isCompact,
     columnsWithHandles,
     handleEdgeTypes,
     onClick,
-  } = data as unknown as ViewNodeData;
+  } = data as unknown as TableNodeData;
 
   return (
     <div
       onClick={onClick}
       className={cn(
         "bg-card border border-border rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer relative",
-        isFocused && "border-emerald-500 ring-2 ring-emerald-200",
+        isFocused && "border-blue-500 ring-2 ring-blue-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
       )}
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-3 py-2 flex items-center relative">
+      <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2 flex items-center relative">
         {/* Generic target handle for incoming procedure/trigger references - inside header */}
         <Handle
           type="target"
           position={Position.Left}
-          id={`${view.id}-target`}
+          id={`${table.id}-target`}
           className="!w-0 !h-0 !bg-transparent !border-0"
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
@@ -71,31 +71,31 @@ function ViewNodeComponent({ data }: NodeProps) {
         {/* Left header indicators - fixed width for alignment */}
         <div className="w-4 shrink-0">
           <HandleIndicators
-            edgeTypes={handleEdgeTypes?.get(`${view.id}-target`)}
+            edgeTypes={handleEdgeTypes?.get(`${table.id}-target`)}
             isCompact={isCompact}
           />
         </div>
 
         <div className="flex-1">
-          <span className="text-[10px] text-emerald-200 uppercase tracking-wide block">
-            View
+          <span className="text-[10px] text-slate-400 uppercase tracking-wide block">
+            Table
           </span>
-          <span className="text-sm font-semibold">{view.name}</span>
+          <span className="text-sm font-semibold">{table.name}</span>
         </div>
 
         {/* Right header indicators - fixed width for alignment */}
         <div className="w-4 shrink-0 flex justify-end">
           <HandleIndicators
-            edgeTypes={handleEdgeTypes?.get(`${view.id}-source`)}
+            edgeTypes={handleEdgeTypes?.get(`${table.id}-source`)}
             isCompact={isCompact}
           />
         </div>
 
-        {/* Generic source handle for outgoing view-level connections - inside header */}
+        {/* Generic source handle for outgoing table-level connections (e.g., to triggers) - inside header */}
         <Handle
           type="source"
           position={Position.Right}
-          id={`${view.id}-source`}
+          id={`${table.id}-source`}
           className="!w-0 !h-0 !bg-transparent !border-0"
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
@@ -103,13 +103,13 @@ function ViewNodeComponent({ data }: NodeProps) {
 
       {/* Columns */}
       <div className="py-1">
-        {view.columns.map((column, index) => (
+        {table.columns.map((column, index) => (
           <ColumnRow
             key={column.name}
             column={column}
-            viewId={view.id}
+            tableId={table.id}
             index={index}
-            hasHandle={columnsWithHandles?.has(`${view.id}-${column.name}`) ?? true}
+            hasHandle={columnsWithHandles?.has(`${table.id}-${column.name}`) ?? true}
             handleEdgeTypes={handleEdgeTypes}
             isCompact={isCompact}
           />
@@ -117,7 +117,7 @@ function ViewNodeComponent({ data }: NodeProps) {
       </div>
       {isCompact && (
         <div className="px-3 pb-2 text-[10px] text-muted-foreground">
-          {view.columns.length} column{view.columns.length !== 1 && "s"}
+          {table.columns.length} column{table.columns.length !== 1 && "s"}
         </div>
       )}
     </div>
@@ -126,7 +126,7 @@ function ViewNodeComponent({ data }: NodeProps) {
 
 interface ColumnRowProps {
   column: Column;
-  viewId: string;
+  tableId: string;
   index: number;
   hasHandle: boolean;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
@@ -135,12 +135,12 @@ interface ColumnRowProps {
 
 function ColumnRow({
   column,
-  viewId,
+  tableId,
   hasHandle,
   handleEdgeTypes,
   isCompact,
 }: ColumnRowProps) {
-  const handleId = `${viewId}-${column.name}`;
+  const handleId = `${tableId}-${column.name}`;
   const targetEdgeTypes = handleEdgeTypes?.get(`${handleId}-target`);
   const sourceEdgeTypes = handleEdgeTypes?.get(`${handleId}-source`);
 
@@ -171,7 +171,7 @@ function ColumnRow({
 
   return (
     <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
-      {/* Left handle for incoming references (target) - only render if column has relationships */}
+      {/* Left handle for incoming FKs (target) - only render if column has relationships */}
       {hasHandle && (
         <Handle
           type="target"
@@ -189,7 +189,19 @@ function ColumnRow({
 
       {/* Column info */}
       <div className="flex items-center gap-2 flex-1 overflow-hidden">
-        <span className="text-xs text-foreground truncate">{column.name}</span>
+        {column.isPrimaryKey && (
+          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.5 rounded shrink-0">
+            PK
+          </span>
+        )}
+        <span
+          className={cn(
+            "text-xs text-foreground truncate",
+            column.isPrimaryKey && "font-semibold"
+          )}
+        >
+          {column.name}
+        </span>
         <span className="text-[10px] text-muted-foreground shrink-0 ml-auto">
           {column.dataType}
         </span>
@@ -205,7 +217,7 @@ function ColumnRow({
         <HandleIndicators edgeTypes={sourceEdgeTypes} />
       </div>
 
-      {/* Right handle for outgoing references (source) - only render if column has relationships */}
+      {/* Right handle for outgoing FKs (source) - only render if column has relationships */}
       {hasHandle && (
         <Handle
           type="source"
@@ -220,4 +232,4 @@ function ColumnRow({
 }
 
 // Memoize for performance
-export const ViewNode = memo(ViewNodeComponent);
+export const TableNode = memo(TableNodeComponent);

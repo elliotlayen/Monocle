@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Monocle is a Tauri desktop application for visualizing SQL Server database schemas. It connects to SQL Server via ODBC, loads table/column/foreign key metadata, and renders an interactive relationship graph similar to Supabase's schema visualizer.
+Monocle is a Tauri desktop application for visualizing SQL Server database schemas. It connects to SQL Server via tiberius (TDS protocol), loads table/column/foreign key metadata, and renders an interactive relationship graph similar to Supabase's schema visualizer.
 
 ## Common Commands
 
@@ -21,6 +21,8 @@ npm run dev
 # Type check and build frontend
 npm run build
 
+# Run tests
+npm run test
 ```
 
 Note: Always lint, test, and typecheck updated files. Use project-wide build sparingly.
@@ -29,43 +31,84 @@ Note: Always lint, test, and typecheck updated files. Use project-wide build spa
 
 ### Frontend (React + TypeScript)
 
-- `src/App.tsx` - Root component, conditionally shows ConnectionForm or SchemaGraphView
-- `src/stores/schemaStore.ts` - Zustand store managing schema state, filters, and Tauri command invocations
-- `src/types/schema.ts` - Shared type definitions (SchemaGraph, TableNode, Column, RelationshipEdge)
-- `src/components/schema-graph/` - React Flow visualization components
-  - `schema-graph.tsx` - Main graph view with filtering/focus logic
-  - `table-node.tsx` - Custom node rendering tables with columns
-- `src/components/connection-form.tsx` - Database connection UI
-- `src/components/toolbar.tsx` - Search, schema filter, and focus controls
+The frontend uses a feature-based architecture with a services layer for Tauri IPC.
+
+```
+src/
+  features/
+    connection/
+      components/connection-form.tsx  - Database connection UI with recent connections
+      services/connection-service.ts  - Tauri IPC for connection history
+    schema-graph/
+      components/                     - React Flow visualization components
+        schema-graph.tsx              - Main graph view with filtering/focus
+        table-node.tsx                - Custom node for tables
+        view-node.tsx                 - Custom node for views
+        trigger-node.tsx              - Custom node for triggers
+        stored-procedure-node.tsx     - Custom node for procedures
+        scalar-function-node.tsx      - Custom node for functions
+        detail-modal.tsx              - SQL definition modal
+      hooks/useFilteredCounts.ts      - Filter statistics hook
+      services/schema-service.ts      - Tauri IPC for schema loading
+      store.ts                        - Zustand store for schema state
+      types.ts                        - TypeScript types (SchemaGraph, TableNode, etc.)
+    settings/
+      components/settings-sheet.tsx   - Settings panel
+      services/settings-service.ts    - Tauri IPC for settings persistence
+    toolbar/
+      components/toolbar.tsx          - Search, schema filter, focus controls
+      components/search-bar.tsx       - Fuzzy search component
+      types.ts                        - Search result types
+  components/
+    ui/                               - shadcn/ui components
+    status-bar.tsx                    - Bottom status bar
+    update-checker.tsx                - Auto-update notification
+  App.tsx                             - Root component
+```
 
 ### Backend (Rust + Tauri)
 
-- `src-tauri/src/lib.rs` - Tauri app setup, registers commands
-- `src-tauri/src/commands/` - Tauri command handlers
-  - `schema.rs` - `load_schema` command (real database)
-  - `mock.rs` - `load_schema_mock` command (test data)
-- `src-tauri/src/db/` - Database interaction layer
-  - `connection.rs` - ODBC connection management, connection string building
-  - `queries.rs` - SQL queries for tables/columns and foreign keys
-  - `schema_loader.rs` - Parses ODBC results into SchemaGraph
-- `src-tauri/src/types/` - Rust type definitions mirroring frontend types
+```
+src-tauri/src/
+  lib.rs              - Tauri app setup, registers commands and state
+  state.rs            - AppState with Mutex<AppSettings> for thread-safe persistence
+  commands/
+    schema.rs         - load_schema_cmd (real database)
+    mock.rs           - load_schema_mock (test data)
+    connections.rs    - Connection history CRUD commands
+    settings.rs       - Settings persistence commands
+  db/
+    connection.rs     - Tiberius connection management
+    queries.rs        - SQL queries for metadata
+    schema_loader.rs  - Parses results into SchemaGraph
+  types/              - Rust type definitions mirroring frontend types
+```
 
 ### Key Data Flow
 
-1. Frontend calls `invoke<SchemaGraph>("load_schema", { params })` via Tauri
-2. Rust builds ODBC connection string, executes SQL Server metadata queries
-3. Results parsed into `SchemaGraph` struct, serialized to JSON
-4. Frontend receives data, stores in Zustand, converts to React Flow nodes/edges
+1. Frontend calls service (e.g., `schemaService.loadSchema(params)`)
+2. Service invokes Tauri command via `invoke<SchemaGraph>("load_schema_cmd", { params })`
+3. Rust connects via tiberius, executes SQL Server metadata queries
+4. Results parsed into `SchemaGraph` struct, serialized to JSON
+5. Frontend receives data, stores in Zustand, converts to React Flow nodes/edges
+
+### State Persistence
+
+- `AppState` in Rust manages settings via `Mutex<AppSettings>`
+- Settings persist to `{app_data_dir}/settings.json`
+- Connection history (last 10) saved automatically on successful connect
+- Schema filter preference restored on app launch
 
 ## Type Consistency
 
-TypeScript types in `src/types/schema.ts` must stay in sync with Rust types in `src-tauri/src/types/schema.rs`. Both use camelCase field names (Rust uses `#[serde(rename_all = "camelCase")]`).
+TypeScript types in `src/features/schema-graph/types.ts` must stay in sync with Rust types in `src-tauri/src/types/schema.rs`. Both use camelCase field names (Rust uses `#[serde(rename_all = "camelCase")]`).
 
 ## Prerequisites
 
-- ODBC Driver 17+ for SQL Server must be installed on the system
 - Rust toolchain for Tauri backend
 - Node.js for frontend
+
+No external database drivers needed - tiberius connects to SQL Server directly via TDS protocol.
 
 ## Code Style
 

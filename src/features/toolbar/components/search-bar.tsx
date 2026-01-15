@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useSchemaStore } from '@/stores/schemaStore';
+import { useSchemaStore } from '@/features/schema-graph/store';
 import { useShallow } from 'zustand/shallow';
 import { searchSchema } from '@/lib/search-utils';
-import type { SearchResult, GroupedSearchResults } from '@/types/search';
+import type { SearchResult, GroupedSearchResults } from '../types';
 import { Input } from '@/components/ui/input';
 import { Search, X, Table2, Eye, Zap, Code, Columns, FunctionSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';

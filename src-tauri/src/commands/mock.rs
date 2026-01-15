@@ -131,7 +131,7 @@ fn generate_tables(config: &MockConfig) -> Vec<TableNode> {
             columns.push(Column {
                 name: format!("{}{}", COLUMN_NAMES[col_idx], c),
                 data_type: DATA_TYPES[type_idx].to_string(),
-                is_nullable: simple_hash(i * 100 + c, 5) % 2 == 0,
+                is_nullable: simple_hash(i * 100 + c, 5).is_multiple_of(2),
                 is_primary_key: false,
                 ..Default::default()
             });
@@ -255,12 +255,12 @@ fn generate_triggers(tables: &[TableNode], config: &MockConfig) -> Vec<Trigger> 
         let name = format!("TR_{}_{}", table.name, i);
         let trigger_type = trigger_types[simple_hash(i, 31) % trigger_types.len()].to_string();
 
-        let fires_on_insert = simple_hash(i, 32) % 2 == 0;
-        let fires_on_update = simple_hash(i, 33) % 2 == 0 || !fires_on_insert;
-        let fires_on_delete = simple_hash(i, 34) % 3 == 0;
+        let fires_on_insert = simple_hash(i, 32).is_multiple_of(2);
+        let fires_on_update = simple_hash(i, 33).is_multiple_of(2) || !fires_on_insert;
+        let fires_on_delete = simple_hash(i, 34).is_multiple_of(3);
 
         let mut affected_tables = vec![];
-        if simple_hash(i, 35) % 2 == 0 && tables.len() > 1 {
+        if simple_hash(i, 35).is_multiple_of(2) && tables.len() > 1 {
             let affected_idx = (table_idx + 1 + simple_hash(i, 36)) % tables.len();
             affected_tables.push(tables[affected_idx].id.clone());
         }
@@ -271,7 +271,7 @@ fn generate_triggers(tables: &[TableNode], config: &MockConfig) -> Vec<Trigger> 
             schema: table.schema.clone(),
             table_id: table.id.clone(),
             trigger_type,
-            is_disabled: simple_hash(i, 37) % 5 == 0,
+            is_disabled: simple_hash(i, 37).is_multiple_of(5),
             fires_on_insert,
             fires_on_update,
             fires_on_delete,
@@ -308,7 +308,7 @@ fn generate_procedures(tables: &[TableNode], config: &MockConfig) -> Vec<StoredP
             parameters.push(ProcedureParameter {
                 name: format!("@{}", COLUMN_NAMES[param_name_idx]),
                 data_type: DATA_TYPES[type_idx].to_string(),
-                is_output: p == num_params - 1 && simple_hash(i, 44) % 3 == 0,
+                is_output: p == num_params - 1 && simple_hash(i, 44).is_multiple_of(3),
             });
         }
 
@@ -381,7 +381,7 @@ fn generate_functions(tables: &[TableNode], config: &MockConfig) -> Vec<ScalarFu
         let return_type = return_types[simple_hash(i, 54) % return_types.len()].to_string();
 
         let mut referenced_tables = vec![];
-        if !tables.is_empty() && simple_hash(i, 55) % 2 == 0 {
+        if !tables.is_empty() && simple_hash(i, 55).is_multiple_of(2) {
             let table_idx = simple_hash(i, 56) % tables.len();
             referenced_tables.push(tables[table_idx].id.clone());
         }

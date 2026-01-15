@@ -1,4 +1,4 @@
-import { EdgeType, ObjectType } from "@/stores/schemaStore";
+import { EdgeType, ObjectType } from "@/features/schema-graph/store";
 
 export const EDGE_COLORS: Record<EdgeType, string> = {
   foreignKeys: "#3b82f6",

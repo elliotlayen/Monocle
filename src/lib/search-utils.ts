@@ -1,4 +1,4 @@
-import type { SchemaGraph } from '@/types/schema';
+import type { SchemaGraph } from '@/features/schema-graph/types';
 import type {
   GroupedSearchResults,
   TableSearchResult,
@@ -7,7 +7,7 @@ import type {
   TriggerSearchResult,
   ProcedureSearchResult,
   FunctionSearchResult,
-} from '@/types/search';
+} from '@/features/toolbar/types';
 
 const MAX_RESULTS_PER_CATEGORY = 10;
 

@@ -1,6 +1,10 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
-import { SchemaGraph, ConnectionParams } from "@/types/schema";
+import { SchemaGraph, ConnectionParams } from "./types";
+import { schemaService } from "./services/schema-service";
+import {
+  settingsService,
+  type AppSettings,
+} from "@/features/settings/services/settings-service";
 
 export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures" | "scalarFunctions";
 
@@ -20,6 +24,7 @@ interface SchemaStore {
   error: string | null;
   isConnected: boolean;
   connectionInfo: { server: string; database: string } | null;
+  preferredSchemaFilter: string;
 
   // Filters
   searchFilter: string;
@@ -36,11 +41,12 @@ interface SchemaStore {
   availableSchemas: string[];
 
   // Actions
-  loadMockSchema: (size: string) => Promise<void>;
-  loadSchema: (params: ConnectionParams) => Promise<void>;
+  loadMockSchema: (size: string) => Promise<boolean>;
+  loadSchema: (params: ConnectionParams) => Promise<boolean>;
   setSearchFilter: (search: string) => void;
   setDebouncedSearchFilter: (search: string) => void;
   setSchemaFilter: (schema: string) => void;
+  hydrateSettings: (settings: AppSettings) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   toggleObjectType: (type: ObjectType) => void;
@@ -71,8 +77,7 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
   "functionReads",
 ]);
 
-export const useSchemaStore = create<SchemaStore>((set) => ({
-  // Initial state
+export const createInitialSchemaState = () => ({
   schema: null,
   isLoading: false,
   error: null,
@@ -81,42 +86,65 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   searchFilter: "",
   debouncedSearchFilter: "",
   schemaFilter: "all",
+  preferredSchemaFilter: "all",
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
   selectedEdgeIds: new Set(),
   availableSchemas: [],
+});
+
+const getAvailableSchemas = (schema: SchemaGraph) => {
+  const schemas = new Set<string>();
+  schema.tables.forEach((table) => schemas.add(table.schema));
+  (schema.views || []).forEach((view) => schemas.add(view.schema));
+  (schema.triggers || []).forEach((trigger) => schemas.add(trigger.schema));
+  (schema.storedProcedures || []).forEach((procedure) => schemas.add(procedure.schema));
+  (schema.scalarFunctions || []).forEach((fn) => schemas.add(fn.schema));
+  return [...schemas];
+};
+
+export const useSchemaStore = create<SchemaStore>((set, get) => ({
+  // Initial state
+  ...createInitialSchemaState(),
 
   loadMockSchema: async (size: string) => {
     set({ isLoading: true, error: null });
     try {
-      const schema = await invoke<SchemaGraph>("load_schema_mock", { size });
-      const tableSchemas = schema.tables.map((t) => t.schema);
-      const viewSchemas = schema.views.map((v) => v.schema);
-      const functionSchemas = schema.scalarFunctions?.map((f) => f.schema) || [];
-      const schemas = [...new Set([...tableSchemas, ...viewSchemas, ...functionSchemas])];
+      const schema = await schemaService.loadMockSchema(size);
+      const schemas = getAvailableSchemas(schema);
+      const preferredSchemaFilter = get().preferredSchemaFilter;
+      const resolvedSchemaFilter =
+        preferredSchemaFilter === "all" || schemas.includes(preferredSchemaFilter)
+          ? preferredSchemaFilter
+          : "all";
       set({
         schema,
         isLoading: false,
         isConnected: true,
         connectionInfo: { server: "localhost", database: "MockDB" },
         availableSchemas: schemas,
+        schemaFilter: resolvedSchemaFilter,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       });
+      return true;
     } catch (err) {
       set({ error: String(err), isLoading: false });
+      return false;
     }
   },
 
   loadSchema: async (params: ConnectionParams) => {
     set({ isLoading: true, error: null });
     try {
-      const schema = await invoke<SchemaGraph>("load_schema_cmd", { params });
-      const tableSchemas = schema.tables.map((t) => t.schema);
-      const viewSchemas = schema.views.map((v) => v.schema);
-      const functionSchemas = schema.scalarFunctions?.map((f) => f.schema) || [];
-      const schemas = [...new Set([...tableSchemas, ...viewSchemas, ...functionSchemas])];
+      const schema = await schemaService.loadSchema(params);
+      const schemas = getAvailableSchemas(schema);
+      const preferredSchemaFilter = get().preferredSchemaFilter;
+      const resolvedSchemaFilter =
+        preferredSchemaFilter === "all" || schemas.includes(preferredSchemaFilter)
+          ? preferredSchemaFilter
+          : "all";
       set({
         schema,
         isLoading: false,
@@ -126,14 +154,16 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
         // Reset filters on new connection
         searchFilter: "",
         debouncedSearchFilter: "",
-        schemaFilter: "all",
+        schemaFilter: resolvedSchemaFilter,
         focusedTableId: null,
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set(),
       });
+      return true;
     } catch (err) {
       set({ error: String(err), isLoading: false });
+      return false;
     }
   },
 
@@ -142,7 +172,25 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   setDebouncedSearchFilter: (search: string) =>
     set({ debouncedSearchFilter: search }),
 
-  setSchemaFilter: (schema: string) => set({ schemaFilter: schema }),
+  setSchemaFilter: (schema: string) => {
+    set({ schemaFilter: schema, preferredSchemaFilter: schema });
+    settingsService.saveSettings({ schemaFilter: schema }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  hydrateSettings: (settings: AppSettings) => {
+    if (!settings.schemaFilter) return;
+    const availableSchemas = get().availableSchemas;
+    const resolvedSchemaFilter =
+      settings.schemaFilter === "all" || availableSchemas.includes(settings.schemaFilter)
+        ? settings.schemaFilter
+        : "all";
+    set((state) => ({
+      preferredSchemaFilter: settings.schemaFilter,
+      schemaFilter: state.schema ? resolvedSchemaFilter : state.schemaFilter,
+    }));
+  },
 
   setFocusedTable: (tableId: string | null) => set({ focusedTableId: tableId }),
 

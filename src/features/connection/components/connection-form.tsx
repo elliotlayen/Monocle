@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { useSchemaStore } from "@/stores/schemaStore";
+import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,11 @@ import {
   MockDataModal,
   type MockDataSize,
 } from "@/components/mock-data-modal";
-import type { ConnectionParams, AuthType } from "@/types/schema";
+import type { ConnectionParams, AuthType } from "@/features/schema-graph/types";
+import {
+  connectionService,
+  type ConnectionHistory,
+} from "../services/connection-service";
 
 const STORAGE_KEY = "monocle-connection-settings";
 
@@ -70,6 +74,17 @@ export function ConnectionForm() {
   });
 
   const [mockModalOpen, setMockModalOpen] = useState(false);
+  const [recentConnections, setRecentConnections] = useState<ConnectionHistory[]>([]);
+
+  // Load recent connections on mount
+  useEffect(() => {
+    connectionService
+      .getRecentConnections()
+      .then(setRecentConnections)
+      .catch(() => {
+        // Ignore errors - recent connections are optional
+      });
+  }, []);
 
   // Save settings when they change
   useEffect(() => {
@@ -81,7 +96,7 @@ export function ConnectionForm() {
   }, [formData.server, formData.database, formData.authType]);
 
   const handleLoadMock = (size: MockDataSize) => {
-    loadMockSchema(size);
+    void loadMockSchema(size);
     setMockModalOpen(false);
   };
 
@@ -100,7 +115,33 @@ export function ConnectionForm() {
       params.password = formData.password;
     }
 
-    await loadSchema(params);
+    const connected = await loadSchema(params);
+
+    // Save to connection history on successful connection
+    if (connected) {
+      connectionService
+        .saveConnection({
+          server: formData.server,
+          database: formData.database,
+          username: formData.username || "",
+        })
+        .then(() => {
+          // Refresh the list
+          connectionService.getRecentConnections().then(setRecentConnections);
+        })
+        .catch(() => {
+          // Ignore save errors
+        });
+    }
+  };
+
+  const handleSelectRecent = (connection: ConnectionHistory) => {
+    setFormData((prev) => ({
+      ...prev,
+      server: connection.server,
+      database: connection.database,
+      username: connection.username,
+    }));
   };
 
   const handleChange = (
@@ -120,6 +161,32 @@ export function ConnectionForm() {
         <Card className="w-80">
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-3">
+              {recentConnections.length > 0 && (
+                <div className="space-y-1">
+                  <Label htmlFor="recent">Recent Connections</Label>
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      const idx = parseInt(value, 10);
+                      if (!isNaN(idx) && recentConnections[idx]) {
+                        handleSelectRecent(recentConnections[idx]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="recent">
+                      <SelectValue placeholder="Select a recent connection" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {recentConnections.map((conn, idx) => (
+                        <SelectItem key={`${conn.server}-${conn.database}`} value={String(idx)}>
+                          {conn.server} / {conn.database}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <Label htmlFor="server">Server</Label>
                 <Input

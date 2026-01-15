@@ -1,4 +1,4 @@
-import type { SchemaGraph } from "@/types/schema";
+import type { SchemaGraph } from "@/features/schema-graph/types";
 
 export interface ViewColumnSource {
   columnName: string;

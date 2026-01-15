@@ -20,8 +20,8 @@ import {
   Trigger,
   StoredProcedure,
   ScalarFunction,
-} from "@/types/schema";
-import { ObjectType, EdgeType, useSchemaStore } from "@/stores/schemaStore";
+} from "../types";
+import { ObjectType, EdgeType, useSchemaStore } from "../store";
 import { getSchemaIndex } from "@/lib/schema-index";
 import { useShallow } from "zustand/shallow";
 import { TableNode } from "./table-node";

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { SchemaGraph } from "@/types/schema";
-import { ObjectType, EdgeType } from "@/stores/schemaStore";
+import { SchemaGraph } from "../types";
+import { ObjectType, EdgeType } from "../store";
 import { getSchemaIndex } from "@/lib/schema-index";
 
 interface FilteredCounts {

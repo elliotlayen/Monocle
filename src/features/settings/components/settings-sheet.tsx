@@ -1,4 +1,4 @@
-import { Settings, Database } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme } from "@/providers/theme-provider";
-import { useSchemaStore } from "@/stores/schemaStore";
+import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { useAppVersion } from "@/hooks/useAppVersion";
 
@@ -100,7 +100,6 @@ export function SettingsSheet() {
           </Button>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-primary" />
               <div className="flex flex-col">
                 <span className="font-semibold text-sm">Monocle</span>
                 <span className="text-xs text-muted-foreground">By Elliot Layen</span>

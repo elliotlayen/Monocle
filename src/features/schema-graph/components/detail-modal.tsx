@@ -14,7 +14,7 @@ import {
   ScalarFunction,
   Column,
   ProcedureParameter,
-} from "@/types/schema";
+} from "../types";
 import { cn } from "@/lib/utils";
 import { SqlCodeBlock } from "./sql-code-block";
 

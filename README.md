@@ -19,7 +19,6 @@ A desktop application for visualizing SQL Server database schemas. Connect to an
 
 - Node.js 18+
 - Rust (install via [rustup](https://rustup.rs/))
-- [ODBC Driver 18 for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
 
 ### Installation
 
@@ -40,7 +39,7 @@ npm run tauri build
 |-------|------------|
 | Desktop Framework | Tauri 2.0 |
 | Backend | Rust |
-| Database | ODBC API (SQL Server) |
+| Database | Tiberius (SQL Server TDS) |
 | Frontend | React 19 + TypeScript |
 | Graph Visualization | React Flow |
 | State Management | Zustand |

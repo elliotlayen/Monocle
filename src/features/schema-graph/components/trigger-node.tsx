@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Trigger } from "@/types/schema";
+import { Trigger } from "../types";
 import { cn } from "@/lib/utils";
 
 interface TriggerNodeData {

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { StoredProcedure } from "@/types/schema";
+import { StoredProcedure } from "../types";
 import { cn } from "@/lib/utils";
 
 interface StoredProcedureNodeData {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSchemaStore, type ObjectType, type EdgeType } from "@/stores/schemaStore";
+import { useSchemaStore, type ObjectType, type EdgeType } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Target, Box, Network, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SettingsSheet } from "@/components/settings-sheet";
-import { SearchBar } from "@/components/search-bar";
+import { SettingsSheet } from "@/features/settings/components/settings-sheet";
+import { SearchBar } from "./search-bar";
 import { EDGE_TYPE_LABELS, EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {

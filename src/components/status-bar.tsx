@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Box, Network } from "lucide-react";
-import { useSchemaStore } from "@/stores/schemaStore";
+import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
-import { useFilteredCounts } from "@/hooks/useFilteredCounts";
+import { useFilteredCounts } from "@/features/schema-graph/hooks/useFilteredCounts";
 import {
   Popover,
   PopoverContent,
