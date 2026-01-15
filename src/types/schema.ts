@@ -96,12 +96,6 @@ export interface SchemaGraph {
 // Authentication type
 export type AuthType = "sqlServer" | "windows";
 
-// Data source info from ODBC
-export interface DataSourceInfo {
-  name: string;
-  description: string;
-}
-
 // Connection parameters
 export interface ConnectionParams {
   server: string;

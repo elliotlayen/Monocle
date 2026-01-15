@@ -112,7 +112,7 @@ export const useSchemaStore = create<SchemaStore>((set) => ({
   loadSchema: async (params: ConnectionParams) => {
     set({ isLoading: true, error: null });
     try {
-      const schema = await invoke<SchemaGraph>("load_schema", { params });
+      const schema = await invoke<SchemaGraph>("load_schema_cmd", { params });
       const tableSchemas = schema.tables.map((t) => t.schema);
       const viewSchemas = schema.views.map((v) => v.schema);
       const functionSchemas = schema.scalarFunctions?.map((f) => f.schema) || [];

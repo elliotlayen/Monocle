@@ -128,10 +128,3 @@ pub struct ConnectionParams {
     #[serde(default)]
     pub trust_server_certificate: bool,
 }
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DataSourceInfo {
-    pub name: String,
-    pub description: String,
-}

@@ -1,70 +1,83 @@
-use odbc_api::{Connection, ConnectionOptions, Environment};
-use std::sync::OnceLock;
+use tiberius::{AuthMethod, Client, Config, EncryptionLevel};
+use tokio::net::TcpStream;
+use tokio_util::compat::TokioAsyncWriteCompatExt;
 
 use crate::types::{AuthType, ConnectionParams};
 
-static ODBC_ENV: OnceLock<Environment> = OnceLock::new();
-
-pub fn get_environment() -> &'static Environment {
-    ODBC_ENV.get_or_init(|| {
-        Environment::new().expect("Failed to create ODBC environment")
-    })
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectionError {
+    #[error("Database error: {0}")]
+    Tiberius(#[from] tiberius::error::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("{0}")]
+    Auth(String),
 }
 
-/// Detect the best available SQL Server ODBC driver.
-/// Prefers newer versions (18 > 17 > any other SQL Server driver).
-fn detect_sql_server_driver() -> Option<String> {
-    let env = get_environment();
+pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
+    let mut config = Config::new();
 
-    let drivers: Vec<_> = env
-        .drivers()
-        .ok()?
-        .into_iter()
-        .filter(|d| d.description.contains("SQL Server"))
-        .collect();
+    // Parse server and port (format: "server" or "server,port" or "server:port")
+    let (host, port) = parse_server(&params.server);
+    config.host(&host);
+    config.port(port);
+    config.database(&params.database);
 
-    // Prefer newer versions
-    for version in ["18", "17"] {
-        if let Some(driver) = drivers
-            .iter()
-            .find(|d| d.description.contains(&format!("ODBC Driver {} for SQL Server", version)))
-        {
-            return Some(driver.description.clone());
+    // Configure authentication
+    match params.auth_type {
+        AuthType::Windows => {
+            #[cfg(windows)]
+            {
+                config.authentication(AuthMethod::Integrated);
+            }
+            #[cfg(not(windows))]
+            {
+                return Err(ConnectionError::Auth(
+                    "Windows Authentication is only supported on Windows".to_string(),
+                ));
+            }
         }
-    }
-
-    // Fall back to any SQL Server driver
-    drivers.first().map(|d| d.description.clone())
-}
-
-pub fn build_connection_string(params: &ConnectionParams) -> Result<String, String> {
-    let driver = detect_sql_server_driver().ok_or_else(|| {
-        "No SQL Server ODBC driver found. Please install ODBC Driver 17 or 18 for SQL Server."
-            .to_string()
-    })?;
-
-    let trust_cert = if params.trust_server_certificate {
-        "TrustServerCertificate=Yes;"
-    } else {
-        ""
-    };
-
-    let auth_part = match params.auth_type {
-        AuthType::Windows => "Trusted_Connection=Yes;".to_string(),
         AuthType::SqlServer => {
             let username = params.username.as_deref().unwrap_or("");
             let password = params.password.as_deref().unwrap_or("");
-            format!("Uid={};Pwd={};", username, password)
+            config.authentication(AuthMethod::sql_server(username, password));
         }
-    };
+    }
 
-    Ok(format!(
-        "Driver={{{}}};Server={};Database={};{}{}",
-        driver, params.server, params.database, auth_part, trust_cert
-    ))
+    // Configure TLS
+    if params.trust_server_certificate {
+        config.trust_cert();
+    }
+    config.encryption(EncryptionLevel::Required);
+
+    // Connect via TCP
+    let tcp = TcpStream::connect(config.get_addr()).await?;
+    tcp.set_nodelay(true)?;
+
+    // Create tiberius client
+    let client = Client::connect(config, tcp.compat_write()).await?;
+
+    Ok(client)
 }
 
-pub fn create_connection(connection_string: &str) -> Result<Connection<'static>, odbc_api::Error> {
-    let env = get_environment();
-    env.connect_with_connection_string(connection_string, ConnectionOptions::default())
+/// Parse server string into host and port.
+/// Supports formats: "server", "server,port", "server:port"
+fn parse_server(server: &str) -> (String, u16) {
+    const DEFAULT_PORT: u16 = 1433;
+
+    // Try comma separator first (SQL Server style)
+    if let Some((host, port_str)) = server.split_once(',') {
+        if let Ok(port) = port_str.trim().parse::<u16>() {
+            return (host.trim().to_string(), port);
+        }
+    }
+
+    // Try colon separator
+    if let Some((host, port_str)) = server.rsplit_once(':') {
+        if let Ok(port) = port_str.trim().parse::<u16>() {
+            return (host.trim().to_string(), port);
+        }
+    }
+
+    (server.to_string(), DEFAULT_PORT)
 }

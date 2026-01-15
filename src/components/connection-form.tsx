@@ -1,5 +1,4 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
@@ -14,16 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import {
   MockDataModal,
   type MockDataSize,
 } from "@/components/mock-data-modal";
-import type {
-  ConnectionParams,
-  AuthType,
-  DataSourceInfo,
-} from "@/types/schema";
+import type { ConnectionParams, AuthType } from "@/types/schema";
 
 const STORAGE_KEY = "monocle-connection-settings";
 
@@ -76,8 +70,6 @@ export function ConnectionForm() {
   });
 
   const [mockModalOpen, setMockModalOpen] = useState(false);
-  const [dataSources, setDataSources] = useState<DataSourceInfo[]>([]);
-  const [dsnLoading, setDsnLoading] = useState(true);
 
   // Save settings when they change
   useEffect(() => {
@@ -87,26 +79,6 @@ export function ConnectionForm() {
       authType: formData.authType,
     });
   }, [formData.server, formData.database, formData.authType]);
-
-  useEffect(() => {
-    const fetchDataSources = async () => {
-      try {
-        const sources = await invoke<DataSourceInfo[]>("list_data_sources");
-        setDataSources(sources);
-      } catch (err) {
-        console.error("Failed to load data sources:", err);
-      } finally {
-        setDsnLoading(false);
-      }
-    };
-    fetchDataSources();
-  }, []);
-
-  const serverOptions: ComboboxOption[] = dataSources.map((ds) => ({
-    value: ds.name,
-    label: ds.name,
-    description: ds.description,
-  }));
 
   const handleLoadMock = (size: MockDataSize) => {
     loadMockSchema(size);
@@ -150,24 +122,25 @@ export function ConnectionForm() {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1">
                 <Label htmlFor="server">Server</Label>
-                <Combobox
+                <Input
                   id="server"
-                  options={serverOptions}
+                  type="text"
                   value={formData.server}
-                  onValueChange={(value) => handleChange("server", value)}
-                  placeholder="Type server or select DSN..."
-                  disabled={dsnLoading}
+                  onChange={(e) => handleChange("server", e.target.value)}
+                  placeholder="localhost or server,port"
+                  required
                 />
               </div>
 
               <div className="space-y-1">
                 <Label htmlFor="database">Database</Label>
-                <Combobox
+                <Input
                   id="database"
-                  options={[]}
+                  type="text"
                   value={formData.database}
-                  onValueChange={(value) => handleChange("database", value)}
-                  placeholder="Type database name..."
+                  onChange={(e) => handleChange("database", e.target.value)}
+                  placeholder="Database name"
+                  required
                 />
               </div>
 
