@@ -23,9 +23,11 @@ import {
 import { useTheme } from "@/providers/theme-provider";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { useShallow } from "zustand/shallow";
+import { useAppVersion } from "@/hooks/useAppVersion";
 
 export function SettingsSheet() {
   const { theme, setTheme } = useTheme();
+  const version = useAppVersion();
   const { schemaFilter, availableSchemas, setSchemaFilter, disconnect } = useSchemaStore(
     useShallow((state) => ({
       schemaFilter: state.schemaFilter,
@@ -96,12 +98,17 @@ export function SettingsSheet() {
           <Button variant="destructive" className="w-full" onClick={disconnect}>
             Disconnect
           </Button>
-          <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-primary" />
-            <div className="flex flex-col">
-              <span className="font-semibold text-sm">Monocle</span>
-              <span className="text-xs text-muted-foreground">By Elliot Layen</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-primary" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-sm">Monocle</span>
+                <span className="text-xs text-muted-foreground">By Elliot Layen</span>
+              </div>
             </div>
+            {version && (
+              <span className="text-xs text-muted-foreground">v{version}</span>
+            )}
           </div>
         </div>
       </SheetContent>

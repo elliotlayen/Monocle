@@ -8,6 +8,8 @@ use commands::{load_schema_cmd, load_schema_mock};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             load_schema_mock,
             load_schema_cmd

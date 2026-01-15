@@ -4,6 +4,7 @@ import { ConnectionForm } from "@/components/connection-form";
 import { Toolbar } from "@/components/toolbar";
 import { StatusBar } from "@/components/status-bar";
 import { SchemaGraphView } from "@/components/schema-graph";
+import { UpdateChecker } from "@/components/update-checker";
 
 function App() {
   const {
@@ -27,11 +28,17 @@ function App() {
   );
 
   if (!isConnected || !schema) {
-    return <ConnectionForm />;
+    return (
+      <>
+        <UpdateChecker />
+        <ConnectionForm />
+      </>
+    );
   }
 
   return (
     <div className="flex flex-col h-screen">
+      <UpdateChecker />
       <Toolbar />
       <main className="flex-1 overflow-hidden">
         <SchemaGraphView
