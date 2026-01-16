@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
-import { ConnectionForm } from "@/features/connection/components/connection-form";
+import { HomeScreen } from "@/features/connection/components/home-screen";
 import { Toolbar } from "@/features/toolbar/components/toolbar";
 import { FilterInfoBar } from "@/features/toolbar/components/filter-info-bar";
 import { StatusBar } from "@/components/status-bar";
@@ -52,7 +52,7 @@ function App() {
     return (
       <>
         <UpdateChecker />
-        <ConnectionForm />
+        <HomeScreen />
       </>
     );
   }

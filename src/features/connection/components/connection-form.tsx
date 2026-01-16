@@ -17,6 +17,7 @@ import {
   MockDataModal,
   type MockDataSize,
 } from "@/components/mock-data-modal";
+import { MonocleLogo } from "./monocle-logo";
 import type { ConnectionParams, AuthType } from "@/features/schema-graph/types";
 import {
   connectionService,
@@ -154,13 +155,16 @@ export function ConnectionForm() {
   const isWindowsAuth = formData.authType === "windows";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted p-4">
-      <div className="flex items-center gap-8">
-        <h1 className="text-4xl font-bold">Monocle</h1>
+    <div className="h-screen flex items-center justify-center bg-muted p-4 overflow-hidden">
+      <div className="flex items-center gap-8 max-h-full">
+        <div className="flex flex-col items-center gap-3 shrink-0">
+          <MonocleLogo className="w-20 h-20" />
+          <h1 className="text-4xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Monocle</h1>
+        </div>
 
-        <Card className="w-80">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-3">
+        <Card className="w-96 max-h-[calc(100vh-4rem)] flex flex-col">
+          <CardContent className="pt-6 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="space-y-2">
               {recentConnections.length > 0 && (
                 <div className="space-y-1">
                   <Label htmlFor="recent">Recent Connections</Label>
@@ -187,28 +191,29 @@ export function ConnectionForm() {
                 </div>
               )}
 
-              <div className="space-y-1">
-                <Label htmlFor="server">Server</Label>
-                <Input
-                  id="server"
-                  type="text"
-                  value={formData.server}
-                  onChange={(e) => handleChange("server", e.target.value)}
-                  placeholder="localhost or server,port"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="database">Database</Label>
-                <Input
-                  id="database"
-                  type="text"
-                  value={formData.database}
-                  onChange={(e) => handleChange("database", e.target.value)}
-                  placeholder="Database name"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="server">Server</Label>
+                  <Input
+                    id="server"
+                    type="text"
+                    value={formData.server}
+                    onChange={(e) => handleChange("server", e.target.value)}
+                    placeholder="localhost"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="database">Database</Label>
+                  <Input
+                    id="database"
+                    type="text"
+                    value={formData.database}
+                    onChange={(e) => handleChange("database", e.target.value)}
+                    placeholder="Database name"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -234,7 +239,7 @@ export function ConnectionForm() {
               </div>
 
               {!isWindowsAuth && (
-                <>
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label htmlFor="username">Username</Label>
                     <Input
@@ -246,7 +251,6 @@ export function ConnectionForm() {
                       required={!isWindowsAuth}
                     />
                   </div>
-
                   <div className="space-y-1">
                     <Label htmlFor="password">Password</Label>
                     <Input
@@ -257,7 +261,7 @@ export function ConnectionForm() {
                       required={!isWindowsAuth}
                     />
                   </div>
-                </>
+                </div>
               )}
 
               <div className="flex items-center space-x-2">

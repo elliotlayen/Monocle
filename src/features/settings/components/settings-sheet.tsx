@@ -120,7 +120,7 @@ export function SettingsSheet() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex flex-col">
-                <span className="font-semibold text-sm">Monocle</span>
+                <span className="font-semibold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Monocle</span>
                 <span className="text-xs text-muted-foreground">By Elliot Layen</span>
               </div>
             </div>
