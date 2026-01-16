@@ -120,36 +120,46 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 
 ### Creating a Release
 
-1. Tag the commit with a `v*` prefix (e.g., `v0.2.3`):
-   ```bash
-   git tag v0.2.3
-   git push origin v0.2.3
-   ```
+1. Update the version in config files (if not already at desired version):
+   - `package.json`
+   - `src-tauri/Cargo.toml`
+   - `src-tauri/tauri.conf.json`
 
-2. The GitHub Actions workflow automatically:
-   - Extracts version from the tag (strips `v` prefix)
-   - Syncs version to `package.json`, `Cargo.toml`, and `tauri.conf.json`
-   - Builds for macOS (ARM64 + x64) and Windows
-   - Creates a GitHub release with all artifacts
+2. Go to **Actions > Release > Run workflow** and click "Run workflow"
+
+3. The workflow automatically:
+   - Reads version from `tauri.conf.json` (source of truth)
+   - Builds for macOS (ARM64 + x64) and Windows in parallel
    - Generates `latest.json` for the auto-updater
+   - Creates a GitHub release with tag `v{version}` and all artifacts
+   - Creates a PR to bump version to next patch
+
+### Version Source of Truth
+
+The version in `tauri.conf.json` determines the release version. To release:
+
+- **Patch release** (e.g., 0.2.4): Just run the workflow (version was auto-bumped after last release)
+- **Minor/major release** (e.g., 0.3.0 or 1.0.0): Update config files first, then run workflow
 
 ### Auto-Updater
 
 The app checks for updates via Tauri's updater plugin:
+
 - Endpoint: `https://github.com/elliotlayen/Monocle/releases/latest/download/latest.json`
 - The `latest.json` file contains the version, download URLs, and signatures
 - Users are prompted to update when a newer version is available
 
 ### Version Bump PR
 
-After a successful release, the workflow automatically creates a PR to bump the version to the next patch (e.g., `0.2.3` -> `0.2.4`). This ensures:
-- Config files stay in sync with the latest release
-- The next release tag will have matching versions
-- No manual version updates needed
+After a successful release, the workflow automatically creates a PR to bump the version to the next patch (e.g., `0.2.4` -> `0.2.5`). This ensures:
+
+- Config files are ready for the next patch release
+- No manual version updates needed for patch releases
 
 ### Version Files
 
 These files must stay in sync:
+
 - `package.json` - npm version
 - `src-tauri/Cargo.toml` - Rust crate version
-- `src-tauri/tauri.conf.json` - Tauri app version (used for `latest.json`)
+- `src-tauri/tauri.conf.json` - Tauri app version (source of truth for releases)

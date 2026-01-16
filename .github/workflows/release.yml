@@ -1,26 +1,16 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  release:
-    permissions:
-      contents: write
+  build_macos:
+    runs-on: macos-latest
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-          - platform: windows-latest
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
 
@@ -32,73 +22,190 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Sync version from tag
-        shell: bash
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          VERSION="${TAG_NAME#v}"
-          echo "Syncing version to $VERSION"
-
-          # Update package.json
-          npm pkg set version="$VERSION"
-
-          # Update Cargo.toml
-          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
-          rm -f src-tauri/Cargo.toml.bak
-
-          # Update tauri.conf.json
-          if command -v jq &> /dev/null; then
-            jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
-          else
-            sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
-            rm -f src-tauri/tauri.conf.json.bak
-          fi
-
-          echo "Version synced to $VERSION in all config files"
+          targets: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and release
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Monocle v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
+        run: npm run tauri build -- --target ${{ matrix.target }}
 
-  bump-version:
-    needs: release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz.sig
+
+  build_windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
 
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
+
+  release:
+    needs: [build_macos, build_windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Read version from config
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+
+          # Copy macOS ARM64 artifacts
+          cp artifacts/macos-aarch64-apple-darwin/*.dmg release-assets/ 2>/dev/null || true
+          cp artifacts/macos-aarch64-apple-darwin/*.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/macos-aarch64-apple-darwin/*.tar.gz.sig release-assets/ 2>/dev/null || true
+
+          # Copy macOS x64 artifacts
+          cp artifacts/macos-x86_64-apple-darwin/*.dmg release-assets/ 2>/dev/null || true
+          cp artifacts/macos-x86_64-apple-darwin/*.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/macos-x86_64-apple-darwin/*.tar.gz.sig release-assets/ 2>/dev/null || true
+
+          # Copy Windows artifacts
+          cp artifacts/windows-x86_64/*.msi release-assets/ 2>/dev/null || true
+          cp artifacts/windows-x86_64/*.exe release-assets/ 2>/dev/null || true
+          cp artifacts/windows-x86_64/*.exe.sig release-assets/ 2>/dev/null || true
+
+          echo "Release assets:"
+          ls -la release-assets/
+
+      - name: Generate latest.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 << 'EOF'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          version = os.environ["VERSION"]
+          pub_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+          # Read signature files
+          def read_sig(path):
+              try:
+                  with open(path, "r") as f:
+                      return f.read().strip()
+              except FileNotFoundError:
+                  return ""
+
+          # Find artifact files
+          assets_dir = "release-assets"
+          files = os.listdir(assets_dir)
+
+          # Find macOS ARM64 tar.gz
+          macos_arm_tar = next((f for f in files if "aarch64" in f and f.endswith(".tar.gz") and not f.endswith(".sig")), None)
+          macos_arm_sig = read_sig(f"{assets_dir}/{macos_arm_tar}.sig") if macos_arm_tar else ""
+
+          # Find macOS x64 tar.gz
+          macos_x64_tar = next((f for f in files if "x86_64" in f and f.endswith(".tar.gz") and not f.endswith(".sig")), None)
+          macos_x64_sig = read_sig(f"{assets_dir}/{macos_x64_tar}.sig") if macos_x64_tar else ""
+
+          # Find Windows NSIS installer
+          windows_exe = next((f for f in files if f.endswith(".exe") and not f.endswith(".sig")), None)
+          windows_sig = read_sig(f"{assets_dir}/{windows_exe}.sig") if windows_exe else ""
+
+          base_url = f"https://github.com/elliotlayen/Monocle/releases/download/v{version}"
+
+          latest = {
+              "version": version,
+              "notes": f"See release notes at {base_url.replace('/download/', '/')}",
+              "pub_date": pub_date,
+              "platforms": {}
+          }
+
+          if macos_arm_tar and macos_arm_sig:
+              latest["platforms"]["darwin-aarch64"] = {
+                  "signature": macos_arm_sig,
+                  "url": f"{base_url}/{macos_arm_tar}"
+              }
+
+          if macos_x64_tar and macos_x64_sig:
+              latest["platforms"]["darwin-x86_64"] = {
+                  "signature": macos_x64_sig,
+                  "url": f"{base_url}/{macos_x64_tar}"
+              }
+
+          if windows_exe and windows_sig:
+              latest["platforms"]["windows-x86_64"] = {
+                  "signature": windows_sig,
+                  "url": f"{base_url}/{windows_exe}"
+              }
+
+          with open("release-assets/latest.json", "w") as f:
+              json.dump(latest, f, indent=2)
+
+          print(json.dumps(latest, indent=2))
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --title "Monocle v$VERSION" \
+            --notes "See the assets to download this version and install." \
+            release-assets/*
+
       - name: Calculate next version
         id: next_version
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          CURRENT="${TAG_NAME#v}"
-          IFS='.' read -ra PARTS <<< "$CURRENT"
+          IFS='.' read -ra PARTS <<< "$VERSION"
           MAJOR="${PARTS[0]}"
           MINOR="${PARTS[1]}"
           PATCH="${PARTS[2]}"
@@ -107,30 +214,30 @@ jobs:
           echo "next=$NEXT_VERSION" >> $GITHUB_OUTPUT
           echo "Next version: $NEXT_VERSION"
 
-      - name: Update version files
+      - name: Update version files for bump
         env:
-          VERSION: ${{ steps.next_version.outputs.next }}
+          NEXT_VERSION: ${{ steps.next_version.outputs.next }}
         run: |
           # Update package.json
-          npm pkg set version="$VERSION"
+          npm pkg set version="$NEXT_VERSION"
 
           # Update Cargo.toml
-          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          sed -i "s/^version = \".*\"/version = \"$NEXT_VERSION\"/" src-tauri/Cargo.toml
 
           # Update tauri.conf.json
-          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          jq --arg v "$NEXT_VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         env:
           NEXT_VERSION: ${{ steps.next_version.outputs.next }}
-          TAG_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: bump version to ${{ steps.next_version.outputs.next }}"
           title: "chore: bump version to ${{ steps.next_version.outputs.next }}"
           body: |
-            Automated version bump after release ${{ github.ref_name }}.
+            Automated version bump after release v${{ steps.version.outputs.version }}.
 
             This PR updates the version in:
             - package.json
