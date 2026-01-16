@@ -94,6 +94,35 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
     addNeighbor(rel.to, rel.from);
   }
 
+  // Add trigger -> table relationships for focus feature
+  for (const trigger of schema.triggers || []) {
+    addNeighbor(trigger.id, trigger.tableId);
+    addNeighbor(trigger.tableId, trigger.id);
+    for (const tableId of trigger.referencedTables || []) {
+      addNeighbor(trigger.id, tableId);
+    }
+    for (const tableId of trigger.affectedTables || []) {
+      addNeighbor(trigger.id, tableId);
+    }
+  }
+
+  // Add procedure -> table relationships for focus feature
+  for (const proc of schema.storedProcedures || []) {
+    for (const tableId of proc.referencedTables || []) {
+      addNeighbor(proc.id, tableId);
+    }
+    for (const tableId of proc.affectedTables || []) {
+      addNeighbor(proc.id, tableId);
+    }
+  }
+
+  // Add function -> table relationships for focus feature
+  for (const fn of schema.scalarFunctions || []) {
+    for (const tableId of fn.referencedTables || []) {
+      addNeighbor(fn.id, tableId);
+    }
+  }
+
   for (const view of schema.views || []) {
     for (const col of view.columns) {
       if (!col.sourceTable || !col.sourceColumn) continue;
@@ -120,6 +149,15 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
         sourceTableId,
         sourceColumn: col.sourceColumn,
       });
+    }
+  }
+
+  // Add view -> source table relationships for focus feature
+  for (const [viewId, sources] of viewColumnSources) {
+    const sourceTableIds = new Set(sources.map((s) => s.sourceTableId));
+    for (const tableId of sourceTableIds) {
+      addNeighbor(viewId, tableId);
+      addNeighbor(tableId, viewId);
     }
   }
 

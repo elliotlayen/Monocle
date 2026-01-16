@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -6,6 +6,8 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Node,
   type Edge,
   type EdgeMouseHandler,
@@ -140,6 +142,75 @@ interface SchemaGraphProps {
   schemaFilter?: string;
   objectTypeFilter?: Set<ObjectType>;
   edgeTypeFilter?: Set<EdgeType>;
+}
+
+/**
+ * Calculate compact layout positions when focus mode is "hide".
+ * Places focused node at center with neighbors in a ring around it.
+ */
+function calculateCompactLayout(
+  focusedNodeId: string,
+  visibleNodeIds: Set<string>,
+  neighbors: Set<string>,
+  schema: SchemaGraphType
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+
+  // Focused node at center
+  positions.set(focusedNodeId, { x: 0, y: 0 });
+
+  // Filter neighbors to only include visible ones (tables and views)
+  const visibleNeighbors = [...neighbors].filter((id) => visibleNodeIds.has(id));
+  const radius = NODE_WIDTH + GAP_X;
+
+  // Position neighbors in a circle around the focused node
+  visibleNeighbors.forEach((id, i) => {
+    const angle = (2 * Math.PI * i) / visibleNeighbors.length - Math.PI / 2;
+    positions.set(id, {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    });
+  });
+
+  // Position triggers near their parent tables
+  (schema.triggers || []).forEach((trigger) => {
+    if (!visibleNodeIds.has(trigger.id)) return;
+    const parentPos = positions.get(trigger.tableId);
+    if (parentPos) {
+      // Count triggers for this table to stack them
+      const existingTriggers = [...positions.keys()].filter((id) =>
+        (schema.triggers || []).some((t) => t.id === id && t.tableId === trigger.tableId)
+      );
+      positions.set(trigger.id, {
+        x: parentPos.x + TRIGGER_OFFSET_X,
+        y: parentPos.y + existingTriggers.length * TRIGGER_GAP_Y,
+      });
+    }
+  });
+
+  // Position procedures below the main cluster
+  let procIndex = 0;
+  (schema.storedProcedures || []).forEach((proc) => {
+    if (!visibleNodeIds.has(proc.id)) return;
+    positions.set(proc.id, {
+      x: -200 + procIndex * 320,
+      y: radius + NODE_HEIGHT + GAP_Y,
+    });
+    procIndex++;
+  });
+
+  // Position functions next to procedures
+  let funcIndex = 0;
+  (schema.scalarFunctions || []).forEach((fn) => {
+    if (!visibleNodeIds.has(fn.id)) return;
+    positions.set(fn.id, {
+      x: -200 + (procIndex + funcIndex) * 320,
+      y: radius + NODE_HEIGHT + GAP_Y,
+    });
+    funcIndex++;
+  });
+
+  return positions;
 }
 
 // Callback types for node clicks
@@ -502,7 +573,7 @@ function buildEdgeState(
   return { edges: nextEdges, handleEdgeTypes };
 }
 
-export function SchemaGraphView({
+function SchemaGraphInner({
   schema,
   focusedTableId,
   searchFilter,
@@ -513,14 +584,28 @@ export function SchemaGraphView({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection } =
+  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection, focusMode } =
     useSchemaStore(
       useShallow((state) => ({
         selectedEdgeIds: state.selectedEdgeIds,
         toggleEdgeSelection: state.toggleEdgeSelection,
         clearEdgeSelection: state.clearEdgeSelection,
+        focusMode: state.focusMode,
       }))
     );
+
+  // React Flow hook for programmatic viewport control
+  const { fitView } = useReactFlow();
+
+  // Store original positions for restoration when focus is cleared
+  const originalPositionsRef = useRef<Map<string, { x: number; y: number }>>(
+    new Map()
+  );
+  // Track previous focus state to detect transitions (for one-time fitView)
+  const prevFocusStateRef = useRef<{ focusedTableId: string | null; focusMode: string }>({
+    focusedTableId: null,
+    focusMode: "fade",
+  });
 
   const [zoom, setZoom] = useState(0.8);
   const isCompact = zoom < COMPACT_ZOOM;
@@ -617,6 +702,13 @@ export function SchemaGraphView({
     setNodes(baseNodes);
   }, [baseNodes, setNodes]);
 
+  // Store original positions when baseNodes change
+  useEffect(() => {
+    const positions = new Map<string, { x: number; y: number }>();
+    baseNodes.forEach((node) => positions.set(node.id, { ...node.position }));
+    originalPositionsRef.current = positions;
+  }, [baseNodes]);
+
   useEffect(() => {
     const lowerSearch = searchFilter?.trim().toLowerCase() ?? "";
     const hasSearch = lowerSearch.length > 0;
@@ -702,16 +794,80 @@ export function SchemaGraphView({
       ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
       : new Set<string>();
 
+    // Calculate which nodes would be dimmed for focus mode
+    const dimmedNodeIds = new Set<string>();
+    if (focusedTableId) {
+      visibleNodeIds.forEach((nodeId) => {
+        // Tables and views: dimmed if not focused and not a neighbor
+        if (visibleTableIds.has(nodeId) || visibleViewIds.has(nodeId)) {
+          if (nodeId !== focusedTableId && !focusedNeighbors.has(nodeId)) {
+            dimmedNodeIds.add(nodeId);
+          }
+        }
+        // Triggers: dimmed if their table is not focused and not a neighbor
+        else if (visibleTriggerIds.has(nodeId)) {
+          const trigger = (schema.triggers || []).find((t) => t.id === nodeId);
+          if (trigger && trigger.tableId !== focusedTableId && !focusedNeighbors.has(trigger.tableId)) {
+            dimmedNodeIds.add(nodeId);
+          }
+        }
+        // Procedures: dimmed if none of their tables are focused or neighbors
+        else if (visibleProcedureIds.has(nodeId)) {
+          const procedure = (schema.storedProcedures || []).find((p) => p.id === nodeId);
+          if (procedure) {
+            const refs = [...(procedure.referencedTables || []), ...(procedure.affectedTables || [])];
+            if (!refs.some((tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId))) {
+              dimmedNodeIds.add(nodeId);
+            }
+          }
+        }
+        // Functions: dimmed if none of their tables are focused or neighbors
+        else if (visibleFunctionIds.has(nodeId)) {
+          const fn = (schema.scalarFunctions || []).find((f) => f.id === nodeId);
+          if (fn) {
+            const refs = fn.referencedTables || [];
+            if (!refs.some((tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId))) {
+              dimmedNodeIds.add(nodeId);
+            }
+          }
+        }
+      });
+    }
+
+    // For edge building, exclude dimmed nodes when focus mode is "hide"
+    const edgeVisibleNodeIds = focusMode === "hide"
+      ? new Set([...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id)))
+      : visibleNodeIds;
+
     const { edges: nextEdges, handleEdgeTypes } = buildEdgeState(
       baseEdges,
       edgeTypeFilter,
-      visibleNodeIds,
+      edgeVisibleNodeIds,
       focusedTableId ?? null,
       selectedEdgeIds,
       hoveredEdgeId,
       showEdgeLabels
     );
     setEdges(nextEdges);
+
+    // Check if we're entering or exiting focus mode (for one-time position changes)
+    const prevState = prevFocusStateRef.current;
+    const justEnteredFocus =
+      focusMode === "hide" &&
+      focusedTableId &&
+      (prevState.focusedTableId !== focusedTableId || prevState.focusMode !== "hide");
+
+    // Detect if we JUST exited focus mode (restore positions once, not continuously)
+    const justExitedFocus =
+      !(focusMode === "hide" && focusedTableId) &&
+      prevState.focusMode === "hide" &&
+      prevState.focusedTableId !== null;
+
+    // Calculate compact positions when focus mode is "hide" and focused
+    const shouldUseCompactLayout = focusMode === "hide" && focusedTableId;
+    const compactPositions = shouldUseCompactLayout
+      ? calculateCompactLayout(focusedTableId, edgeVisibleNodeIds, focusedNeighbors, schema)
+      : null;
 
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
@@ -761,17 +917,42 @@ export function SchemaGraphView({
           nextData.isCompact = isCompact;
         }
 
+        // Hide node if not visible by filters, or if dimmed and focus mode is "hide"
+        const shouldHide = !isVisible || (focusMode === "hide" && isDimmed);
+
+        // Apply compact position (only when entering focus) or restore original (only when exiting)
+        let position = node.position;  // Keep current position by default (preserves user drag)
+        if (justEnteredFocus && compactPositions && compactPositions.has(node.id)) {
+          position = compactPositions.get(node.id)!;
+        } else if (justExitedFocus && originalPositionsRef.current.has(node.id)) {
+          // Only restore original position when JUST exiting focus mode
+          position = originalPositionsRef.current.get(node.id)!;
+        }
+
         return {
           ...node,
-          hidden: !isVisible,
+          position,
+          hidden: shouldHide,
           data: nextData,
         };
       })
     );
+
+    // Call fitView when entering focus mode
+    // minZoom: 0.6 ensures we zoom in enough for full node rendering (not compact mode)
+    if (justEnteredFocus) {
+      setTimeout(() => {
+        fitView({ padding: 0.2, maxZoom: 1.5, minZoom: 0.6, duration: 300 });
+      }, 50);
+    }
+
+    // Update ref for next comparison
+    prevFocusStateRef.current = { focusedTableId: focusedTableId ?? null, focusMode };
   }, [
     baseEdges,
     edgeTypeFilter,
     focusedTableId,
+    focusMode,
     isCompact,
     schema,
     schemaFilter,
@@ -783,6 +964,7 @@ export function SchemaGraphView({
     setNodes,
     showEdgeLabels,
     objectTypeFilter,
+    fitView,
   ]);
 
   return (
@@ -826,5 +1008,14 @@ export function SchemaGraphView({
         modalData={modalData}
       />
     </div>
+  );
+}
+
+// Wrapper component that provides ReactFlowProvider for useReactFlow hook
+export function SchemaGraphView(props: SchemaGraphProps) {
+  return (
+    <ReactFlowProvider>
+      <SchemaGraphInner {...props} />
+    </ReactFlowProvider>
   );
 }

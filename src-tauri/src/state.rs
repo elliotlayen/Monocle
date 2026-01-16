@@ -20,6 +20,8 @@ pub struct AppSettings {
     pub theme: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schema_filter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_mode: Option<String>,
 }
 
 pub struct AppState {
@@ -32,6 +34,7 @@ pub struct AppState {
 pub struct AppSettingsUpdate {
     pub theme: Option<String>,
     pub schema_filter: Option<String>,
+    pub focus_mode: Option<String>,
 }
 
 impl AppState {
@@ -85,6 +88,9 @@ impl AppState {
         }
         if let Some(schema_filter) = update.schema_filter {
             settings.schema_filter = Some(schema_filter);
+        }
+        if let Some(focus_mode) = update.focus_mode {
+            settings.focus_mode = Some(focus_mode);
         }
 
         let updated = settings.clone();
@@ -155,6 +161,7 @@ mod tests {
             .update_settings(AppSettingsUpdate {
                 theme: Some("dark".to_string()),
                 schema_filter: Some("dbo".to_string()),
+                focus_mode: None,
             })
             .expect("update settings");
 
@@ -172,6 +179,7 @@ mod tests {
             .update_settings(AppSettingsUpdate {
                 theme: Some("light".to_string()),
                 schema_filter: Some("sales".to_string()),
+                focus_mode: None,
             })
             .expect("update settings");
 

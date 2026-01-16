@@ -24,15 +24,18 @@ import { useTheme } from "@/providers/theme-provider";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { useAppVersion } from "@/hooks/useAppVersion";
+import type { FocusMode } from "@/features/settings/services/settings-service";
 
 export function SettingsSheet() {
   const { theme, setTheme } = useTheme();
   const version = useAppVersion();
-  const { schemaFilter, availableSchemas, setSchemaFilter, disconnect } = useSchemaStore(
+  const { schemaFilter, availableSchemas, setSchemaFilter, focusMode, setFocusMode, disconnect } = useSchemaStore(
     useShallow((state) => ({
       schemaFilter: state.schemaFilter,
       availableSchemas: state.availableSchemas,
       setSchemaFilter: state.setSchemaFilter,
+      focusMode: state.focusMode,
+      setFocusMode: state.setFocusMode,
       disconnect: state.disconnect,
     }))
   );
@@ -89,6 +92,22 @@ export function SettingsSheet() {
             </Select>
             <p className="text-xs text-muted-foreground">
               Choose your preferred color scheme
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Focus Mode</label>
+            <Select value={focusMode} onValueChange={(value) => setFocusMode(value as FocusMode)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select focus mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fade">Fade unfocused</SelectItem>
+                <SelectItem value="hide">Hide unfocused</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Unfocused element visibility
             </p>
           </div>
 

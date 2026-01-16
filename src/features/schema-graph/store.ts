@@ -4,6 +4,7 @@ import { schemaService } from "./services/schema-service";
 import {
   settingsService,
   type AppSettings,
+  type FocusMode,
 } from "@/features/settings/services/settings-service";
 
 export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures" | "scalarFunctions";
@@ -25,6 +26,7 @@ interface SchemaStore {
   isConnected: boolean;
   connectionInfo: { server: string; database: string } | null;
   preferredSchemaFilter: string;
+  focusMode: FocusMode;
 
   // Filters
   searchFilter: string;
@@ -47,6 +49,7 @@ interface SchemaStore {
   setDebouncedSearchFilter: (search: string) => void;
   setSchemaFilter: (schema: string) => void;
   hydrateSettings: (settings: AppSettings) => void;
+  setFocusMode: (mode: FocusMode) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   toggleObjectType: (type: ObjectType) => void;
@@ -87,6 +90,7 @@ export const createInitialSchemaState = () => ({
   debouncedSearchFilter: "",
   schemaFilter: "all",
   preferredSchemaFilter: "all",
+  focusMode: "fade" as FocusMode,
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
@@ -180,16 +184,34 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   },
 
   hydrateSettings: (settings: AppSettings) => {
-    if (!settings.schemaFilter) return;
-    const availableSchemas = get().availableSchemas;
-    const resolvedSchemaFilter =
-      settings.schemaFilter === "all" || availableSchemas.includes(settings.schemaFilter)
-        ? settings.schemaFilter
-        : "all";
-    set((state) => ({
-      preferredSchemaFilter: settings.schemaFilter,
-      schemaFilter: state.schema ? resolvedSchemaFilter : state.schemaFilter,
-    }));
+    const updates: Partial<SchemaStore> = {};
+
+    if (settings.schemaFilter) {
+      const availableSchemas = get().availableSchemas;
+      const resolvedSchemaFilter =
+        settings.schemaFilter === "all" || availableSchemas.includes(settings.schemaFilter)
+          ? settings.schemaFilter
+          : "all";
+      updates.preferredSchemaFilter = settings.schemaFilter;
+      if (get().schema) {
+        updates.schemaFilter = resolvedSchemaFilter;
+      }
+    }
+
+    if (settings.focusMode) {
+      updates.focusMode = settings.focusMode;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      set(updates);
+    }
+  },
+
+  setFocusMode: (mode: FocusMode) => {
+    set({ focusMode: mode });
+    settingsService.saveSettings({ focusMode: mode }).catch(() => {
+      // Ignore persistence errors
+    });
   },
 
   setFocusedTable: (tableId: string | null) => set({ focusedTableId: tableId }),

@@ -75,29 +75,6 @@ export function Toolbar() {
   const allObjectsSelected = objectTypeFilter.size === 5;
   const allEdgesSelected = edgeTypeFilter.size === 7;
 
-  // Dynamic label helpers
-  const getObjectsLabel = () => {
-    if (allObjectsSelected) return null;
-    if (objectTypeFilter.size > 1) return `${objectTypeFilter.size} Objects`;
-    const type = Array.from(objectTypeFilter)[0];
-    return OBJECT_TYPE_LABELS[type];
-  };
-
-  const getEdgesLabel = () => {
-    if (allEdgesSelected) return null;
-    if (edgeTypeFilter.size > 1) return `${edgeTypeFilter.size} Edges`;
-    const type = Array.from(edgeTypeFilter)[0];
-    return EDGE_TYPE_LABELS[type];
-  };
-
-  const getFocusLabel = () => {
-    if (!focusedTableId) return null;
-    return focusedTableId;
-  };
-
-  const objectsLabel = getObjectsLabel();
-  const edgesLabel = getEdgesLabel();
-  const focusLabel = getFocusLabel();
 
   // Group objects by type for the focus popover
   const objectsByType = {
@@ -109,7 +86,7 @@ export function Toolbar() {
   };
 
   return (
-    <div className="relative flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
+    <div className="relative z-20 flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
       {/* Left: Monocle branding */}
       <span className="font-semibold text-base">Monocle</span>
 
@@ -133,10 +110,10 @@ export function Toolbar() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`rounded-r-none border-r-0 gap-1.5 ${focusLabel ? "bg-accent" : ""}`}
+                    className="rounded-r-none border-r-0"
+                    style={focusedTableId ? { backgroundColor: '#22c55e' } : undefined}
                   >
                     <Target className="w-4 h-4" />
-                    {focusLabel && <span className="max-w-24 truncate">{focusLabel}</span>}
                   </Button>
                 </PopoverTrigger>
               </TooltipTrigger>
@@ -207,10 +184,10 @@ export function Toolbar() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`rounded-none border-r-0 gap-1.5 ${objectsLabel ? "bg-accent" : ""}`}
+                    className="rounded-none border-r-0"
+                    style={!allObjectsSelected ? { backgroundColor: '#22c55e' } : undefined}
                   >
                     <Box className="w-4 h-4" />
-                    {objectsLabel && <span>{objectsLabel}</span>}
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
@@ -248,10 +225,10 @@ export function Toolbar() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`rounded-l-none gap-1.5 ${edgesLabel ? "bg-accent" : ""}`}
+                    className="rounded-l-none"
+                    style={!allEdgesSelected ? { backgroundColor: '#22c55e' } : undefined}
                   >
                     <Network className="w-4 h-4" />
-                    {edgesLabel && <span>{edgesLabel}</span>}
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>

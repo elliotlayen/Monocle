@@ -3,6 +3,7 @@ import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { ConnectionForm } from "@/features/connection/components/connection-form";
 import { Toolbar } from "@/features/toolbar/components/toolbar";
+import { FilterInfoBar } from "@/features/toolbar/components/filter-info-bar";
 import { StatusBar } from "@/components/status-bar";
 import { SchemaGraphView } from "@/features/schema-graph/components";
 import { UpdateChecker } from "@/components/update-checker";
@@ -60,7 +61,8 @@ function App() {
     <div className="flex flex-col h-screen">
       <UpdateChecker />
       <Toolbar />
-      <main className="flex-1 overflow-hidden">
+      <main className="relative flex-1 overflow-hidden">
+        <FilterInfoBar />
         <SchemaGraphView
           schema={schema}
           searchFilter={debouncedSearchFilter}

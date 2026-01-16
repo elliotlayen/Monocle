@@ -190,3 +190,4 @@ html, body, #root {
 .react-flow__minimap:hover .react-flow__minimap-mask {
   fill: var(--minimap-mask-hover) !important;
 }
+
