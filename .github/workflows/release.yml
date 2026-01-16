@@ -34,6 +34,31 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
+      - name: Sync version from tag
+        shell: bash
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          echo "Syncing version to $VERSION"
+
+          # Update package.json
+          npm pkg set version="$VERSION"
+
+          # Update Cargo.toml
+          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          rm -f src-tauri/Cargo.toml.bak
+
+          # Update tauri.conf.json
+          if command -v jq &> /dev/null; then
+            jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          else
+            sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+            rm -f src-tauri/tauri.conf.json.bak
+          fi
+
+          echo "Version synced to $VERSION in all config files"
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -50,3 +75,66 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  bump-version:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Calculate next version
+        id: next_version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          CURRENT="${TAG_NAME#v}"
+          IFS='.' read -ra PARTS <<< "$CURRENT"
+          MAJOR="${PARTS[0]}"
+          MINOR="${PARTS[1]}"
+          PATCH="${PARTS[2]}"
+          NEXT_PATCH=$((PATCH + 1))
+          NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
+          echo "next=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "Next version: $NEXT_VERSION"
+
+      - name: Update version files
+        env:
+          VERSION: ${{ steps.next_version.outputs.next }}
+        run: |
+          # Update package.json
+          npm pkg set version="$VERSION"
+
+          # Update Cargo.toml
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+
+          # Update tauri.conf.json
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        env:
+          NEXT_VERSION: ${{ steps.next_version.outputs.next }}
+          TAG_NAME: ${{ github.ref_name }}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump version to ${{ steps.next_version.outputs.next }}"
+          title: "chore: bump version to ${{ steps.next_version.outputs.next }}"
+          body: |
+            Automated version bump after release ${{ github.ref_name }}.
+
+            This PR updates the version in:
+            - package.json
+            - src-tauri/Cargo.toml
+            - src-tauri/tauri.conf.json
+          branch: chore/bump-version-${{ steps.next_version.outputs.next }}
+          base: main

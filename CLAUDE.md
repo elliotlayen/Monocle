@@ -115,3 +115,41 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - **No emojis**: Do not use emojis anywhere in code, comments, commits, or documentation
 - **Commit messages**: Do not include "Generated with Claude Code" or "Co-Authored-By" lines
 - **Components**: Use shadcn/ui for UI components
+
+## Release Workflow
+
+### Creating a Release
+
+1. Tag the commit with a `v*` prefix (e.g., `v0.2.3`):
+   ```bash
+   git tag v0.2.3
+   git push origin v0.2.3
+   ```
+
+2. The GitHub Actions workflow automatically:
+   - Extracts version from the tag (strips `v` prefix)
+   - Syncs version to `package.json`, `Cargo.toml`, and `tauri.conf.json`
+   - Builds for macOS (ARM64 + x64) and Windows
+   - Creates a GitHub release with all artifacts
+   - Generates `latest.json` for the auto-updater
+
+### Auto-Updater
+
+The app checks for updates via Tauri's updater plugin:
+- Endpoint: `https://github.com/elliotlayen/Monocle/releases/latest/download/latest.json`
+- The `latest.json` file contains the version, download URLs, and signatures
+- Users are prompted to update when a newer version is available
+
+### Version Bump PR
+
+After a successful release, the workflow automatically creates a PR to bump the version to the next patch (e.g., `0.2.3` -> `0.2.4`). This ensures:
+- Config files stay in sync with the latest release
+- The next release tag will have matching versions
+- No manual version updates needed
+
+### Version Files
+
+These files must stay in sync:
+- `package.json` - npm version
+- `src-tauri/Cargo.toml` - Rust crate version
+- `src-tauri/tauri.conf.json` - Tauri app version (used for `latest.json`)
