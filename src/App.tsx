@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ReactFlowProvider } from "@xyflow/react";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { HomeScreen } from "@/features/connection/components/home-screen";
@@ -58,22 +59,24 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      <UpdateChecker />
-      <Toolbar />
-      <main className="relative flex-1 overflow-hidden">
-        <FilterInfoBar />
-        <SchemaGraphView
-          schema={schema}
-          searchFilter={debouncedSearchFilter}
-          schemaFilter={schemaFilter}
-          focusedTableId={focusedTableId}
-          objectTypeFilter={objectTypeFilter}
-          edgeTypeFilter={edgeTypeFilter}
-        />
-      </main>
-      <StatusBar />
-    </div>
+    <ReactFlowProvider>
+      <div className="flex flex-col h-screen">
+        <UpdateChecker />
+        <Toolbar />
+        <main className="relative flex-1 overflow-hidden">
+          <FilterInfoBar />
+          <SchemaGraphView
+            schema={schema}
+            searchFilter={debouncedSearchFilter}
+            schemaFilter={schemaFilter}
+            focusedTableId={focusedTableId}
+            objectTypeFilter={objectTypeFilter}
+            edgeTypeFilter={edgeTypeFilter}
+          />
+        </main>
+        <StatusBar />
+      </div>
+    </ReactFlowProvider>
   );
 }
 

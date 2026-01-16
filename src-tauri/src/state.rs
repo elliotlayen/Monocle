@@ -22,6 +22,8 @@ pub struct AppSettings {
     pub schema_filter: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_expand_threshold: Option<u32>,
 }
 
 pub struct AppState {
@@ -35,6 +37,7 @@ pub struct AppSettingsUpdate {
     pub theme: Option<String>,
     pub schema_filter: Option<String>,
     pub focus_mode: Option<String>,
+    pub focus_expand_threshold: Option<u32>,
 }
 
 impl AppState {
@@ -91,6 +94,9 @@ impl AppState {
         }
         if let Some(focus_mode) = update.focus_mode {
             settings.focus_mode = Some(focus_mode);
+        }
+        if let Some(threshold) = update.focus_expand_threshold {
+            settings.focus_expand_threshold = Some(threshold);
         }
 
         let updated = settings.clone();
@@ -162,6 +168,7 @@ mod tests {
                 theme: Some("dark".to_string()),
                 schema_filter: Some("dbo".to_string()),
                 focus_mode: None,
+                focus_expand_threshold: None,
             })
             .expect("update settings");
 
@@ -180,6 +187,7 @@ mod tests {
                 theme: Some("light".to_string()),
                 schema_filter: Some("sales".to_string()),
                 focus_mode: None,
+                focus_expand_threshold: None,
             })
             .expect("update settings");
 

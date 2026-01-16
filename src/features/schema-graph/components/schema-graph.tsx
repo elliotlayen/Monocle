@@ -7,7 +7,6 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
-  ReactFlowProvider,
   type Node,
   type Edge,
   type EdgeMouseHandler,
@@ -44,7 +43,26 @@ const PROCEDURE_GAP_Y = 180;
 const PROCEDURE_OFFSET_X = NODE_WIDTH + GAP_X + 300;
 const FUNCTION_OFFSET_X = 320;
 const COMPACT_ZOOM = 0.6;
+const FOCUS_COMPACT_ZOOM = 0.4;
+const FORCE_COMPACT_ZOOM = 0.3;
 const EDGE_LABEL_ZOOM = 0.8;
+
+/**
+ * Calculate actual node height based on column count.
+ * Expanded mode: 52 + (columnCount * 28) pixels
+ * Default for triggers/procedures/functions: 150px
+ */
+function getNodeHeight(nodeId: string, schema: SchemaGraphType): number {
+  const table = schema.tables.find((t) => t.id === nodeId);
+  if (table) {
+    return 52 + table.columns.length * 28;
+  }
+  const view = (schema.views || []).find((v) => v.id === nodeId);
+  if (view) {
+    return 52 + view.columns.length * 28;
+  }
+  return 150; // Default for triggers/procedures/functions
+}
 
 const EDGE_STYLE: Record<
   EdgeType,
@@ -145,8 +163,67 @@ interface SchemaGraphProps {
 }
 
 /**
+ * Position a tier of nodes with row wrapping.
+ * Centers each row horizontally and stacks rows vertically.
+ * Uses dynamic height calculation based on column count.
+ * Returns the final Y position after positioning all rows.
+ */
+function positionTier(
+  nodeIds: string[],
+  baseY: number,
+  positions: Map<string, { x: number; y: number }>,
+  direction: "up" | "down",
+  schema: SchemaGraphType
+): number {
+  if (nodeIds.length === 0) return baseY;
+
+  const MAX_PER_ROW = 4;
+  const NODE_GAP_X = NODE_WIDTH + 80; // 380px horizontal spacing
+  const VERTICAL_GAP = 60;
+
+  // Group nodes into rows
+  const rows: string[][] = [];
+  for (let i = 0; i < nodeIds.length; i += MAX_PER_ROW) {
+    rows.push(nodeIds.slice(i, i + MAX_PER_ROW));
+  }
+
+  let cumulativeY = baseY;
+
+  rows.forEach((rowNodes) => {
+    // Calculate max height in this row for proper spacing
+    const maxHeight = Math.max(...rowNodes.map((id) => getNodeHeight(id, schema)));
+
+    // For "up" direction, first move up by maxHeight before positioning
+    if (direction === "up") {
+      cumulativeY -= maxHeight;
+    }
+
+    // Position nodes in this row (centered horizontally)
+    const rowWidth = rowNodes.length * NODE_GAP_X;
+    const startX = -rowWidth / 2 + NODE_GAP_X / 2;
+
+    rowNodes.forEach((id, col) => {
+      positions.set(id, {
+        x: startX + col * NODE_GAP_X,
+        y: cumulativeY,
+      });
+    });
+
+    // Move to next row position
+    if (direction === "up") {
+      cumulativeY -= VERTICAL_GAP; // Additional gap for next row above
+    } else {
+      cumulativeY += maxHeight + VERTICAL_GAP; // Move below current row
+    }
+  });
+
+  return cumulativeY;
+}
+
+/**
  * Calculate compact layout positions when focus mode is "hide".
- * Places focused node at center with neighbors in a ring around it.
+ * Uses directional flow layout with upstream tables above and downstream below.
+ * Calculates dynamic heights based on column count to prevent overlap.
  */
 function calculateCompactLayout(
   focusedNodeId: string,
@@ -158,19 +235,51 @@ function calculateCompactLayout(
 
   // Focused node at center
   positions.set(focusedNodeId, { x: 0, y: 0 });
+  const focusedHeight = getNodeHeight(focusedNodeId, schema);
 
-  // Filter neighbors to only include visible ones (tables and views)
+  // Categorize neighbors by FK direction
+  const upstream: string[] = [];   // Tables that reference focused (FK points to focused)
+  const downstream: string[] = []; // Tables that focused references (FK points away)
   const visibleNeighbors = [...neighbors].filter((id) => visibleNodeIds.has(id));
-  const radius = NODE_WIDTH + GAP_X;
 
-  // Position neighbors in a circle around the focused node
-  visibleNeighbors.forEach((id, i) => {
-    const angle = (2 * Math.PI * i) / visibleNeighbors.length - Math.PI / 2;
-    positions.set(id, {
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
-    });
-  });
+  for (const neighborId of visibleNeighbors) {
+    // Check if this is a table/view (not trigger/procedure)
+    const isTableOrView = schema.tables.some(t => t.id === neighborId) ||
+                          (schema.views || []).some(v => v.id === neighborId);
+
+    if (!isTableOrView) continue;
+
+    // Check FK direction
+    // referencedByFocused: focused table has FK pointing to this neighbor
+    const referencedByFocused = schema.relationships.some(
+      rel => rel.from === focusedNodeId && rel.to === neighborId
+    );
+    // referencesFocused: this neighbor has FK pointing to focused table
+    const referencesFocused = schema.relationships.some(
+      rel => rel.from === neighborId && rel.to === focusedNodeId
+    );
+
+    if (referencesFocused && !referencedByFocused) {
+      upstream.push(neighborId);
+    } else if (referencedByFocused && !referencesFocused) {
+      downstream.push(neighborId);
+    } else {
+      // Bidirectional or view dependency - put in upstream
+      upstream.push(neighborId);
+    }
+  }
+
+  // Gap between focused node and tiers
+  const TIER_GAP = 60;
+
+  // Position upstream tables (above focused) - position so bottom of first row ends at y = -TIER_GAP
+  // Focused node at (0, 0) occupies y from 0 to focusedHeight (top-left positioning)
+  const upstreamBaseY = -TIER_GAP;
+  positionTier(upstream, upstreamBaseY, positions, "up", schema);
+
+  // Position downstream tables (below focused) - first row at y = focusedHeight + TIER_GAP
+  const downstreamBaseY = focusedHeight + TIER_GAP;
+  const bottomY = positionTier(downstream, downstreamBaseY, positions, "down", schema);
 
   // Position triggers near their parent tables
   (schema.triggers || []).forEach((trigger) => {
@@ -188,13 +297,19 @@ function calculateCompactLayout(
     }
   });
 
+  // Calculate bottom Y position for procedures/functions
+  // Use bottomY from positionTier if downstream has nodes, otherwise calculate from positions
+  const allYPositions = [...positions.values()].map(p => p.y);
+  const maxY = Math.max(...allYPositions, 0);
+  const procedureY = downstream.length > 0 ? bottomY : maxY + NODE_HEIGHT + GAP_Y;
+
   // Position procedures below the main cluster
   let procIndex = 0;
   (schema.storedProcedures || []).forEach((proc) => {
     if (!visibleNodeIds.has(proc.id)) return;
     positions.set(proc.id, {
       x: -200 + procIndex * 320,
-      y: radius + NODE_HEIGHT + GAP_Y,
+      y: procedureY,
     });
     procIndex++;
   });
@@ -205,7 +320,7 @@ function calculateCompactLayout(
     if (!visibleNodeIds.has(fn.id)) return;
     positions.set(fn.id, {
       x: -200 + (procIndex + funcIndex) * 320,
-      y: radius + NODE_HEIGHT + GAP_Y,
+      y: procedureY,
     });
     funcIndex++;
   });
@@ -584,13 +699,14 @@ function SchemaGraphInner({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<DetailModalData | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection, focusMode } =
+  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection, focusMode, focusExpandThreshold } =
     useSchemaStore(
       useShallow((state) => ({
         selectedEdgeIds: state.selectedEdgeIds,
         toggleEdgeSelection: state.toggleEdgeSelection,
         clearEdgeSelection: state.clearEdgeSelection,
         focusMode: state.focusMode,
+        focusExpandThreshold: state.focusExpandThreshold,
       }))
     );
 
@@ -608,7 +724,6 @@ function SchemaGraphInner({
   });
 
   const [zoom, setZoom] = useState(0.8);
-  const isCompact = zoom < COMPACT_ZOOM;
   const showEdgeLabels = zoom >= EDGE_LABEL_ZOOM;
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
@@ -834,6 +949,11 @@ function SchemaGraphInner({
       });
     }
 
+    // Count visible non-dimmed tables/views for per-node compact calculation
+    const visibleNonDimmedCount = [...visibleTableIds, ...visibleViewIds]
+      .filter((id) => !dimmedNodeIds.has(id)).length;
+    const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
+
     // For edge building, exclude dimmed nodes when focus mode is "hide"
     const edgeVisibleNodeIds = focusMode === "hide"
       ? new Set([...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id)))
@@ -914,7 +1034,26 @@ function SchemaGraphInner({
         if (node.type === "tableNode" || node.type === "viewNode") {
           nextData.columnsWithHandles = schemaIndex.columnsWithHandles;
           nextData.handleEdgeTypes = handleEdgeTypes;
-          nextData.isCompact = isCompact;
+
+          // Per-node compact calculation
+          let nodeIsCompact = zoom < COMPACT_ZOOM;
+
+          if (zoom < FORCE_COMPACT_ZOOM) {
+            nodeIsCompact = true;
+          } else if (focusedTableId) {
+            if (node.id === focusedTableId) {
+              // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM)
+              nodeIsCompact = false;
+            } else if (focusedNeighbors.has(node.id)) {
+              // Neighbors: expand based on count thresholds
+              if (visibleNonDimmedCount <= focusExpandThreshold) {
+                nodeIsCompact = false;
+              } else if (visibleNonDimmedCount <= moderateThreshold) {
+                nodeIsCompact = zoom < FOCUS_COMPACT_ZOOM;
+              }
+            }
+          }
+          nextData.isCompact = nodeIsCompact;
         }
 
         // Hide node if not visible by filters, or if dimmed and focus mode is "hide"
@@ -953,7 +1092,8 @@ function SchemaGraphInner({
     edgeTypeFilter,
     focusedTableId,
     focusMode,
-    isCompact,
+    focusExpandThreshold,
+    zoom,
     schema,
     schemaFilter,
     schemaIndex,
@@ -1011,11 +1151,6 @@ function SchemaGraphInner({
   );
 }
 
-// Wrapper component that provides ReactFlowProvider for useReactFlow hook
 export function SchemaGraphView(props: SchemaGraphProps) {
-  return (
-    <ReactFlowProvider>
-      <SchemaGraphInner {...props} />
-    </ReactFlowProvider>
-  );
+  return <SchemaGraphInner {...props} />;
 }

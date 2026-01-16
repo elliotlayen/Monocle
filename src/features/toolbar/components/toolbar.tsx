@@ -25,6 +25,7 @@ import {
 import { Target, Box, Network, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SettingsSheet } from "@/features/settings/components/settings-sheet";
+import { ExportButton } from "@/features/export/components/export-button";
 import { SearchBar } from "./search-bar";
 import { EDGE_TYPE_LABELS, EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 
@@ -258,6 +259,11 @@ export function Toolbar() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        </TooltipProvider>
+
+        {/* Export */}
+        <TooltipProvider>
+          <ExportButton />
         </TooltipProvider>
 
         {/* Settings */}

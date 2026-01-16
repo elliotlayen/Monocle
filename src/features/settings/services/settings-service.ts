@@ -9,12 +9,14 @@ export interface AppSettings {
   theme?: ThemeSetting;
   schemaFilter?: string;
   focusMode?: FocusMode;
+  focusExpandThreshold?: number;
 }
 
 export interface SettingsUpdate {
   theme?: ThemeSetting;
   schemaFilter?: string;
   focusMode?: FocusMode;
+  focusExpandThreshold?: number;
 }
 
 export const settingsService = {

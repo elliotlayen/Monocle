@@ -27,6 +27,7 @@ interface SchemaStore {
   connectionInfo: { server: string; database: string } | null;
   preferredSchemaFilter: string;
   focusMode: FocusMode;
+  focusExpandThreshold: number;
 
   // Filters
   searchFilter: string;
@@ -50,6 +51,7 @@ interface SchemaStore {
   setSchemaFilter: (schema: string) => void;
   hydrateSettings: (settings: AppSettings) => void;
   setFocusMode: (mode: FocusMode) => void;
+  setFocusExpandThreshold: (threshold: number) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   toggleObjectType: (type: ObjectType) => void;
@@ -91,6 +93,7 @@ export const createInitialSchemaState = () => ({
   schemaFilter: "all",
   preferredSchemaFilter: "all",
   focusMode: "fade" as FocusMode,
+  focusExpandThreshold: 15,
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
@@ -202,6 +205,10 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       updates.focusMode = settings.focusMode;
     }
 
+    if (settings.focusExpandThreshold !== undefined) {
+      updates.focusExpandThreshold = settings.focusExpandThreshold;
+    }
+
     if (Object.keys(updates).length > 0) {
       set(updates);
     }
@@ -210,6 +217,13 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   setFocusMode: (mode: FocusMode) => {
     set({ focusMode: mode });
     settingsService.saveSettings({ focusMode: mode }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setFocusExpandThreshold: (threshold: number) => {
+    set({ focusExpandThreshold: threshold });
+    settingsService.saveSettings({ focusExpandThreshold: threshold }).catch(() => {
       // Ignore persistence errors
     });
   },

@@ -29,13 +29,15 @@ import type { FocusMode } from "@/features/settings/services/settings-service";
 export function SettingsSheet() {
   const { theme, setTheme } = useTheme();
   const version = useAppVersion();
-  const { schemaFilter, availableSchemas, setSchemaFilter, focusMode, setFocusMode, disconnect } = useSchemaStore(
+  const { schemaFilter, availableSchemas, setSchemaFilter, focusMode, setFocusMode, focusExpandThreshold, setFocusExpandThreshold, disconnect } = useSchemaStore(
     useShallow((state) => ({
       schemaFilter: state.schemaFilter,
       availableSchemas: state.availableSchemas,
       setSchemaFilter: state.setSchemaFilter,
       focusMode: state.focusMode,
       setFocusMode: state.setFocusMode,
+      focusExpandThreshold: state.focusExpandThreshold,
+      setFocusExpandThreshold: state.setFocusExpandThreshold,
       disconnect: state.disconnect,
     }))
   );
@@ -108,6 +110,28 @@ export function SettingsSheet() {
             </Select>
             <p className="text-xs text-muted-foreground">
               Unfocused element visibility
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Focus Expand Threshold</label>
+            <Select
+              value={String(focusExpandThreshold)}
+              onValueChange={(v) => setFocusExpandThreshold(Number(v))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 nodes</SelectItem>
+                <SelectItem value="10">10 nodes</SelectItem>
+                <SelectItem value="15">15 nodes</SelectItem>
+                <SelectItem value="20">20 nodes</SelectItem>
+                <SelectItem value="25">25 nodes</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Max neighbors to show expanded in focus mode
             </p>
           </div>
 
