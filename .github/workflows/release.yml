@@ -103,20 +103,20 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Copy macOS ARM64 artifacts
-          cp artifacts/macos-aarch64-apple-darwin/*.dmg release-assets/ 2>/dev/null || true
-          cp artifacts/macos-aarch64-apple-darwin/*.tar.gz release-assets/ 2>/dev/null || true
-          cp artifacts/macos-aarch64-apple-darwin/*.tar.gz.sig release-assets/ 2>/dev/null || true
+          # Copy macOS ARM64 artifacts (preserves directory structure from upload)
+          cp artifacts/macos-aarch64-apple-darwin/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg release-assets/ 2>/dev/null || true
+          cp artifacts/macos-aarch64-apple-darwin/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/macos-aarch64-apple-darwin/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz.sig release-assets/ 2>/dev/null || true
 
           # Copy macOS x64 artifacts
-          cp artifacts/macos-x86_64-apple-darwin/*.dmg release-assets/ 2>/dev/null || true
-          cp artifacts/macos-x86_64-apple-darwin/*.tar.gz release-assets/ 2>/dev/null || true
-          cp artifacts/macos-x86_64-apple-darwin/*.tar.gz.sig release-assets/ 2>/dev/null || true
+          cp artifacts/macos-x86_64-apple-darwin/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg release-assets/ 2>/dev/null || true
+          cp artifacts/macos-x86_64-apple-darwin/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/macos-x86_64-apple-darwin/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.tar.gz.sig release-assets/ 2>/dev/null || true
 
           # Copy Windows artifacts
-          cp artifacts/windows-x86_64/*.msi release-assets/ 2>/dev/null || true
-          cp artifacts/windows-x86_64/*.exe release-assets/ 2>/dev/null || true
-          cp artifacts/windows-x86_64/*.exe.sig release-assets/ 2>/dev/null || true
+          cp artifacts/windows-x86_64/src-tauri/target/release/bundle/msi/*.msi release-assets/ 2>/dev/null || true
+          cp artifacts/windows-x86_64/src-tauri/target/release/bundle/nsis/*.exe release-assets/ 2>/dev/null || true
+          cp artifacts/windows-x86_64/src-tauri/target/release/bundle/nsis/*.exe.sig release-assets/ 2>/dev/null || true
 
           echo "Release assets:"
           ls -la release-assets/
