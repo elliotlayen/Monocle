@@ -8,12 +8,14 @@ import { FilterInfoBar } from "@/features/toolbar/components/filter-info-bar";
 import { StatusBar } from "@/components/status-bar";
 import { SchemaGraphView } from "@/features/schema-graph/components";
 import { UpdateChecker } from "@/components/update-checker";
+import { ToastContainer } from "@/components/toast-container";
 import { settingsService } from "@/features/settings/services/settings-service";
 
 function App() {
   const {
     schema,
     isConnected,
+    serverConnection,
     debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
@@ -24,6 +26,7 @@ function App() {
     useShallow((state) => ({
       schema: state.schema,
       isConnected: state.isConnected,
+      serverConnection: state.serverConnection,
       debouncedSearchFilter: state.debouncedSearchFilter,
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
@@ -49,34 +52,42 @@ function App() {
     };
   }, [hydrateSettings]);
 
-  if (!isConnected || !schema) {
-    return (
-      <>
-        <UpdateChecker />
-        <HomeScreen />
-      </>
-    );
-  }
+  const showHome = !schema && (!isConnected || !serverConnection);
 
   return (
-    <ReactFlowProvider>
-      <div className="flex flex-col h-screen">
-        <UpdateChecker />
-        <Toolbar />
-        <main className="relative flex-1 overflow-hidden">
-          <FilterInfoBar />
-          <SchemaGraphView
-            schema={schema}
-            searchFilter={debouncedSearchFilter}
-            schemaFilter={schemaFilter}
-            focusedTableId={focusedTableId}
-            objectTypeFilter={objectTypeFilter}
-            edgeTypeFilter={edgeTypeFilter}
-          />
-        </main>
-        <StatusBar />
-      </div>
-    </ReactFlowProvider>
+    <>
+      <ToastContainer />
+      <UpdateChecker />
+      {showHome ? (
+        <HomeScreen />
+      ) : (
+        <ReactFlowProvider>
+          <div className="flex flex-col h-screen">
+            <Toolbar />
+            <main className="relative flex-1 overflow-hidden">
+              {schema ? (
+                <>
+                  <FilterInfoBar />
+                  <SchemaGraphView
+                    schema={schema}
+                    searchFilter={debouncedSearchFilter}
+                    schemaFilter={schemaFilter}
+                    focusedTableId={focusedTableId}
+                    objectTypeFilter={objectTypeFilter}
+                    edgeTypeFilter={edgeTypeFilter}
+                  />
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>Select a database from the toolbar to view its schema</p>
+                </div>
+              )}
+            </main>
+            <StatusBar />
+          </div>
+        </ReactFlowProvider>
+      )}
+    </>
   );
 }
 

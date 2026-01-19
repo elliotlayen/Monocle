@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Database, Settings, Info } from "lucide-react";
+import { Server, Settings, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -80,8 +80,8 @@ export function HomeScreen() {
           onClick={() => setConnectionModalOpen(true)}
         >
           <span className="flex items-center gap-3">
-            <Database className="w-5 h-5" />
-            Connect to Database
+            <Server className="w-5 h-5" />
+            Connect to Server
           </span>
           <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             {modKey}N

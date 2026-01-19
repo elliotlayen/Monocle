@@ -22,14 +22,14 @@ import {
   MockDataModal,
   type MockDataSize,
 } from "@/components/mock-data-modal";
-import type { ConnectionParams, AuthType } from "@/features/schema-graph/types";
+import type { ServerConnectionParams, AuthType } from "@/features/schema-graph/types";
 import { connectionService, type ConnectionHistory } from "../services/connection-service";
+import { useToastStore } from "@/features/notifications/store";
 
 const STORAGE_KEY = "monocle-connection-settings";
 
 interface SavedSettings {
   server: string;
-  database: string;
   authType: AuthType;
 }
 
@@ -53,6 +53,10 @@ function saveSettings(settings: SavedSettings) {
   }
 }
 
+interface FormData extends ServerConnectionParams {
+  // ServerConnectionParams already has all fields we need
+}
+
 interface ConnectionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -66,20 +70,22 @@ export function ConnectionModal({
   recentConnections,
   onConnectionSuccess,
 }: ConnectionModalProps) {
-  const { loadSchema, loadMockSchema, isLoading, error } = useSchemaStore(
+  const { connectToServer, loadMockSchema, isLoading, isDatabasesLoading, error } = useSchemaStore(
     useShallow((state) => ({
-      loadSchema: state.loadSchema,
+      connectToServer: state.connectToServer,
       loadMockSchema: state.loadMockSchema,
       isLoading: state.isLoading,
+      isDatabasesLoading: state.isDatabasesLoading,
       error: state.error,
     }))
   );
 
-  const [formData, setFormData] = useState<ConnectionParams>(() => {
+  const { addToast } = useToastStore();
+
+  const [formData, setFormData] = useState<FormData>(() => {
     const saved = loadSavedSettings();
     return {
       server: saved?.server ?? "",
-      database: saved?.database ?? "",
       authType: saved?.authType ?? "sqlServer",
       username: "",
       password: "",
@@ -93,10 +99,9 @@ export function ConnectionModal({
   useEffect(() => {
     saveSettings({
       server: formData.server,
-      database: formData.database,
       authType: formData.authType,
     });
-  }, [formData.server, formData.database, formData.authType]);
+  }, [formData.server, formData.authType]);
 
   const handleLoadMock = (size: MockDataSize) => {
     void loadMockSchema(size);
@@ -107,9 +112,8 @@ export function ConnectionModal({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    const params: ConnectionParams = {
+    const params: ServerConnectionParams = {
       server: formData.server,
-      database: formData.database,
       authType: formData.authType,
       trustServerCertificate: formData.trustServerCertificate,
     };
@@ -119,19 +123,26 @@ export function ConnectionModal({
       params.password = formData.password;
     }
 
-    const connected = await loadSchema(params);
+    const connected = await connectToServer(params);
 
     if (connected) {
       connectionService
         .saveConnection({
           server: formData.server,
-          database: formData.database,
+          database: "",
           username: formData.username || "",
         })
         .then(() => {
           onConnectionSuccess?.();
         })
         .catch(() => {});
+
+      addToast({
+        type: "success",
+        title: "Connected",
+        message: `Connected to ${formData.server}`,
+        duration: 3000,
+      });
 
       onOpenChange(false);
     }
@@ -141,13 +152,12 @@ export function ConnectionModal({
     setFormData((prev) => ({
       ...prev,
       server: connection.server,
-      database: connection.database,
       username: connection.username,
     }));
   };
 
   const handleChange = (
-    field: keyof ConnectionParams,
+    field: keyof ServerConnectionParams,
     value: string | boolean
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -155,17 +165,19 @@ export function ConnectionModal({
 
   const isWindowsAuth = formData.authType === "windows";
 
+  const isConnecting = isLoading || isDatabasesLoading;
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Connect to Database</DialogTitle>
+            <DialogTitle>Connect to Server</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             {recentConnections.length > 0 && (
               <div className="space-y-1">
-                <Label htmlFor="recent">Recent Connections</Label>
+                <Label htmlFor="recent">Recent Servers</Label>
                 <Select
                   value=""
                   onValueChange={(value) => {
@@ -176,12 +188,12 @@ export function ConnectionModal({
                   }}
                 >
                   <SelectTrigger id="recent">
-                    <SelectValue placeholder="Select a recent connection" />
+                    <SelectValue placeholder="Select a recent server" />
                   </SelectTrigger>
                   <SelectContent>
                     {recentConnections.map((conn, idx) => (
-                      <SelectItem key={`${conn.server}-${conn.database}`} value={String(idx)}>
-                        {conn.server} / {conn.database}
+                      <SelectItem key={`${conn.server}-${idx}`} value={String(idx)}>
+                        {conn.server}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -189,29 +201,16 @@ export function ConnectionModal({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="server">Server</Label>
-                <Input
-                  id="server"
-                  type="text"
-                  value={formData.server}
-                  onChange={(e) => handleChange("server", e.target.value)}
-                  placeholder="localhost"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="database">Database</Label>
-                <Input
-                  id="database"
-                  type="text"
-                  value={formData.database}
-                  onChange={(e) => handleChange("database", e.target.value)}
-                  placeholder="Database name"
-                  required
-                />
-              </div>
+            <div className="space-y-1">
+              <Label htmlFor="server">Server</Label>
+              <Input
+                id="server"
+                type="text"
+                value={formData.server}
+                onChange={(e) => handleChange("server", e.target.value)}
+                placeholder="localhost"
+                required
+              />
             </div>
 
             <div className="space-y-1">
@@ -282,15 +281,15 @@ export function ConnectionModal({
             )}
 
             <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={isLoading} className="flex-1">
-                {isLoading ? "Connecting..." : "Connect"}
+              <Button type="submit" disabled={isConnecting} className="flex-1">
+                {isConnecting ? "Connecting..." : "Connect"}
               </Button>
               {import.meta.env.DEV && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setMockModalOpen(true)}
-                  disabled={isLoading}
+                  disabled={isConnecting}
                 >
                   Mock Data
                 </Button>
@@ -305,7 +304,7 @@ export function ConnectionModal({
           open={mockModalOpen}
           onOpenChange={setMockModalOpen}
           onLoad={handleLoadMock}
-          isLoading={isLoading}
+          isLoading={isConnecting}
         />
       )}
     </>

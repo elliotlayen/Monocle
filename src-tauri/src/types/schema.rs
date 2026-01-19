@@ -128,3 +128,17 @@ pub struct ConnectionParams {
     #[serde(default)]
     pub trust_server_certificate: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConnectionParams {
+    pub server: String,
+    #[serde(default)]
+    pub auth_type: AuthType,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+    #[serde(default)]
+    pub trust_server_certificate: bool,
+}

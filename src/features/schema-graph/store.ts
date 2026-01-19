@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { SchemaGraph, ConnectionParams } from "./types";
+import { SchemaGraph, ConnectionParams, ServerConnectionParams } from "./types";
 import { schemaService } from "./services/schema-service";
+import { databaseService } from "@/features/connection/services/database-service";
 import {
   settingsService,
   type AppSettings,
@@ -24,10 +25,16 @@ interface SchemaStore {
   isLoading: boolean;
   error: string | null;
   isConnected: boolean;
-  connectionInfo: { server: string; database: string } | null;
+  connectionInfo: { server: string; database?: string } | null;
   preferredSchemaFilter: string;
   focusMode: FocusMode;
   focusExpandThreshold: number;
+
+  // Server connection state
+  serverConnection: ServerConnectionParams | null;
+  availableDatabases: string[];
+  selectedDatabase: string | null;
+  isDatabasesLoading: boolean;
 
   // Filters
   searchFilter: string;
@@ -46,9 +53,13 @@ interface SchemaStore {
   // Actions
   loadMockSchema: (size: string) => Promise<boolean>;
   loadSchema: (params: ConnectionParams) => Promise<boolean>;
+  connectToServer: (params: ServerConnectionParams) => Promise<boolean>;
+  selectDatabase: (database: string) => Promise<boolean>;
+  disconnectServer: () => void;
   setSearchFilter: (search: string) => void;
   setDebouncedSearchFilter: (search: string) => void;
   setSchemaFilter: (schema: string) => void;
+  clearError: () => void;
   hydrateSettings: (settings: AppSettings) => void;
   setFocusMode: (mode: FocusMode) => void;
   setFocusExpandThreshold: (threshold: number) => void;
@@ -99,6 +110,11 @@ export const createInitialSchemaState = () => ({
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
   selectedEdgeIds: new Set<string>(),
   availableSchemas: [],
+  // Server connection state
+  serverConnection: null,
+  availableDatabases: [] as string[],
+  selectedDatabase: null,
+  isDatabasesLoading: false,
 });
 
 const getAvailableSchemas = (schema: SchemaGraph) => {
@@ -158,6 +174,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         isConnected: true,
         connectionInfo: { server: params.server, database: params.database },
         availableSchemas: schemas,
+        selectedDatabase: params.database,
         // Reset filters on new connection
         searchFilter: "",
         debouncedSearchFilter: "",
@@ -174,6 +191,102 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     }
   },
 
+  connectToServer: async (params: ServerConnectionParams) => {
+    set({ isDatabasesLoading: true, error: null });
+    try {
+      const databases = await databaseService.listDatabases(params);
+      set({
+        serverConnection: params,
+        availableDatabases: databases,
+        isDatabasesLoading: false,
+        isConnected: true,
+        connectionInfo: { server: params.server },
+        // Reset schema state
+        schema: null,
+        selectedDatabase: null,
+        availableSchemas: [],
+        searchFilter: "",
+        debouncedSearchFilter: "",
+        schemaFilter: "all",
+        focusedTableId: null,
+        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        edgeTypeFilter: new Set(ALL_EDGE_TYPES),
+        selectedEdgeIds: new Set<string>(),
+      });
+      return true;
+    } catch (err) {
+      set({ error: String(err), isDatabasesLoading: false });
+      return false;
+    }
+  },
+
+  selectDatabase: async (database: string) => {
+    const serverConnection = get().serverConnection;
+    if (!serverConnection) {
+      set({ error: "Not connected to server" });
+      return false;
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      const params: ConnectionParams = {
+        server: serverConnection.server,
+        database,
+        authType: serverConnection.authType,
+        username: serverConnection.username,
+        password: serverConnection.password,
+        trustServerCertificate: serverConnection.trustServerCertificate,
+      };
+
+      const schema = await schemaService.loadSchema(params);
+      const schemas = getAvailableSchemas(schema);
+      const preferredSchemaFilter = get().preferredSchemaFilter;
+      const resolvedSchemaFilter =
+        preferredSchemaFilter === "all" || schemas.includes(preferredSchemaFilter)
+          ? preferredSchemaFilter
+          : "all";
+
+      set({
+        schema,
+        isLoading: false,
+        selectedDatabase: database,
+        connectionInfo: { server: serverConnection.server, database },
+        availableSchemas: schemas,
+        // Reset filters on database change
+        searchFilter: "",
+        debouncedSearchFilter: "",
+        schemaFilter: resolvedSchemaFilter,
+        focusedTableId: null,
+        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        edgeTypeFilter: new Set(ALL_EDGE_TYPES),
+        selectedEdgeIds: new Set<string>(),
+      });
+      return true;
+    } catch (err) {
+      set({ error: String(err), isLoading: false });
+      return false;
+    }
+  },
+
+  disconnectServer: () =>
+    set({
+      schema: null,
+      isConnected: false,
+      connectionInfo: null,
+      serverConnection: null,
+      availableDatabases: [],
+      selectedDatabase: null,
+      searchFilter: "",
+      debouncedSearchFilter: "",
+      schemaFilter: "all",
+      focusedTableId: null,
+      objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+      edgeTypeFilter: new Set(ALL_EDGE_TYPES),
+      selectedEdgeIds: new Set<string>(),
+      availableSchemas: [],
+      error: null,
+    }),
+
   setSearchFilter: (search: string) => set({ searchFilter: search }),
 
   setDebouncedSearchFilter: (search: string) =>
@@ -185,6 +298,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       // Ignore persistence errors
     });
   },
+
+  clearError: () => set({ error: null }),
 
   hydrateSettings: (settings: AppSettings) => {
     const updates: Partial<SchemaStore> = {};
@@ -281,6 +396,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       schema: null,
       isConnected: false,
       connectionInfo: null,
+      serverConnection: null,
+      availableDatabases: [],
+      selectedDatabase: null,
       searchFilter: "",
       debouncedSearchFilter: "",
       schemaFilter: "all",

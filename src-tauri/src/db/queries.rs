@@ -1,3 +1,12 @@
+pub const LIST_DATABASES_QUERY: &str = r#"
+SELECT name
+FROM sys.databases
+WHERE state_desc = 'ONLINE'
+  AND database_id > 4
+  AND HAS_DBACCESS(name) = 1
+ORDER BY name
+"#;
+
 pub const TABLES_AND_COLUMNS_QUERY: &str = r#"
 SELECT
     s.name AS schema_name,

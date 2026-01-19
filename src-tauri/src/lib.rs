@@ -4,8 +4,8 @@ mod state;
 mod types;
 
 use commands::{
-    delete_connection, get_recent_connections, get_settings, load_schema_cmd, load_schema_mock,
-    save_connection, save_settings,
+    delete_connection, get_recent_connections, get_settings, list_databases_cmd, load_schema_cmd,
+    load_schema_mock, save_connection, save_settings,
 };
 use state::AppState;
 use tauri::Manager;
@@ -30,6 +30,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_schema_mock,
             load_schema_cmd,
+            list_databases_cmd,
             get_recent_connections,
             save_connection,
             delete_connection,

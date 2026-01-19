@@ -105,3 +105,12 @@ export interface ConnectionParams {
   password?: string;
   trustServerCertificate?: boolean;
 }
+
+// Server connection parameters (without database)
+export interface ServerConnectionParams {
+  server: string;
+  authType: AuthType;
+  username?: string;
+  password?: string;
+  trustServerCertificate?: boolean;
+}

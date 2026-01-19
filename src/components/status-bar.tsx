@@ -53,7 +53,20 @@ export function StatusBar() {
   const [objectsOpen, setObjectsOpen] = useState(false);
   const [edgesOpen, setEdgesOpen] = useState(false);
 
-  if (!schema) return null;
+  // Show minimal status bar when connected but no schema loaded
+  if (!schema) {
+    return (
+      <div className="flex items-center gap-4 h-6 px-3 text-xs bg-background border-t border-border text-muted-foreground">
+        <div className="flex-1" />
+        {connectionInfo && (
+          <span>
+            {connectionInfo.server}
+            {connectionInfo.database ? ` / ${connectionInfo.database}` : ""}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-4 h-6 px-3 text-xs bg-background border-t border-border text-muted-foreground">
@@ -132,7 +145,10 @@ export function StatusBar() {
 
       {/* Connection info */}
       {connectionInfo && (
-        <span>{connectionInfo.server} / {connectionInfo.database}</span>
+        <span>
+          {connectionInfo.server}
+          {connectionInfo.database ? ` / ${connectionInfo.database}` : ""}
+        </span>
       )}
     </div>
   );

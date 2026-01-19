@@ -817,6 +817,18 @@ function SchemaGraphInner({
     setNodes(baseNodes);
   }, [baseNodes, setNodes]);
 
+  useEffect(() => {
+    if (baseNodes.length === 0) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      fitView({ padding: 0.2, duration: 300 });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [baseNodes, fitView]);
+
   // Store original positions when baseNodes change
   useEffect(() => {
     const positions = new Map<string, { x: number; y: number }>();

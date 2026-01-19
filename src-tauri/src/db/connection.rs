@@ -2,7 +2,7 @@ use tiberius::{AuthMethod, Client, Config, EncryptionLevel};
 use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
-use crate::types::{AuthType, ConnectionParams};
+use crate::types::{AuthType, ConnectionParams, ServerConnectionParams};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
@@ -22,6 +22,53 @@ pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_uti
     config.host(&host);
     config.port(port);
     config.database(&params.database);
+
+    // Configure authentication
+    match params.auth_type {
+        AuthType::Windows => {
+            #[cfg(windows)]
+            {
+                config.authentication(AuthMethod::Integrated);
+            }
+            #[cfg(not(windows))]
+            {
+                return Err(ConnectionError::Auth(
+                    "Windows Authentication is only supported on Windows".to_string(),
+                ));
+            }
+        }
+        AuthType::SqlServer => {
+            let username = params.username.as_deref().unwrap_or("");
+            let password = params.password.as_deref().unwrap_or("");
+            config.authentication(AuthMethod::sql_server(username, password));
+        }
+    }
+
+    // Configure TLS
+    if params.trust_server_certificate {
+        config.trust_cert();
+    }
+    config.encryption(EncryptionLevel::Required);
+
+    // Connect via TCP
+    let tcp = TcpStream::connect(config.get_addr()).await?;
+    tcp.set_nodelay(true)?;
+
+    // Create tiberius client
+    let client = Client::connect(config, tcp.compat_write()).await?;
+
+    Ok(client)
+}
+
+/// Create a client connected to the master database for listing databases
+pub async fn create_server_client(params: &ServerConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
+    let mut config = Config::new();
+
+    // Parse server and port (format: "server" or "server,port" or "server:port")
+    let (host, port) = parse_server(&params.server);
+    config.host(&host);
+    config.port(port);
+    config.database("master"); // Connect to master database for listing databases
 
     // Configure authentication
     match params.auth_type {

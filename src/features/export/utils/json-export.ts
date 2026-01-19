@@ -3,7 +3,7 @@ import type { SchemaGraph } from "@/features/schema-graph/types";
 export interface JsonExportOptions {
   pretty?: boolean;
   includeMetadata?: boolean;
-  connectionInfo?: { server: string; database: string };
+  connectionInfo?: { server: string; database?: string };
 }
 
 export function exportToJson(

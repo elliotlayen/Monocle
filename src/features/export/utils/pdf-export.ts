@@ -5,7 +5,7 @@ export interface PdfExportOptions {
   title?: string;
   includeImage?: boolean;
   imageData?: Uint8Array;
-  connectionInfo?: { server: string; database: string };
+  connectionInfo?: { server: string; database?: string };
 }
 
 export async function exportToPdf(
@@ -50,8 +50,10 @@ export async function exportToPdf(
     doc.setTextColor(100);
     doc.text(`Server: ${connectionInfo.server}`, margin, yPos);
     yPos += 5;
-    doc.text(`Database: ${connectionInfo.database}`, margin, yPos);
-    yPos += 5;
+    if (connectionInfo.database) {
+      doc.text(`Database: ${connectionInfo.database}`, margin, yPos);
+      yPos += 5;
+    }
     doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPos);
     yPos += 10;
   }

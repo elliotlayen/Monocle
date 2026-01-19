@@ -26,7 +26,7 @@ import { Target, Box, Network, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SettingsSheet } from "@/features/settings/components/settings-sheet";
 import { ExportButton } from "@/features/export/components/export-button";
-import { SearchBar } from "./search-bar";
+import { DatabaseSelector } from "./database-selector";
 import { EDGE_TYPE_LABELS, EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
@@ -40,6 +40,7 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
 export function Toolbar() {
   const {
     schema,
+    serverConnection,
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
@@ -52,6 +53,7 @@ export function Toolbar() {
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
+      serverConnection: state.serverConnection,
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
       edgeTypeFilter: state.edgeTypeFilter,
@@ -66,7 +68,8 @@ export function Toolbar() {
 
   const [focusSearch, setFocusSearch] = useState("");
 
-  if (!schema) return null;
+  const hasSchema = Boolean(schema);
+  const showDatabaseSelector = Boolean(serverConnection);
 
   const filterItems = (items: { id: string }[]) =>
     items.filter((item) =>
@@ -78,12 +81,18 @@ export function Toolbar() {
 
 
   // Group objects by type for the focus popover
-  const objectsByType = {
+  const objectsByType = schema ? {
     tables: schema.tables,
     views: schema.views,
     triggers: schema.triggers,
     storedProcedures: schema.storedProcedures,
     scalarFunctions: schema.scalarFunctions,
+  } : {
+    tables: [],
+    views: [],
+    triggers: [],
+    storedProcedures: [],
+    scalarFunctions: [],
   };
 
   return (
@@ -91,16 +100,19 @@ export function Toolbar() {
       {/* Left: Monocle branding */}
       <span className="font-semibold text-base" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Monocle</span>
 
-      {/* Center: Search (absolutely centered with explicit width) */}
-      <div className="absolute left-1/2 -translate-x-1/2 w-[448px]">
-        <SearchBar />
-      </div>
+      {/* Center: Database selector */}
+      {showDatabaseSelector && (
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <DatabaseSelector />
+        </div>
+      )}
 
       <div className="flex-1" />
 
       {/* Right: Button group + Settings */}
       <div className="flex items-center gap-2">
-        {/* Button group */}
+        {/* Button group - only show when schema loaded */}
+        {hasSchema && (
         <TooltipProvider>
         <div className="flex">
           {/* Focus button */}
@@ -260,11 +272,14 @@ export function Toolbar() {
           </DropdownMenu>
         </div>
         </TooltipProvider>
+        )}
 
-        {/* Export */}
+        {/* Export - only show when schema loaded */}
+        {hasSchema && (
         <TooltipProvider>
           <ExportButton />
         </TooltipProvider>
+        )}
 
         {/* Settings */}
         <SettingsSheet />
