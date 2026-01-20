@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSchemaStore, type ObjectType, type EdgeType } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,9 @@ export function Toolbar() {
   );
 
   const [focusSearch, setFocusSearch] = useState("");
+  const [isFocusOpen, setIsFocusOpen] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledOnOpenRef = useRef(false);
 
   const hasSchema = Boolean(schema);
   const showDatabaseSelector = Boolean(serverConnection);
@@ -79,6 +82,39 @@ export function Toolbar() {
   const allObjectsSelected = objectTypeFilter.size === 5;
   const allEdgesSelected = edgeTypeFilter.size === 7;
 
+  useEffect(() => {
+    if (!isFocusOpen) {
+      hasScrolledOnOpenRef.current = false;
+      return;
+    }
+
+    if (hasScrolledOnOpenRef.current || !focusedTableId) {
+      return;
+    }
+
+    hasScrolledOnOpenRef.current = true;
+    let attempts = 0;
+    const attemptScroll = () => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        const candidates = container.querySelectorAll<HTMLElement>("[data-item-id]");
+        const selectedElement = Array.from(candidates).find(
+          (element) => element.dataset.itemId === focusedTableId
+        );
+        if (selectedElement) {
+          selectedElement.scrollIntoView({ block: "center", inline: "nearest" });
+          return;
+        }
+      }
+
+      if (attempts < 2) {
+        attempts += 1;
+        requestAnimationFrame(attemptScroll);
+      }
+    };
+
+    requestAnimationFrame(attemptScroll);
+  }, [focusedTableId, isFocusOpen]);
 
   // Group objects by type for the focus popover
   const objectsByType = schema ? {
@@ -116,7 +152,15 @@ export function Toolbar() {
         <TooltipProvider>
         <div className="flex">
           {/* Focus button */}
-          <Popover onOpenChange={(open) => !open && setFocusSearch("")}>
+          <Popover
+            open={isFocusOpen}
+            onOpenChange={(open) => {
+              setIsFocusOpen(open);
+              if (!open) {
+                setFocusSearch("");
+              }
+            }}
+          >
             <Tooltip>
               <TooltipTrigger asChild>
                 <PopoverTrigger asChild>
@@ -145,7 +189,7 @@ export function Toolbar() {
                   />
                 </div>
               </div>
-              <div className="max-h-80 overflow-y-auto">
+              <div ref={scrollContainerRef} className="max-h-80 overflow-y-auto">
                 {focusedTableId && (
                   <button
                     className="w-full px-3 py-2 text-left text-sm hover:bg-accent border-b"
@@ -165,6 +209,7 @@ export function Toolbar() {
                       {filteredItems.map((item) => (
                         <button
                           key={item.id}
+                          data-item-id={item.id}
                           className={`w-full px-3 py-1.5 text-left text-sm hover:bg-accent ${
                             focusedTableId === item.id ? "bg-accent" : ""
                           }`}
