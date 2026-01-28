@@ -1,11 +1,10 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef, useDeferredValue } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   useNodesState,
-  useEdgesState,
   useReactFlow,
   type Node,
   type Edge,
@@ -51,6 +50,7 @@ const COMPACT_ZOOM = 0.6;
 const FOCUS_COMPACT_ZOOM = 0.4;
 const FORCE_COMPACT_ZOOM = 0.3;
 const EDGE_LABEL_ZOOM = 0.8;
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 
 /**
  * Calculate actual node height based on column count.
@@ -232,8 +232,8 @@ function positionTier(
  */
 function calculateCompactLayout(
   focusedNodeId: string,
-  visibleNodeIds: Set<string>,
-  neighbors: Set<string>,
+  visibleNodeIds: ReadonlySet<string>,
+  neighbors: ReadonlySet<string>,
   schema: SchemaGraphType
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
@@ -727,9 +727,11 @@ function SchemaGraphInner({
     focusedTableId: null,
     focusMode: "fade",
   });
+  const processedNodeCacheRef = useRef<Map<string, Node>>(new Map());
 
   const [zoom, setZoom] = useState(0.8);
-  const showEdgeLabels = zoom >= EDGE_LABEL_ZOOM;
+  const deferredZoom = useDeferredValue(zoom);
+  const showEdgeLabels = deferredZoom >= EDGE_LABEL_ZOOM;
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
@@ -820,7 +822,6 @@ function SchemaGraphInner({
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(baseNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   useEffect(() => {
     setNodes(baseNodes);
@@ -845,8 +846,19 @@ function SchemaGraphInner({
     originalPositionsRef.current = positions;
   }, [baseNodes]);
 
-  useEffect(() => {
-    const lowerSearch = searchFilter?.trim().toLowerCase() ?? "";
+  const lowerSearch = useMemo(
+    () => searchFilter?.trim().toLowerCase() ?? "",
+    [searchFilter]
+  );
+
+  const {
+    visibleNodeIds,
+    visibleTableIds,
+    visibleViewIds,
+    visibleTriggerIds,
+    visibleProcedureIds,
+    visibleFunctionIds,
+  } = useMemo(() => {
     const hasSearch = lowerSearch.length > 0;
     const matchesSearch = (map: Map<string, string>, id: string) => {
       if (!hasSearch) return true;
@@ -894,7 +906,9 @@ function SchemaGraphInner({
       );
     }
 
-    let filteredProcedures = showProcedures ? (schema.storedProcedures || []) : [];
+    let filteredProcedures = showProcedures
+      ? (schema.storedProcedures || [])
+      : [];
     let filteredFunctions = showFunctions ? (schema.scalarFunctions || []) : [];
 
     if (schemaFilter && schemaFilter !== "all") {
@@ -926,61 +940,143 @@ function SchemaGraphInner({
       ...visibleFunctionIds,
     ]);
 
-    const focusedNeighbors = focusedTableId
-      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
-      : new Set<string>();
+    return {
+      visibleNodeIds,
+      visibleTableIds,
+      visibleViewIds,
+      visibleTriggerIds,
+      visibleProcedureIds,
+      visibleFunctionIds,
+    };
+  }, [schema, schemaFilter, objectTypeFilter, lowerSearch, schemaIndex]);
 
-    // Calculate which nodes would be dimmed for focus mode
-    const dimmedNodeIds = new Set<string>();
-    if (focusedTableId) {
-      visibleNodeIds.forEach((nodeId) => {
-        // Tables and views: dimmed if not focused and not a neighbor
-        if (visibleTableIds.has(nodeId) || visibleViewIds.has(nodeId)) {
-          if (nodeId !== focusedTableId && !focusedNeighbors.has(nodeId)) {
-            dimmedNodeIds.add(nodeId);
+  const focusedNeighbors = useMemo(() => {
+    if (!focusedTableId) return EMPTY_SET;
+    return schemaIndex.neighbors.get(focusedTableId) ?? EMPTY_SET;
+  }, [focusedTableId, schemaIndex.neighbors]);
+
+  const dimmedNodeIds = useMemo(() => {
+    const dimmed = new Set<string>();
+    if (!focusedTableId) return dimmed;
+
+    const triggersById = new Map(
+      (schema.triggers || []).map((trigger) => [trigger.id, trigger])
+    );
+    const proceduresById = new Map(
+      (schema.storedProcedures || []).map((procedure) => [procedure.id, procedure])
+    );
+    const functionsById = new Map(
+      (schema.scalarFunctions || []).map((fn) => [fn.id, fn])
+    );
+
+    visibleNodeIds.forEach((nodeId) => {
+      if (visibleTableIds.has(nodeId) || visibleViewIds.has(nodeId)) {
+        if (nodeId !== focusedTableId && !focusedNeighbors.has(nodeId)) {
+          dimmed.add(nodeId);
+        }
+        return;
+      }
+
+      if (visibleTriggerIds.has(nodeId)) {
+        const trigger = triggersById.get(nodeId);
+        if (
+          trigger &&
+          trigger.tableId !== focusedTableId &&
+          !focusedNeighbors.has(trigger.tableId)
+        ) {
+          dimmed.add(nodeId);
+        }
+        return;
+      }
+
+      if (visibleProcedureIds.has(nodeId)) {
+        const procedure = proceduresById.get(nodeId);
+        if (procedure) {
+          const refs = [
+            ...(procedure.referencedTables || []),
+            ...(procedure.affectedTables || []),
+          ];
+          if (
+            !refs.some(
+              (tableId) =>
+                tableId === focusedTableId || focusedNeighbors.has(tableId)
+            )
+          ) {
+            dimmed.add(nodeId);
           }
         }
-        // Triggers: dimmed if their table is not focused and not a neighbor
-        else if (visibleTriggerIds.has(nodeId)) {
-          const trigger = (schema.triggers || []).find((t) => t.id === nodeId);
-          if (trigger && trigger.tableId !== focusedTableId && !focusedNeighbors.has(trigger.tableId)) {
-            dimmedNodeIds.add(nodeId);
+        return;
+      }
+
+      if (visibleFunctionIds.has(nodeId)) {
+        const fn = functionsById.get(nodeId);
+        if (fn) {
+          const refs = fn.referencedTables || [];
+          if (
+            !refs.some(
+              (tableId) =>
+                tableId === focusedTableId || focusedNeighbors.has(tableId)
+            )
+          ) {
+            dimmed.add(nodeId);
           }
         }
-        // Procedures: dimmed if none of their tables are focused or neighbors
-        else if (visibleProcedureIds.has(nodeId)) {
-          const procedure = (schema.storedProcedures || []).find((p) => p.id === nodeId);
-          if (procedure) {
-            const refs = [...(procedure.referencedTables || []), ...(procedure.affectedTables || [])];
-            if (!refs.some((tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId))) {
-              dimmedNodeIds.add(nodeId);
-            }
-          }
-        }
-        // Functions: dimmed if none of their tables are focused or neighbors
-        else if (visibleFunctionIds.has(nodeId)) {
-          const fn = (schema.scalarFunctions || []).find((f) => f.id === nodeId);
-          if (fn) {
-            const refs = fn.referencedTables || [];
-            if (!refs.some((tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId))) {
-              dimmedNodeIds.add(nodeId);
-            }
-          }
-        }
-      });
-    }
+      }
+    });
 
-    // Count visible non-dimmed tables/views for per-node compact calculation
-    const visibleNonDimmedCount = [...visibleTableIds, ...visibleViewIds]
-      .filter((id) => !dimmedNodeIds.has(id)).length;
-    const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
+    return dimmed;
+  }, [
+    focusedTableId,
+    schema,
+    visibleNodeIds,
+    visibleTableIds,
+    visibleViewIds,
+    visibleTriggerIds,
+    visibleProcedureIds,
+    visibleFunctionIds,
+    focusedNeighbors,
+  ]);
 
-    // For edge building, exclude dimmed nodes when focus mode is "hide"
-    const edgeVisibleNodeIds = focusMode === "hide"
-      ? new Set([...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id)))
-      : visibleNodeIds;
+  const visibleNonDimmedCount = useMemo(() => {
+    let count = 0;
+    visibleTableIds.forEach((id) => {
+      if (!dimmedNodeIds.has(id)) count += 1;
+    });
+    visibleViewIds.forEach((id) => {
+      if (!dimmedNodeIds.has(id)) count += 1;
+    });
+    return count;
+  }, [visibleTableIds, visibleViewIds, dimmedNodeIds]);
 
-    const { edges: nextEdges, handleEdgeTypes } = buildEdgeState(
+  const moderateThreshold = useMemo(
+    () => Math.ceil(focusExpandThreshold * 1.67),
+    [focusExpandThreshold]
+  );
+
+  const edgeVisibleNodeIds = useMemo(() => {
+    if (focusMode !== "hide") return visibleNodeIds;
+    const next = new Set<string>();
+    visibleNodeIds.forEach((id) => {
+      if (!dimmedNodeIds.has(id)) {
+        next.add(id);
+      }
+    });
+    return next;
+  }, [focusMode, visibleNodeIds, dimmedNodeIds]);
+
+  const compactPositions = useMemo(() => {
+    if (focusMode !== "hide" || !focusedTableId) return null;
+    return calculateCompactLayout(
+      focusedTableId,
+      edgeVisibleNodeIds,
+      focusedNeighbors,
+      schema
+    );
+  }, [focusMode, focusedTableId, edgeVisibleNodeIds, focusedNeighbors, schema]);
+
+  const edgeState = useMemo(() => {
+    const start = import.meta.env.DEV ? performance.now() : 0;
+    const result = buildEdgeState(
       baseEdges,
       edgeTypeFilter,
       edgeVisibleNodeIds,
@@ -989,144 +1085,220 @@ function SchemaGraphInner({
       hoveredEdgeId,
       showEdgeLabels
     );
-    setEdges(nextEdges);
-
-    // Check if we're entering or exiting focus mode (for one-time position changes)
-    const prevState = prevFocusStateRef.current;
-    const justEnteredFocus =
-      focusMode === "hide" &&
-      focusedTableId &&
-      (prevState.focusedTableId !== focusedTableId || prevState.focusMode !== "hide");
-
-    // Detect if we JUST exited focus mode (restore positions once, not continuously)
-    const justExitedFocus =
-      !(focusMode === "hide" && focusedTableId) &&
-      prevState.focusMode === "hide" &&
-      prevState.focusedTableId !== null;
-
-    // Calculate compact positions when focus mode is "hide" and focused
-    const shouldUseCompactLayout = focusMode === "hide" && focusedTableId;
-    const compactPositions = shouldUseCompactLayout
-      ? calculateCompactLayout(focusedTableId, edgeVisibleNodeIds, focusedNeighbors, schema)
-      : null;
-
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        const isVisible = visibleNodeIds.has(node.id);
-        let isFocused = false;
-        let isDimmed = false;
-
-        if (focusedTableId) {
-          if (node.type === "tableNode" || node.type === "viewNode") {
-            isFocused = node.id === focusedTableId;
-            isDimmed = !isFocused && !focusedNeighbors.has(node.id);
-          } else if (node.type === "triggerNode") {
-            const trigger = (node.data as { trigger?: Trigger }).trigger;
-            if (trigger) {
-              isDimmed =
-                trigger.tableId !== focusedTableId &&
-                !focusedNeighbors.has(trigger.tableId);
-            }
-          } else if (node.type === "storedProcedureNode") {
-            const procedure = (node.data as { procedure?: StoredProcedure }).procedure;
-            if (procedure) {
-              const refs = [...(procedure.referencedTables || []), ...(procedure.affectedTables || [])];
-              isDimmed = !refs.some(
-                (tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId)
-              );
-            }
-          } else if (node.type === "scalarFunctionNode") {
-            const fn = (node.data as { function?: ScalarFunction }).function;
-            if (fn) {
-              const refs = fn.referencedTables || [];
-              isDimmed = !refs.some(
-                (tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId)
-              );
-            }
-          }
-        }
-
-        const nextData: Record<string, unknown> = {
-          ...(node.data as Record<string, unknown>),
-          isFocused,
-          isDimmed,
-        };
-
-        if (node.type === "tableNode" || node.type === "viewNode") {
-          nextData.columnsWithHandles = schemaIndex.columnsWithHandles;
-          nextData.handleEdgeTypes = handleEdgeTypes;
-
-          // Per-node compact calculation
-          let nodeIsCompact = zoom < COMPACT_ZOOM;
-
-          if (zoom < FORCE_COMPACT_ZOOM) {
-            nodeIsCompact = true;
-          } else if (focusedTableId) {
-            if (node.id === focusedTableId) {
-              // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM)
-              nodeIsCompact = false;
-            } else if (focusedNeighbors.has(node.id)) {
-              // Neighbors: expand based on count thresholds
-              if (visibleNonDimmedCount <= focusExpandThreshold) {
-                nodeIsCompact = false;
-              } else if (visibleNonDimmedCount <= moderateThreshold) {
-                nodeIsCompact = zoom < FOCUS_COMPACT_ZOOM;
-              }
-            }
-          }
-          nextData.isCompact = nodeIsCompact;
-        }
-
-        // Hide node if not visible by filters, or if dimmed and focus mode is "hide"
-        const shouldHide = !isVisible || (focusMode === "hide" && isDimmed);
-
-        // Apply compact position (only when entering focus) or restore original (only when exiting)
-        let position = node.position;  // Keep current position by default (preserves user drag)
-        if (justEnteredFocus && compactPositions && compactPositions.has(node.id)) {
-          position = compactPositions.get(node.id)!;
-        } else if (justExitedFocus && originalPositionsRef.current.has(node.id)) {
-          // Only restore original position when JUST exiting focus mode
-          position = originalPositionsRef.current.get(node.id)!;
-        }
-
-        return {
-          ...node,
-          position,
-          hidden: shouldHide,
-          data: nextData,
-        };
-      })
-    );
-
-    // Call fitView when entering focus mode
-    // minZoom: 0.6 ensures we zoom in enough for full node rendering (not compact mode)
-    if (justEnteredFocus) {
-      setTimeout(() => {
-        fitView({ padding: 0.2, maxZoom: 1.5, minZoom: 0.6, duration: 300 });
-      }, 50);
+    if (import.meta.env.DEV) {
+      const duration = performance.now() - start;
+      if (duration > 4) {
+        console.log("[perf] buildEdgeState", {
+          durationMs: Number(duration.toFixed(2)),
+          edgeCount: baseEdges.length,
+        });
+      }
     }
-
-    // Update ref for next comparison
-    prevFocusStateRef.current = { focusedTableId: focusedTableId ?? null, focusMode };
+    return result;
   }, [
     baseEdges,
     edgeTypeFilter,
+    edgeVisibleNodeIds,
     focusedTableId,
-    focusMode,
-    focusExpandThreshold,
-    zoom,
-    schema,
-    schemaFilter,
-    schemaIndex,
-    searchFilter,
     selectedEdgeIds,
     hoveredEdgeId,
-    setEdges,
-    setNodes,
     showEdgeLabels,
-    objectTypeFilter,
-    fitView,
   ]);
+
+  const processedNodes = useMemo(() => {
+    const start = import.meta.env.DEV ? performance.now() : 0;
+    let updatedCount = 0;
+    const previousCache = processedNodeCacheRef.current;
+    const nextCache = new Map<string, Node>();
+
+    const nextNodes = nodes.map((node) => {
+      const prevNode = previousCache.get(node.id);
+      const isVisible = visibleNodeIds.has(node.id);
+      const isDimmed = dimmedNodeIds.has(node.id);
+      const isFocused =
+        focusedTableId &&
+        (node.type === "tableNode" || node.type === "viewNode")
+          ? node.id === focusedTableId
+          : false;
+
+      const shouldHide = !isVisible || (focusMode === "hide" && isDimmed);
+      const prevData = (prevNode?.data ?? node.data) as Record<string, unknown>;
+      let nextData = prevData;
+
+      const baseDataChanged =
+        prevData.isFocused !== isFocused || prevData.isDimmed !== isDimmed;
+
+      if (node.type === "tableNode" || node.type === "viewNode") {
+        let nodeIsCompact = deferredZoom < COMPACT_ZOOM;
+
+        if (deferredZoom < FORCE_COMPACT_ZOOM) {
+          nodeIsCompact = true;
+        } else if (focusedTableId) {
+          if (node.id === focusedTableId) {
+            nodeIsCompact = false;
+          } else if (focusedNeighbors.has(node.id)) {
+            if (visibleNonDimmedCount <= focusExpandThreshold) {
+              nodeIsCompact = false;
+            } else if (visibleNonDimmedCount <= moderateThreshold) {
+              nodeIsCompact = deferredZoom < FOCUS_COMPACT_ZOOM;
+            }
+          }
+        }
+
+        const nextColumnsWithHandles = schemaIndex.columnsWithHandles;
+        const nextHandleEdgeTypes = edgeState.handleEdgeTypes;
+
+        const nextDataChanged =
+          baseDataChanged ||
+          prevData.isCompact !== nodeIsCompact ||
+          prevData.columnsWithHandles !== nextColumnsWithHandles ||
+          prevData.handleEdgeTypes !== nextHandleEdgeTypes;
+
+        if (nextDataChanged) {
+          nextData = {
+            ...prevData,
+            isFocused,
+            isDimmed,
+            isCompact: nodeIsCompact,
+            columnsWithHandles: nextColumnsWithHandles,
+            handleEdgeTypes: nextHandleEdgeTypes,
+          };
+        }
+      } else if (baseDataChanged) {
+        nextData = {
+          ...prevData,
+          isFocused,
+          isDimmed,
+        };
+      }
+
+      const prevHidden = prevNode?.hidden ?? node.hidden ?? false;
+      const prevPosition = prevNode?.position ?? node.position;
+      const positionUnchanged =
+        prevPosition.x === node.position.x &&
+        prevPosition.y === node.position.y;
+
+      if (
+        prevNode &&
+        prevHidden === shouldHide &&
+        nextData === prevData &&
+        positionUnchanged
+      ) {
+        nextCache.set(node.id, prevNode);
+        return prevNode;
+      }
+
+      const nextNode = {
+        ...node,
+        hidden: shouldHide,
+        data: nextData,
+      };
+      updatedCount += 1;
+      nextCache.set(node.id, nextNode);
+      return nextNode;
+    });
+
+    processedNodeCacheRef.current = nextCache;
+
+    if (import.meta.env.DEV) {
+      const duration = performance.now() - start;
+      if (duration > 4) {
+        console.log("[perf] processNodes", {
+          durationMs: Number(duration.toFixed(2)),
+          nodeCount: nodes.length,
+          updatedCount,
+        });
+      }
+    }
+
+    return nextNodes;
+  }, [
+    nodes,
+    visibleNodeIds,
+    dimmedNodeIds,
+    focusedTableId,
+    focusedNeighbors,
+    focusMode,
+    deferredZoom,
+    focusExpandThreshold,
+    visibleNonDimmedCount,
+    moderateThreshold,
+    schemaIndex.columnsWithHandles,
+    edgeState.handleEdgeTypes,
+  ]);
+
+  const processedEdges = edgeState.edges;
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    console.log("[perf] schema-graph recalculated", {
+      baseNodes: baseNodes.length,
+      baseEdges: baseEdges.length,
+      visibleNodes: visibleNodeIds.size,
+      visibleEdges: processedEdges.length,
+    });
+  }, [baseNodes.length, baseEdges.length, visibleNodeIds, processedEdges.length]);
+
+  useEffect(() => {
+    const prevState = prevFocusStateRef.current;
+    const nextFocusedId = focusedTableId ?? null;
+    const isHideFocusActive = focusMode === "hide" && Boolean(nextFocusedId);
+    const justEnteredFocus =
+      isHideFocusActive &&
+      (prevState.focusedTableId !== nextFocusedId ||
+        prevState.focusMode !== "hide");
+    const justExitedFocus =
+      !isHideFocusActive &&
+      prevState.focusMode === "hide" &&
+      prevState.focusedTableId !== null;
+
+    let timeoutId: number | undefined;
+
+    if (justEnteredFocus || justExitedFocus) {
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          let nextPosition = node.position;
+
+          if (justEnteredFocus && compactPositions && compactPositions.has(node.id)) {
+            nextPosition = compactPositions.get(node.id)!;
+          } else if (
+            justExitedFocus &&
+            originalPositionsRef.current.has(node.id)
+          ) {
+            nextPosition = originalPositionsRef.current.get(node.id)!;
+          } else {
+            return node;
+          }
+
+          if (
+            nextPosition.x === node.position.x &&
+            nextPosition.y === node.position.y
+          ) {
+            return node;
+          }
+
+          return {
+            ...node,
+            position: nextPosition,
+          };
+        })
+      );
+
+      if (justEnteredFocus) {
+        timeoutId = window.setTimeout(() => {
+          fitView({ padding: 0.2, maxZoom: 1.5, minZoom: 0.6, duration: 300 });
+        }, 50);
+      }
+    }
+
+    prevFocusStateRef.current = { focusedTableId: nextFocusedId, focusMode };
+
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [focusedTableId, focusMode, compactPositions, setNodes, fitView]);
 
   return (
     <div className="w-full h-full relative flex">
@@ -1154,10 +1326,9 @@ function SchemaGraphInner({
             visible={!sidebarOpen}
           />
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={processedNodes}
+            edges={processedEdges}
             onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
             onEdgeClick={onEdgeClick}
             onEdgeMouseEnter={onEdgeMouseEnter}
             onEdgeMouseLeave={onEdgeMouseLeave}

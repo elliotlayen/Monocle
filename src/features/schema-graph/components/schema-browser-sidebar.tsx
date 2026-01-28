@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ChevronRight,
   ChevronDown,
@@ -40,6 +41,28 @@ interface TreeCategory {
   schemas: TreeSchema[];
   count: number;
 }
+
+type RowItem =
+  | {
+      type: "category";
+      key: string;
+      category: TreeCategory;
+      depth: number;
+    }
+  | {
+      type: "schema";
+      key: string;
+      category: TreeCategory;
+      schema: TreeSchema;
+      schemaKey: string;
+      depth: number;
+    }
+  | {
+      type: "item";
+      key: string;
+      item: TreeItem;
+      depth: number;
+    };
 
 function buildTree(schema: SchemaGraph): TreeCategory[] {
   const categories: TreeCategory[] = [];
@@ -224,12 +247,77 @@ export function SchemaBrowserSidebar({
   const filteredTree = useMemo(() => filterTree(tree, searchFilter), [tree, searchFilter]);
 
   // Auto-expand all when searching
-  const effectiveExpandedCategories = searchFilter.trim()
-    ? new Set(filteredTree.map((c) => c.type))
-    : expandedCategories;
-  const effectiveExpandedSchemas = searchFilter.trim()
-    ? new Set(filteredTree.flatMap((c) => c.schemas.map((s) => `${c.type}-${s.name}`)))
-    : expandedSchemas;
+  const isSearching = searchFilter.trim().length > 0;
+  const effectiveExpandedCategories = useMemo(() => {
+    if (isSearching) {
+      return new Set(filteredTree.map((c) => c.type));
+    }
+    return expandedCategories;
+  }, [isSearching, filteredTree, expandedCategories]);
+  const effectiveExpandedSchemas = useMemo(() => {
+    if (isSearching) {
+      return new Set(
+        filteredTree.flatMap((c) => c.schemas.map((s) => `${c.type}-${s.name}`))
+      );
+    }
+    return expandedSchemas;
+  }, [isSearching, filteredTree, expandedSchemas]);
+
+  const rowItems = useMemo<RowItem[]>(() => {
+    const rows: RowItem[] = [];
+    filteredTree.forEach((category) => {
+      rows.push({
+        type: "category",
+        key: `category-${category.type}`,
+        category,
+        depth: 0,
+      });
+
+      if (!effectiveExpandedCategories.has(category.type)) return;
+
+      category.schemas.forEach((schemaEntry) => {
+        const schemaKey = `${category.type}-${schemaEntry.name}`;
+        rows.push({
+          type: "schema",
+          key: `schema-${schemaKey}`,
+          category,
+          schema: schemaEntry,
+          schemaKey,
+          depth: 1,
+        });
+
+        if (!effectiveExpandedSchemas.has(schemaKey)) return;
+
+        schemaEntry.items.forEach((item) => {
+          rows.push({
+            type: "item",
+            key: `item-${item.id}`,
+            item,
+            depth: 2,
+          });
+        });
+      });
+    });
+
+    return rows;
+  }, [filteredTree, effectiveExpandedCategories, effectiveExpandedSchemas]);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rowItems.length,
+    getScrollElement: () =>
+      scrollRef.current?.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      ) as HTMLElement | null,
+    estimateSize: (index) => {
+      const row = rowItems[index];
+      if (!row) return 28;
+      if (row.type === "category") return 32;
+      if (row.type === "schema") return 28;
+      return 26;
+    },
+    overscan: 8,
+  });
 
   const toggleCategory = useCallback((type: ObjectType) => {
     setExpandedCategories((prev) => {
@@ -319,77 +407,99 @@ export function SchemaBrowserSidebar({
       </div>
 
       {/* Tree */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="p-2">
-          {filteredTree.length === 0 ? (
+          {rowItems.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               {schema ? "No objects found" : "Connect to a database to browse schema"}
             </p>
           ) : (
-            filteredTree.map((category) => (
-              <div key={category.type} className="mb-1">
-                {/* Category row */}
-                <button
-                  className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left"
-                  onClick={() => toggleCategory(category.type)}
-                >
-                  {effectiveExpandedCategories.has(category.type) ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  )}
-                  <span className="text-muted-foreground flex-shrink-0">{category.icon}</span>
-                  <span className="text-sm font-medium flex-1 truncate">{category.label}</span>
-                  <span className="text-xs text-muted-foreground">{category.count}</span>
-                </button>
+            <div
+              className="relative w-full"
+              style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const row = rowItems[virtualRow.index];
+                if (!row) return null;
 
-                {/* Schemas */}
-                {effectiveExpandedCategories.has(category.type) && (
-                  <div className="ml-4">
-                    {category.schemas.map((schema) => {
-                      const schemaKey = `${category.type}-${schema.name}`;
-                      return (
-                        <div key={schemaKey}>
-                          {/* Schema row */}
-                          <button
-                            className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-muted text-left"
-                            onClick={() => toggleSchema(schemaKey)}
-                          >
-                            {effectiveExpandedSchemas.has(schemaKey) ? (
-                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                            )}
-                            <span className="text-sm text-muted-foreground flex-1 truncate">
-                              {schema.name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {schema.items.length}
-                            </span>
-                          </button>
+                const baseStyle = {
+                  position: "absolute" as const,
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                };
 
-                          {/* Items */}
-                          {effectiveExpandedSchemas.has(schemaKey) && (
-                            <div className="ml-4">
-                              {schema.items.map((item) => (
-                                <button
-                                  key={item.id}
-                                  className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-muted text-left"
-                                  onClick={(e) => handleItemClick(e, item.data)}
-                                >
-                                  <span className="w-3.5" />
-                                  <span className="text-sm truncate">{item.name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                const paddingLeft = 8 + row.depth * 16;
+
+                if (row.type === "category") {
+                  const isExpanded = effectiveExpandedCategories.has(row.category.type);
+                  return (
+                    <div key={row.key} style={baseStyle}>
+                      <button
+                        className="flex items-center gap-2 w-full pr-2 py-1.5 rounded hover:bg-muted text-left"
+                        style={{ paddingLeft }}
+                        onClick={() => toggleCategory(row.category.type)}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <span className="text-muted-foreground flex-shrink-0">
+                          {row.category.icon}
+                        </span>
+                        <span className="text-sm font-medium flex-1 truncate">
+                          {row.category.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {row.category.count}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (row.type === "schema") {
+                  const isExpanded = effectiveExpandedSchemas.has(row.schemaKey);
+                  return (
+                    <div key={row.key} style={baseStyle}>
+                      <button
+                        className="flex items-center gap-2 w-full pr-2 py-1 rounded hover:bg-muted text-left"
+                        style={{ paddingLeft }}
+                        onClick={() => toggleSchema(row.schemaKey)}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <span className="text-sm text-muted-foreground flex-1 truncate">
+                          {row.schema.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {row.schema.items.length}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={row.key} style={baseStyle}>
+                    <button
+                      className="flex items-center gap-2 w-full pr-2 py-1 rounded hover:bg-muted text-left"
+                      style={{ paddingLeft }}
+                      onClick={(e) => handleItemClick(e, row.item.data)}
+                    >
+                      <span className="w-3.5" />
+                      <span className="text-sm truncate">{row.item.name}</span>
+                    </button>
                   </div>
-                )}
-              </div>
-            ))
+                );
+              })}
+            </div>
           )}
         </div>
       </ScrollArea>

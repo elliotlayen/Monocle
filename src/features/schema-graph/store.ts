@@ -71,6 +71,7 @@ interface SchemaStore {
   toggleEdgeType: (type: EdgeType) => void;
   selectAllEdgeTypes: () => void;
   toggleEdgeSelection: (edgeId: string) => void;
+  setSelectedEdgeIds: (ids: Set<string>) => void;
   clearEdgeSelection: () => void;
   disconnect: () => void;
 }
@@ -125,6 +126,14 @@ const getAvailableSchemas = (schema: SchemaGraph) => {
   (schema.storedProcedures || []).forEach((procedure) => schemas.add(procedure.schema));
   (schema.scalarFunctions || []).forEach((fn) => schemas.add(fn.schema));
   return [...schemas];
+};
+
+const areSetsEqual = <T,>(a: Set<T>, b: Set<T>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
 };
 
 export const useSchemaStore = create<SchemaStore>((set, get) => ({
@@ -389,7 +398,17 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       return { selectedEdgeIds: newSelection };
     }),
 
-  clearEdgeSelection: () => set({ selectedEdgeIds: new Set<string>() }),
+  setSelectedEdgeIds: (ids: Set<string>) =>
+    set((state) => {
+      if (ids === state.selectedEdgeIds) return state;
+      if (areSetsEqual(state.selectedEdgeIds, ids)) return state;
+      return { selectedEdgeIds: ids };
+    }),
+
+  clearEdgeSelection: () =>
+    set((state) =>
+      state.selectedEdgeIds.size === 0 ? state : { selectedEdgeIds: new Set<string>() }
+    ),
 
   disconnect: () =>
     set({

@@ -115,7 +115,7 @@ export function DetailPopover({ open, data, anchorRect, onClose }: DetailPopover
       }}
     >
       {/* Header */}
-      <div className="flex-shrink-0 border-b p-4">
+      <div className="shrink-0 border-b p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -128,7 +128,7 @@ export function DetailPopover({ open, data, anchorRect, onClose }: DetailPopover
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 flex-shrink-0"
+            className="h-8 w-8 shrink-0"
             onClick={onClose}
           >
             <X className="h-4 w-4" />

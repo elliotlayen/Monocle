@@ -6,7 +6,7 @@ import { EdgeType } from "../store";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS } from "@/constants/edge-colors";
 
-function HandleIndicators({
+const HandleIndicators = memo(function HandleIndicators({
   edgeTypes,
   isCompact,
 }: {
@@ -25,7 +25,7 @@ function HandleIndicators({
       ))}
     </div>
   );
-}
+});
 
 interface ViewNodeData {
   view: ViewNodeType;
@@ -134,7 +134,7 @@ interface ColumnRowProps {
   isCompact?: boolean;
 }
 
-function ColumnRow({
+const ColumnRow = memo(function ColumnRow({
   column,
   viewId,
   hasHandle,
@@ -216,7 +216,7 @@ function ColumnRow({
       )}
     </div>
   );
-}
+});
 
 // Memoize for performance
 export const ViewNode = memo(ViewNodeComponent);

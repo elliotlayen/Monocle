@@ -7,7 +7,7 @@ import { EdgeType } from "../store";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS } from "@/constants/edge-colors";
 
-function HandleIndicators({
+const HandleIndicators = memo(function HandleIndicators({
   edgeTypes,
   isCompact,
 }: {
@@ -26,7 +26,7 @@ function HandleIndicators({
       ))}
     </div>
   );
-}
+});
 
 interface TableNodeData {
   table: TableNodeType;
@@ -60,13 +60,13 @@ function TableNodeComponent({ data }: NodeProps) {
       )}
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2 flex items-center relative">
+      <div className="bg-linear-to-r from-slate-800 to-slate-700 text-white px-3 py-2 flex items-center relative">
         {/* Generic target handle for incoming procedure/trigger references - inside header */}
         <Handle
           type="target"
           position={Position.Left}
           id={`${table.id}-target`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          className="w-0! h-0! bg-transparent! border-0!"
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
 
@@ -98,7 +98,7 @@ function TableNodeComponent({ data }: NodeProps) {
           type="source"
           position={Position.Right}
           id={`${table.id}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          className="w-0! h-0! bg-transparent! border-0!"
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
       </div>
@@ -135,7 +135,7 @@ interface ColumnRowProps {
   isCompact?: boolean;
 }
 
-function ColumnRow({
+const ColumnRow = memo(function ColumnRow({
   column,
   tableId,
   hasHandle,
@@ -154,7 +154,7 @@ function ColumnRow({
             type="target"
             position={Position.Left}
             id={`${handleId}-target`}
-            className="!w-0 !h-0 !bg-transparent !border-0"
+            className="w-0! h-0! bg-transparent! border-0!"
             style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
           />
         )}
@@ -163,7 +163,7 @@ function ColumnRow({
             type="source"
             position={Position.Right}
             id={`${handleId}-source`}
-            className="!w-0 !h-0 !bg-transparent !border-0"
+            className="w-0! h-0! bg-transparent! border-0!"
             style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
           />
         )}
@@ -179,7 +179,7 @@ function ColumnRow({
           type="target"
           position={Position.Left}
           id={`${handleId}-target`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          className="w-0! h-0! bg-transparent! border-0!"
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
       )}
@@ -221,13 +221,13 @@ function ColumnRow({
           type="source"
           position={Position.Right}
           id={`${handleId}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          className="w-0! h-0! bg-transparent! border-0!"
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
       )}
     </div>
   );
-}
+});
 
 // Memoize for performance
 export const TableNode = memo(TableNodeComponent);
