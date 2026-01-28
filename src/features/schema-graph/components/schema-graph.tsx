@@ -8,6 +8,7 @@ import {
   useReactFlow,
   type Node,
   type Edge,
+  type NodeChange,
   type EdgeMouseHandler,
   MarkerType,
 } from "@xyflow/react";
@@ -653,7 +654,8 @@ function buildEdgeState(
       ? colors.labelDimmed
       : colors.label;
     const isHovered = hoveredEdgeId === edge.id;
-    const shouldShowLabel = (showLabels || isSelected || isHovered) && !isDimmed;
+    const shouldShowLabel =
+      isVisible && (showLabels || isSelected || isHovered) && !isDimmed;
     const label = shouldShowLabel ? edge.label : undefined;
 
     return {
@@ -728,10 +730,13 @@ function SchemaGraphInner({
     focusMode: "fade",
   });
   const processedNodeCacheRef = useRef<Map<string, Node>>(new Map());
+  const measuredNodeIdsRef = useRef<Set<string>>(new Set());
+  const expectedNodeCountRef = useRef(0);
 
   const [zoom, setZoom] = useState(0.8);
   const deferredZoom = useDeferredValue(zoom);
   const showEdgeLabels = deferredZoom >= EDGE_LABEL_ZOOM;
+  const [renderAllNodes, setRenderAllNodes] = useState(true);
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
@@ -822,10 +827,38 @@ function SchemaGraphInner({
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(baseNodes);
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChange(changes);
+
+      if (!renderAllNodes) return;
+
+      for (const change of changes) {
+        if (change.type !== "dimensions") continue;
+        if (!("dimensions" in change)) continue;
+        if (!change.dimensions) continue;
+        if (change.dimensions.width === 0 && change.dimensions.height === 0) {
+          continue;
+        }
+        measuredNodeIdsRef.current.add(change.id);
+      }
+
+      if (measuredNodeIdsRef.current.size >= expectedNodeCountRef.current) {
+        setRenderAllNodes(false);
+      }
+    },
+    [onNodesChange, renderAllNodes]
+  );
 
   useEffect(() => {
     setNodes(baseNodes);
   }, [baseNodes, setNodes]);
+
+  useEffect(() => {
+    expectedNodeCountRef.current = baseNodes.length;
+    measuredNodeIdsRef.current = new Set();
+    setRenderAllNodes(baseNodes.length > 0);
+  }, [baseNodes]);
 
   useEffect(() => {
     if (baseNodes.length === 0) {
@@ -1227,7 +1260,36 @@ function SchemaGraphInner({
     edgeState.handleEdgeTypes,
   ]);
 
-  const processedEdges = edgeState.edges;
+  const hiddenNodeIds = useMemo(() => {
+    const hidden = new Set<string>();
+    processedNodes.forEach((node) => {
+      if (node.hidden) {
+        hidden.add(node.id);
+      }
+    });
+    return hidden;
+  }, [processedNodes]);
+
+  const processedEdges = useMemo(() => {
+    let updatedCount = 0;
+    const nextEdges = edgeState.edges.map((edge) => {
+      const shouldHide = hiddenNodeIds.has(edge.source) || hiddenNodeIds.has(edge.target);
+      if (!shouldHide) return edge;
+      if (edge.hidden && !edge.label) return edge;
+      updatedCount += 1;
+      return {
+        ...edge,
+        hidden: true,
+        label: undefined,
+      };
+    });
+
+    if (import.meta.env.DEV && updatedCount > 0) {
+      console.log("[perf] hide dangling edges", { updatedCount });
+    }
+
+    return nextEdges;
+  }, [edgeState.edges, hiddenNodeIds]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -1255,6 +1317,7 @@ function SchemaGraphInner({
     let timeoutId: number | undefined;
 
     if (justEnteredFocus || justExitedFocus) {
+      setHoveredEdgeId(null);
       setNodes((currentNodes) =>
         currentNodes.map((node) => {
           let nextPosition = node.position;
@@ -1298,7 +1361,14 @@ function SchemaGraphInner({
         window.clearTimeout(timeoutId);
       }
     };
-  }, [focusedTableId, focusMode, compactPositions, setNodes, fitView]);
+  }, [
+    focusedTableId,
+    focusMode,
+    compactPositions,
+    setNodes,
+    fitView,
+    setHoveredEdgeId,
+  ]);
 
   return (
     <div className="w-full h-full relative flex">
@@ -1328,7 +1398,7 @@ function SchemaGraphInner({
           <ReactFlow
             nodes={processedNodes}
             edges={processedEdges}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgeClick={onEdgeClick}
             onEdgeMouseEnter={onEdgeMouseEnter}
             onEdgeMouseLeave={onEdgeMouseLeave}
@@ -1341,7 +1411,7 @@ function SchemaGraphInner({
             maxZoom={2}
             defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
             proOptions={{ hideAttribution: true }}
-            onlyRenderVisibleElements={true}
+            onlyRenderVisibleElements={!renderAllNodes}
             nodesConnectable={false}
           >
             <Background
