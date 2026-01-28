@@ -134,6 +134,22 @@ No external database drivers needed - tiberius connects to SQL Server directly v
    - Creates a GitHub release with tag `v{version}` and all artifacts
    - Creates a PR to bump version to next patch
 
+### Release Notes Format
+
+GitHub release descriptions should include structured sections instead of generic text. Use this format:
+
+```
+## New Features
+- Feature description 1
+- Feature description 2
+
+## Fixes
+- Fix description 1
+- Fix description 2
+```
+
+Do not use generic text like "See the assets to download this version and install."
+
 ### Version Source of Truth
 
 The version in `tauri.conf.json` determines the release version. To release:
