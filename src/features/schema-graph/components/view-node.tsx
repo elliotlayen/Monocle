@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { TbCircleDashedLetterN } from "react-icons/tb";
 import { ViewNode as ViewNodeType, Column } from "../types";
 import { EdgeType } from "../store";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,7 @@ interface ViewNodeData {
   isCompact?: boolean;
   columnsWithHandles?: Set<string>;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent) => void;
 }
 
 function ViewNodeComponent({ data }: NodeProps) {
@@ -194,9 +195,7 @@ function ColumnRow({
           {column.dataType}
         </span>
         {column.isNullable && (
-          <span className="text-amber-500 text-xs font-bold shrink-0">
-            ?
-          </span>
+          <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
         )}
       </div>
 

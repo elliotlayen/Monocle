@@ -1,5 +1,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { TbCircleDashedLetterN } from "react-icons/tb";
+import { IoMdKey } from "react-icons/io";
 import { TableNode as TableNodeType, Column } from "../types";
 import { EdgeType } from "../store";
 import { cn } from "@/lib/utils";
@@ -33,7 +35,7 @@ interface TableNodeData {
   isCompact?: boolean;
   columnsWithHandles?: Set<string>;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent) => void;
 }
 
 function TableNodeComponent({ data }: NodeProps) {
@@ -189,11 +191,6 @@ function ColumnRow({
 
       {/* Column info */}
       <div className="flex items-center gap-2 flex-1 overflow-hidden">
-        {column.isPrimaryKey && (
-          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.5 rounded shrink-0">
-            PK
-          </span>
-        )}
         <span
           className={cn(
             "text-xs text-foreground truncate",
@@ -202,13 +199,14 @@ function ColumnRow({
         >
           {column.name}
         </span>
+        {column.isPrimaryKey && (
+          <IoMdKey className="text-slate-400 w-3.5 h-3.5 shrink-0 -ml-1" />
+        )}
         <span className="text-[10px] text-muted-foreground shrink-0 ml-auto">
           {column.dataType}
         </span>
         {column.isNullable && (
-          <span className="text-amber-500 text-xs font-bold shrink-0">
-            ?
-          </span>
+          <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
         )}
       </div>
 
