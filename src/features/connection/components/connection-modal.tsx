@@ -242,6 +242,7 @@ export function ConnectionModal({
                   <Input
                     id="username"
                     type="text"
+                    autoCapitalize="off"
                     value={formData.username || ""}
                     onChange={(e) => handleChange("username", e.target.value)}
                     placeholder="sa"
