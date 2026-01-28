@@ -7,7 +7,7 @@ interface TriggerNodeData {
   trigger: Trigger;
   isFocused?: boolean;
   isDimmed?: boolean;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent) => void;
 }
 
 function TriggerNodeComponent({ data }: NodeProps) {

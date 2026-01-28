@@ -7,7 +7,7 @@ interface ScalarFunctionNodeData {
   function: ScalarFunction;
   isFocused?: boolean;
   isDimmed?: boolean;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent) => void;
 }
 
 function ScalarFunctionNodeComponent({ data }: NodeProps) {

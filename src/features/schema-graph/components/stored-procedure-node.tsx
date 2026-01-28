@@ -7,7 +7,7 @@ interface StoredProcedureNodeData {
   procedure: StoredProcedure;
   isFocused?: boolean;
   isDimmed?: boolean;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent) => void;
 }
 
 function StoredProcedureNodeComponent({ data }: NodeProps) {
