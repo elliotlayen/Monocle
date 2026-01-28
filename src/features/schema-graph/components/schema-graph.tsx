@@ -30,7 +30,12 @@ import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
 import { StoredProcedureNode } from "./stored-procedure-node";
 import { ScalarFunctionNode } from "./scalar-function-node";
-import { DetailModal, DetailModalData } from "./detail-modal";
+import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
+import { DetailPopover } from "./detail-popover";
+import { SidebarToggle } from "./sidebar-toggle";
+import { useDetailPopover } from "../hooks/use-detail-popover";
+import type { DetailSidebarData } from "./detail-content";
+import { cn } from "@/lib/utils";
 
 const GRID_COLS = 3;
 const NODE_WIDTH = 300;
@@ -330,11 +335,11 @@ function calculateCompactLayout(
 
 // Callback types for node clicks
 interface ConvertOptions {
-  onTableClick?: (table: TableNodeType) => void;
-  onViewClick?: (view: ViewNodeType) => void;
-  onTriggerClick?: (trigger: Trigger) => void;
-  onProcedureClick?: (procedure: StoredProcedure) => void;
-  onFunctionClick?: (fn: ScalarFunction) => void;
+  onTableClick?: (table: TableNodeType, event: React.MouseEvent) => void;
+  onViewClick?: (view: ViewNodeType, event: React.MouseEvent) => void;
+  onTriggerClick?: (trigger: Trigger, event: React.MouseEvent) => void;
+  onProcedureClick?: (procedure: StoredProcedure, event: React.MouseEvent) => void;
+  onFunctionClick?: (fn: ScalarFunction, event: React.MouseEvent) => void;
 }
 
 interface EdgeMeta {
@@ -374,7 +379,7 @@ function buildBaseNodes(
         isCompact: false,
         columnsWithHandles,
         handleEdgeTypes: undefined,
-        onClick: () => options?.onTableClick?.(table),
+        onClick: (e: React.MouseEvent) => options?.onTableClick?.(table, e),
       },
     };
   });
@@ -400,7 +405,7 @@ function buildBaseNodes(
         isCompact: false,
         columnsWithHandles,
         handleEdgeTypes: undefined,
-        onClick: () => options?.onViewClick?.(view),
+        onClick: (e: React.MouseEvent) => options?.onViewClick?.(view, e),
       },
     };
   });
@@ -429,7 +434,7 @@ function buildBaseNodes(
         data: {
           trigger,
           isDimmed: false,
-          onClick: () => options?.onTriggerClick?.(trigger),
+          onClick: (e: React.MouseEvent) => options?.onTriggerClick?.(trigger, e),
         },
       });
     });
@@ -452,7 +457,7 @@ function buildBaseNodes(
       data: {
         procedure,
         isDimmed: false,
-        onClick: () => options?.onProcedureClick?.(procedure),
+        onClick: (e: React.MouseEvent) => options?.onProcedureClick?.(procedure, e),
       },
     })
   );
@@ -470,7 +475,7 @@ function buildBaseNodes(
       data: {
         function: fn,
         isDimmed: false,
-        onClick: () => options?.onFunctionClick?.(fn),
+        onClick: (e: React.MouseEvent) => options?.onFunctionClick?.(fn, e),
       },
     })
   );
@@ -696,9 +701,9 @@ function SchemaGraphInner({
   objectTypeFilter,
   edgeTypeFilter,
 }: SchemaGraphProps) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalData, setModalData] = useState<DetailModalData | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const { open: popoverOpen, data: popoverData, anchorRect, openPopover, closePopover } = useDetailPopover();
   const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection, focusMode, focusExpandThreshold } =
     useSchemaStore(
       useShallow((state) => ({
@@ -757,38 +762,42 @@ function SchemaGraphInner({
     );
   }, []);
 
-  const handleTableClick = useCallback((table: TableNodeType) => {
-    setModalData({ type: "table", data: table });
-    setModalOpen(true);
-  }, []);
+  const handleNodeClick = useCallback((data: DetailSidebarData, event: React.MouseEvent) => {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    openPopover(data, rect);
+  }, [openPopover]);
 
-  const handleViewClick = useCallback((view: ViewNodeType) => {
-    setModalData({ type: "view", data: view });
-    setModalOpen(true);
-  }, []);
+  const handleTableClick = useCallback((table: TableNodeType, event: React.MouseEvent) => {
+    handleNodeClick({ type: "table", data: table }, event);
+  }, [handleNodeClick]);
 
-  const handleTriggerClick = useCallback((trigger: Trigger) => {
-    setModalData({ type: "trigger", data: trigger });
-    setModalOpen(true);
-  }, []);
+  const handleViewClick = useCallback((view: ViewNodeType, event: React.MouseEvent) => {
+    handleNodeClick({ type: "view", data: view }, event);
+  }, [handleNodeClick]);
 
-  const handleProcedureClick = useCallback((procedure: StoredProcedure) => {
-    setModalData({ type: "storedProcedure", data: procedure });
-    setModalOpen(true);
-  }, []);
+  const handleTriggerClick = useCallback((trigger: Trigger, event: React.MouseEvent) => {
+    handleNodeClick({ type: "trigger", data: trigger }, event);
+  }, [handleNodeClick]);
 
-  const handleFunctionClick = useCallback((fn: ScalarFunction) => {
-    setModalData({ type: "scalarFunction", data: fn });
-    setModalOpen(true);
-  }, []);
+  const handleProcedureClick = useCallback((procedure: StoredProcedure, event: React.MouseEvent) => {
+    handleNodeClick({ type: "storedProcedure", data: procedure }, event);
+  }, [handleNodeClick]);
+
+  const handleFunctionClick = useCallback((fn: ScalarFunction, event: React.MouseEvent) => {
+    handleNodeClick({ type: "scalarFunction", data: fn }, event);
+  }, [handleNodeClick]);
+
+  const handleSidebarItemClick = useCallback((data: DetailSidebarData, rect: DOMRect) => {
+    openPopover(data, rect);
+  }, [openPopover]);
 
   const options: ConvertOptions = useMemo(
     () => ({
-      onTableClick: handleTableClick,
-      onViewClick: handleViewClick,
-      onTriggerClick: handleTriggerClick,
-      onProcedureClick: handleProcedureClick,
-      onFunctionClick: handleFunctionClick,
+      onTableClick: (table: TableNodeType, event: React.MouseEvent) => handleTableClick(table, event),
+      onViewClick: (view: ViewNodeType, event: React.MouseEvent) => handleViewClick(view, event),
+      onTriggerClick: (trigger: Trigger, event: React.MouseEvent) => handleTriggerClick(trigger, event),
+      onProcedureClick: (procedure: StoredProcedure, event: React.MouseEvent) => handleProcedureClick(procedure, event),
+      onFunctionClick: (fn: ScalarFunction, event: React.MouseEvent) => handleFunctionClick(fn, event),
     }),
     [
       handleTableClick,
@@ -1120,45 +1129,65 @@ function SchemaGraphInner({
   ]);
 
   return (
-    <div className="w-full h-full">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onEdgeClick={onEdgeClick}
-        onEdgeMouseEnter={onEdgeMouseEnter}
-        onEdgeMouseLeave={onEdgeMouseLeave}
-        onPaneClick={onPaneClick}
-        onMove={onMove}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={2}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-        proOptions={{ hideAttribution: true }}
-        onlyRenderVisibleElements={true}
-        nodesConnectable={false}
-      >
-        <Background
-          className="!bg-background [&>pattern>circle]:!fill-border"
-          gap={20}
-        />
-        <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
-        <MiniMap
-          nodeColor={getMinimapNodeColor}
-          maskColor="var(--minimap-mask)"
-          className="!bg-background"
-          pannable
-          zoomable
-        />
-      </ReactFlow>
-      <DetailModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        modalData={modalData}
+    <div className="w-full h-full relative flex">
+      <SchemaBrowserSidebar
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+        schema={schema}
+        onItemClick={handleSidebarItemClick}
       />
+      <DetailPopover
+        open={popoverOpen}
+        data={popoverData}
+        anchorRect={anchorRect}
+        onClose={closePopover}
+      />
+      <main
+        className={cn(
+          "flex-1 h-full transition-all duration-300",
+          sidebarOpen && "ml-[280px]"
+        )}
+      >
+        <div className="relative w-full h-full">
+          <SidebarToggle
+            onClick={() => setSidebarOpen(true)}
+            visible={!sidebarOpen}
+          />
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onEdgeClick={onEdgeClick}
+            onEdgeMouseEnter={onEdgeMouseEnter}
+            onEdgeMouseLeave={onEdgeMouseLeave}
+            onPaneClick={onPaneClick}
+            onMove={onMove}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.1}
+            maxZoom={2}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            proOptions={{ hideAttribution: true }}
+            onlyRenderVisibleElements={true}
+            nodesConnectable={false}
+          >
+            <Background
+              className="!bg-background [&>pattern>circle]:!fill-border"
+              gap={20}
+            />
+            <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
+            <MiniMap
+              nodeColor={getMinimapNodeColor}
+              maskColor="var(--minimap-mask)"
+              className="!bg-background"
+              pannable
+              zoomable
+            />
+          </ReactFlow>
+        </div>
+      </main>
     </div>
   );
 }
