@@ -1,5 +1,4 @@
 import { Highlight, themes } from "prism-react-renderer";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface SqlCodeBlockProps {
   code: string;
@@ -18,14 +17,18 @@ export function SqlCodeBlock({ code, maxHeight = "300px" }: SqlCodeBlockProps) {
   return (
     <Highlight theme={themes.nightOwl} code={code} language="sql">
       {({ style, tokens, getLineProps, getTokenProps }) => (
-        <ScrollArea
-          className="rounded-lg h-full"
-          style={{ ...style, maxHeight: maxHeight === "100%" ? undefined : maxHeight }}
+        <div
+          className="rounded-lg overflow-auto"
+          style={{ ...style, maxHeight }}
         >
-          <div className="p-4">
+          <div className="p-4 w-max min-w-full">
             <code className="text-xs">
               {tokens.map((line, i) => (
-                <div key={i} {...getLineProps({ line })} className="whitespace-pre">
+                <div
+                  key={i}
+                  {...getLineProps({ line })}
+                  className="whitespace-pre px-2 -mx-2 hover:bg-white/10 transition-colors"
+                >
                   <span className="inline-block w-8 text-slate-400 select-none text-right mr-4">
                     {i + 1}
                   </span>
@@ -36,8 +39,7 @@ export function SqlCodeBlock({ code, maxHeight = "300px" }: SqlCodeBlockProps) {
               ))}
             </code>
           </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
+        </div>
       )}
     </Highlight>
   );
