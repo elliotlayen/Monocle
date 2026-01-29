@@ -11,7 +11,8 @@ interface TriggerNodeData {
 }
 
 function TriggerNodeComponent({ data }: NodeProps) {
-  const { trigger, isFocused, isDimmed, onClick } = data as unknown as TriggerNodeData;
+  const { trigger, isFocused, isDimmed, onClick } =
+    data as unknown as TriggerNodeData;
 
   const events = [
     trigger.firesOnInsert && "I",
@@ -65,11 +66,15 @@ function TriggerNodeComponent({ data }: NodeProps) {
       {/* Body */}
       <div className="px-3 py-2 space-y-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground uppercase">Type:</span>
+          <span className="text-[10px] text-muted-foreground uppercase">
+            Type:
+          </span>
           <span className="text-xs text-foreground">{trigger.triggerType}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground uppercase">Events:</span>
+          <span className="text-[10px] text-muted-foreground uppercase">
+            Events:
+          </span>
           <div className="flex gap-1">
             {events.map((event, idx) => (
               <span

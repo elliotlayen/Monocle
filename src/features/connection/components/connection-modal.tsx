@@ -68,10 +68,7 @@ interface ConnectionModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ConnectionModal({
-  open,
-  onOpenChange,
-}: ConnectionModalProps) {
+export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
   const {
     connectToServer,
     loadMockSchema,

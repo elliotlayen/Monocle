@@ -8,7 +8,12 @@ import {
   type FocusMode,
 } from "@/features/settings/services/settings-service";
 
-export type ObjectType = "tables" | "views" | "triggers" | "storedProcedures" | "scalarFunctions";
+export type ObjectType =
+  | "tables"
+  | "views"
+  | "triggers"
+  | "storedProcedures"
+  | "scalarFunctions";
 
 export type EdgeType =
   | "foreignKeys"
@@ -122,7 +127,9 @@ const getAvailableSchemas = (schema: SchemaGraph) => {
   schema.tables.forEach((table) => schemas.add(table.schema));
   (schema.views || []).forEach((view) => schemas.add(view.schema));
   (schema.triggers || []).forEach((trigger) => schemas.add(trigger.schema));
-  (schema.storedProcedures || []).forEach((procedure) => schemas.add(procedure.schema));
+  (schema.storedProcedures || []).forEach((procedure) =>
+    schemas.add(procedure.schema)
+  );
   (schema.scalarFunctions || []).forEach((fn) => schemas.add(fn.schema));
   return [...schemas];
 };
@@ -138,7 +145,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       const schemas = getAvailableSchemas(schema);
       const preferredSchemaFilter = get().preferredSchemaFilter;
       const resolvedSchemaFilter =
-        preferredSchemaFilter === "all" || schemas.includes(preferredSchemaFilter)
+        preferredSchemaFilter === "all" ||
+        schemas.includes(preferredSchemaFilter)
           ? preferredSchemaFilter
           : "all";
       set({
@@ -165,7 +173,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       const schemas = getAvailableSchemas(schema);
       const preferredSchemaFilter = get().preferredSchemaFilter;
       const resolvedSchemaFilter =
-        preferredSchemaFilter === "all" || schemas.includes(preferredSchemaFilter)
+        preferredSchemaFilter === "all" ||
+        schemas.includes(preferredSchemaFilter)
           ? preferredSchemaFilter
           : "all";
       set({
@@ -242,7 +251,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       const schemas = getAvailableSchemas(schema);
       const preferredSchemaFilter = get().preferredSchemaFilter;
       const resolvedSchemaFilter =
-        preferredSchemaFilter === "all" || schemas.includes(preferredSchemaFilter)
+        preferredSchemaFilter === "all" ||
+        schemas.includes(preferredSchemaFilter)
           ? preferredSchemaFilter
           : "all";
 
@@ -307,7 +317,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     if (settings.schemaFilter) {
       const availableSchemas = get().availableSchemas;
       const resolvedSchemaFilter =
-        settings.schemaFilter === "all" || availableSchemas.includes(settings.schemaFilter)
+        settings.schemaFilter === "all" ||
+        availableSchemas.includes(settings.schemaFilter)
           ? settings.schemaFilter
           : "all";
       updates.preferredSchemaFilter = settings.schemaFilter;
@@ -338,9 +349,11 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
   setFocusExpandThreshold: (threshold: number) => {
     set({ focusExpandThreshold: threshold });
-    settingsService.saveSettings({ focusExpandThreshold: threshold }).catch(() => {
-      // Ignore persistence errors
-    });
+    settingsService
+      .saveSettings({ focusExpandThreshold: threshold })
+      .catch(() => {
+        // Ignore persistence errors
+      });
   },
 
   setFocusedTable: (tableId: string | null) => set({ focusedTableId: tableId }),
@@ -375,8 +388,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       return { edgeTypeFilter: newFilter };
     }),
 
-  selectAllEdgeTypes: () =>
-    set({ edgeTypeFilter: new Set(ALL_EDGE_TYPES) }),
+  selectAllEdgeTypes: () => set({ edgeTypeFilter: new Set(ALL_EDGE_TYPES) }),
 
   toggleEdgeSelection: (edgeId: string) =>
     set((state) => {

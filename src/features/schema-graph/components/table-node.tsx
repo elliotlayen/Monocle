@@ -111,7 +111,9 @@ function TableNodeComponent({ data }: NodeProps) {
             column={column}
             tableId={table.id}
             index={index}
-            hasHandle={columnsWithHandles?.has(`${table.id}-${column.name}`) ?? true}
+            hasHandle={
+              columnsWithHandles?.has(`${table.id}-${column.name}`) ?? true
+            }
             handleEdgeTypes={handleEdgeTypes}
             isCompact={isCompact}
           />

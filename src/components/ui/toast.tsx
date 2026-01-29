@@ -47,7 +47,8 @@ const iconColorMap = {
 };
 
 interface ToastProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof toastVariants> {
   toast: ToastType;
   onDismiss: () => void;
@@ -57,8 +58,7 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
   ({ className, toast, onDismiss, ...props }, ref) => {
     const Icon = iconMap[toast.type];
     const iconColor = iconColorMap[toast.type];
-    const hasProgress =
-      toast.progress && toast.progress.total > 0;
+    const hasProgress = toast.progress && toast.progress.total > 0;
     const progressPercent = hasProgress
       ? Math.round((toast.progress!.current / toast.progress!.total) * 100)
       : 0;
@@ -110,7 +110,11 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
                 {toast.actions.map((action, index) => (
                   <Button
                     key={index}
-                    variant={index === toast.actions!.length - 1 ? "default" : "outline"}
+                    variant={
+                      index === toast.actions!.length - 1
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
                     onClick={action.onClick}
                   >

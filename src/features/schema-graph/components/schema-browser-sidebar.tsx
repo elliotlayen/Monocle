@@ -18,7 +18,12 @@ import { cn } from "@/lib/utils";
 import type { SchemaGraph } from "../types";
 import type { DetailSidebarData } from "./detail-content";
 
-type ObjectType = "tables" | "views" | "triggers" | "storedProcedures" | "scalarFunctions";
+type ObjectType =
+  | "tables"
+  | "views"
+  | "triggers"
+  | "storedProcedures"
+  | "scalarFunctions";
 
 interface TreeItem {
   id: string;
@@ -65,7 +70,10 @@ function buildTree(schema: SchemaGraph): TreeCategory[] {
       icon: <Table2 className="h-4 w-4" />,
       schemas: [...bySchema.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, items]) => ({ name, items: items.sort((a, b) => a.name.localeCompare(b.name)) })),
+        .map(([name, items]) => ({
+          name,
+          items: items.sort((a, b) => a.name.localeCompare(b.name)),
+        })),
       count: schema.tables.length,
     });
   }
@@ -91,7 +99,10 @@ function buildTree(schema: SchemaGraph): TreeCategory[] {
       icon: <Eye className="h-4 w-4" />,
       schemas: [...bySchema.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, items]) => ({ name, items: items.sort((a, b) => a.name.localeCompare(b.name)) })),
+        .map(([name, items]) => ({
+          name,
+          items: items.sort((a, b) => a.name.localeCompare(b.name)),
+        })),
       count: (schema.views ?? []).length,
     });
   }
@@ -117,7 +128,10 @@ function buildTree(schema: SchemaGraph): TreeCategory[] {
       icon: <Zap className="h-4 w-4" />,
       schemas: [...bySchema.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, items]) => ({ name, items: items.sort((a, b) => a.name.localeCompare(b.name)) })),
+        .map(([name, items]) => ({
+          name,
+          items: items.sort((a, b) => a.name.localeCompare(b.name)),
+        })),
       count: (schema.triggers ?? []).length,
     });
   }
@@ -143,7 +157,10 @@ function buildTree(schema: SchemaGraph): TreeCategory[] {
       icon: <Settings2 className="h-4 w-4" />,
       schemas: [...bySchema.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, items]) => ({ name, items: items.sort((a, b) => a.name.localeCompare(b.name)) })),
+        .map(([name, items]) => ({
+          name,
+          items: items.sort((a, b) => a.name.localeCompare(b.name)),
+        })),
       count: (schema.storedProcedures ?? []).length,
     });
   }
@@ -169,7 +186,10 @@ function buildTree(schema: SchemaGraph): TreeCategory[] {
       icon: <FunctionSquare className="h-4 w-4" />,
       schemas: [...bySchema.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, items]) => ({ name, items: items.sort((a, b) => a.name.localeCompare(b.name)) })),
+        .map(([name, items]) => ({
+          name,
+          items: items.sort((a, b) => a.name.localeCompare(b.name)),
+        })),
       count: (schema.scalarFunctions ?? []).length,
     });
   }
@@ -187,9 +207,10 @@ function filterTree(tree: TreeCategory[], filter: string): TreeCategory[] {
       const filteredSchemas = category.schemas
         .map((schema) => ({
           ...schema,
-          items: schema.items.filter((item) =>
-            item.name.toLowerCase().includes(lowerFilter) ||
-            item.schema.toLowerCase().includes(lowerFilter)
+          items: schema.items.filter(
+            (item) =>
+              item.name.toLowerCase().includes(lowerFilter) ||
+              item.schema.toLowerCase().includes(lowerFilter)
           ),
         }))
         .filter((schema) => schema.items.length > 0);
@@ -217,18 +238,27 @@ export function SchemaBrowserSidebar({
   onItemClick,
 }: SchemaBrowserSidebarProps) {
   const [searchFilter, setSearchFilter] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Set<ObjectType>>(new Set(["tables"]));
-  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<ObjectType>>(
+    new Set(["tables"])
+  );
+  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(
+    new Set()
+  );
 
   const tree = useMemo(() => (schema ? buildTree(schema) : []), [schema]);
-  const filteredTree = useMemo(() => filterTree(tree, searchFilter), [tree, searchFilter]);
+  const filteredTree = useMemo(
+    () => filterTree(tree, searchFilter),
+    [tree, searchFilter]
+  );
 
   // Auto-expand all when searching
   const effectiveExpandedCategories = searchFilter.trim()
     ? new Set(filteredTree.map((c) => c.type))
     : expandedCategories;
   const effectiveExpandedSchemas = searchFilter.trim()
-    ? new Set(filteredTree.flatMap((c) => c.schemas.map((s) => `${c.type}-${s.name}`)))
+    ? new Set(
+        filteredTree.flatMap((c) => c.schemas.map((s) => `${c.type}-${s.name}`))
+      )
     : expandedSchemas;
 
   const toggleCategory = useCallback((type: ObjectType) => {
@@ -257,7 +287,9 @@ export function SchemaBrowserSidebar({
 
   const expandAll = useCallback(() => {
     setExpandedCategories(new Set(tree.map((c) => c.type)));
-    setExpandedSchemas(new Set(tree.flatMap((c) => c.schemas.map((s) => `${c.type}-${s.name}`))));
+    setExpandedSchemas(
+      new Set(tree.flatMap((c) => c.schemas.map((s) => `${c.type}-${s.name}`)))
+    );
   }, [tree]);
 
   const collapseAll = useCallback(() => {
@@ -292,7 +324,9 @@ export function SchemaBrowserSidebar({
               size="icon"
               className="h-7 w-7"
               onClick={expandedCategories.size > 0 ? collapseAll : expandAll}
-              title={expandedCategories.size > 0 ? "Collapse all" : "Expand all"}
+              title={
+                expandedCategories.size > 0 ? "Collapse all" : "Expand all"
+              }
             >
               <ChevronsUpDown className="h-4 w-4" />
             </Button>
@@ -323,7 +357,9 @@ export function SchemaBrowserSidebar({
         <div className="p-2">
           {filteredTree.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              {schema ? "No objects found" : "Connect to a database to browse schema"}
+              {schema
+                ? "No objects found"
+                : "Connect to a database to browse schema"}
             </p>
           ) : (
             filteredTree.map((category) => (
@@ -338,9 +374,15 @@ export function SchemaBrowserSidebar({
                   ) : (
                     <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   )}
-                  <span className="text-muted-foreground flex-shrink-0">{category.icon}</span>
-                  <span className="text-sm font-medium flex-1 truncate">{category.label}</span>
-                  <span className="text-xs text-muted-foreground">{category.count}</span>
+                  <span className="text-muted-foreground flex-shrink-0">
+                    {category.icon}
+                  </span>
+                  <span className="text-sm font-medium flex-1 truncate">
+                    {category.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {category.count}
+                  </span>
                 </button>
 
                 {/* Schemas */}
@@ -378,7 +420,9 @@ export function SchemaBrowserSidebar({
                                   onClick={(e) => handleItemClick(e, item.data)}
                                 >
                                   <span className="w-3.5" />
-                                  <span className="text-sm truncate">{item.name}</span>
+                                  <span className="text-sm truncate">
+                                    {item.name}
+                                  </span>
                                 </button>
                               ))}
                             </div>

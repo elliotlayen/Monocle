@@ -107,7 +107,9 @@ export function TableDetail({ table }: { table: TableNode }) {
               {table.columns.map((col: Column, idx: number) => (
                 <tr
                   key={col.name}
-                  className={cn(idx % 2 === 0 ? "bg-background" : "bg-muted/50")}
+                  className={cn(
+                    idx % 2 === 0 ? "bg-background" : "bg-muted/50"
+                  )}
                 >
                   <td className="px-3 py-2 font-mono text-foreground">
                     <span className="flex items-center gap-2">
@@ -159,7 +161,9 @@ export function ViewDetail({ view }: { view: ViewNode }) {
               {view.columns.map((col: Column, idx: number) => (
                 <tr
                   key={col.name}
-                  className={cn(idx % 2 === 0 ? "bg-background" : "bg-muted/50")}
+                  className={cn(
+                    idx % 2 === 0 ? "bg-background" : "bg-muted/50"
+                  )}
                 >
                   <td className="px-3 py-2 font-mono text-foreground">
                     {col.name}
@@ -229,7 +233,11 @@ export function TriggerDetail({ trigger }: { trigger: Trigger }) {
   );
 }
 
-export function StoredProcedureDetail({ procedure }: { procedure: StoredProcedure }) {
+export function StoredProcedureDetail({
+  procedure,
+}: {
+  procedure: StoredProcedure;
+}) {
   const inputParams = procedure.parameters.filter((p) => !p.isOutput);
   const outputParams = procedure.parameters.filter((p) => p.isOutput);
 

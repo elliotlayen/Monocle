@@ -14,13 +14,16 @@ export function useDetailPopover() {
     anchorRect: null,
   });
 
-  const openPopover = useCallback((data: DetailSidebarData, anchorRect: DOMRect) => {
-    setState({
-      open: true,
-      data,
-      anchorRect,
-    });
-  }, []);
+  const openPopover = useCallback(
+    (data: DetailSidebarData, anchorRect: DOMRect) => {
+      setState({
+        open: true,
+        data,
+        anchorRect,
+      });
+    },
+    []
+  );
 
   const closePopover = useCallback(() => {
     setState({

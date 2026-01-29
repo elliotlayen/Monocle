@@ -92,11 +92,26 @@ export function StatusBar() {
         >
           <div className="text-xs">
             <div className="font-medium mb-1">Objects</div>
-            <div>Tables: {counts.breakdown.tables.filtered} / {counts.breakdown.tables.total}</div>
-            <div>Views: {counts.breakdown.views.filtered} / {counts.breakdown.views.total}</div>
-            <div>Triggers: {counts.breakdown.triggers.filtered} / {counts.breakdown.triggers.total}</div>
-            <div>Procedures: {counts.breakdown.storedProcedures.filtered} / {counts.breakdown.storedProcedures.total}</div>
-            <div>Functions: {counts.breakdown.scalarFunctions.filtered} / {counts.breakdown.scalarFunctions.total}</div>
+            <div>
+              Tables: {counts.breakdown.tables.filtered} /{" "}
+              {counts.breakdown.tables.total}
+            </div>
+            <div>
+              Views: {counts.breakdown.views.filtered} /{" "}
+              {counts.breakdown.views.total}
+            </div>
+            <div>
+              Triggers: {counts.breakdown.triggers.filtered} /{" "}
+              {counts.breakdown.triggers.total}
+            </div>
+            <div>
+              Procedures: {counts.breakdown.storedProcedures.filtered} /{" "}
+              {counts.breakdown.storedProcedures.total}
+            </div>
+            <div>
+              Functions: {counts.breakdown.scalarFunctions.filtered} /{" "}
+              {counts.breakdown.scalarFunctions.total}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
@@ -122,13 +137,36 @@ export function StatusBar() {
         >
           <div className="text-xs">
             <div className="font-medium mb-1">Edges</div>
-            <div>Foreign Keys: {counts.edgeBreakdown.foreignKeys.filtered} / {counts.edgeBreakdown.foreignKeys.total}</div>
-            <div>Trigger Dependencies: {counts.edgeBreakdown.triggerDependencies.filtered} / {counts.edgeBreakdown.triggerDependencies.total}</div>
-            <div>Trigger Writes: {counts.edgeBreakdown.triggerWrites.filtered} / {counts.edgeBreakdown.triggerWrites.total}</div>
-            <div>Procedure Reads: {counts.edgeBreakdown.procedureReads.filtered} / {counts.edgeBreakdown.procedureReads.total}</div>
-            <div>Procedure Writes: {counts.edgeBreakdown.procedureWrites.filtered} / {counts.edgeBreakdown.procedureWrites.total}</div>
-            <div>View Dependencies: {counts.edgeBreakdown.viewDependencies.filtered} / {counts.edgeBreakdown.viewDependencies.total}</div>
-            <div>Function Reads: {counts.edgeBreakdown.functionReads.filtered} / {counts.edgeBreakdown.functionReads.total}</div>
+            <div>
+              Foreign Keys: {counts.edgeBreakdown.foreignKeys.filtered} /{" "}
+              {counts.edgeBreakdown.foreignKeys.total}
+            </div>
+            <div>
+              Trigger Dependencies:{" "}
+              {counts.edgeBreakdown.triggerDependencies.filtered} /{" "}
+              {counts.edgeBreakdown.triggerDependencies.total}
+            </div>
+            <div>
+              Trigger Writes: {counts.edgeBreakdown.triggerWrites.filtered} /{" "}
+              {counts.edgeBreakdown.triggerWrites.total}
+            </div>
+            <div>
+              Procedure Reads: {counts.edgeBreakdown.procedureReads.filtered} /{" "}
+              {counts.edgeBreakdown.procedureReads.total}
+            </div>
+            <div>
+              Procedure Writes: {counts.edgeBreakdown.procedureWrites.filtered}{" "}
+              / {counts.edgeBreakdown.procedureWrites.total}
+            </div>
+            <div>
+              View Dependencies:{" "}
+              {counts.edgeBreakdown.viewDependencies.filtered} /{" "}
+              {counts.edgeBreakdown.viewDependencies.total}
+            </div>
+            <div>
+              Function Reads: {counts.edgeBreakdown.functionReads.filtered} /{" "}
+              {counts.edgeBreakdown.functionReads.total}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
@@ -136,11 +174,12 @@ export function StatusBar() {
       <div className="flex-1" />
 
       {/* Selection info */}
-      {focusedTableId && (
-        <span>Focus: {focusedTableId}</span>
-      )}
+      {focusedTableId && <span>Focus: {focusedTableId}</span>}
       {selectedEdgeIds.size > 0 && (
-        <span>{selectedEdgeIds.size} edge{selectedEdgeIds.size !== 1 ? "s" : ""} selected</span>
+        <span>
+          {selectedEdgeIds.size} edge{selectedEdgeIds.size !== 1 ? "s" : ""}{" "}
+          selected
+        </span>
       )}
 
       {/* Connection info */}

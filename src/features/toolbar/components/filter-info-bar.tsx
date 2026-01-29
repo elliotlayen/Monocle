@@ -1,7 +1,15 @@
-import { useSchemaStore, type ObjectType, type EdgeType } from "@/features/schema-graph/store";
+import {
+  useSchemaStore,
+  type ObjectType,
+  type EdgeType,
+} from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { X } from "lucide-react";
-import { EDGE_TYPE_LABELS, EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
+import {
+  EDGE_TYPE_LABELS,
+  EDGE_COLORS,
+  OBJECT_COLORS,
+} from "@/constants/edge-colors";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
@@ -12,8 +20,22 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
 };
 
 // Order for consistent color display
-const OBJECT_TYPE_ORDER: ObjectType[] = ["tables", "views", "triggers", "storedProcedures", "scalarFunctions"];
-const EDGE_TYPE_ORDER: EdgeType[] = ["foreignKeys", "viewDependencies", "triggerDependencies", "triggerWrites", "procedureReads", "procedureWrites", "functionReads"];
+const OBJECT_TYPE_ORDER: ObjectType[] = [
+  "tables",
+  "views",
+  "triggers",
+  "storedProcedures",
+  "scalarFunctions",
+];
+const EDGE_TYPE_ORDER: EdgeType[] = [
+  "foreignKeys",
+  "viewDependencies",
+  "triggerDependencies",
+  "triggerWrites",
+  "procedureReads",
+  "procedureWrites",
+  "functionReads",
+];
 
 export function FilterInfoBar() {
   const {
@@ -42,11 +64,13 @@ export function FilterInfoBar() {
   // Determine the type of the focused object
   const getFocusedObjectType = (): ObjectType | null => {
     if (!focusedTableId || !schema) return null;
-    if (schema.tables.some(t => t.id === focusedTableId)) return "tables";
-    if (schema.views.some(v => v.id === focusedTableId)) return "views";
-    if (schema.triggers.some(t => t.id === focusedTableId)) return "triggers";
-    if (schema.storedProcedures.some(p => p.id === focusedTableId)) return "storedProcedures";
-    if (schema.scalarFunctions.some(f => f.id === focusedTableId)) return "scalarFunctions";
+    if (schema.tables.some((t) => t.id === focusedTableId)) return "tables";
+    if (schema.views.some((v) => v.id === focusedTableId)) return "views";
+    if (schema.triggers.some((t) => t.id === focusedTableId)) return "triggers";
+    if (schema.storedProcedures.some((p) => p.id === focusedTableId))
+      return "storedProcedures";
+    if (schema.scalarFunctions.some((f) => f.id === focusedTableId))
+      return "scalarFunctions";
     return null;
   };
 
@@ -66,16 +90,16 @@ export function FilterInfoBar() {
 
   // Get colors for selected object types (in consistent order)
   const getObjectColors = (): string[] => {
-    return OBJECT_TYPE_ORDER
-      .filter(type => objectTypeFilter.has(type))
-      .map(type => OBJECT_COLORS[type]);
+    return OBJECT_TYPE_ORDER.filter((type) => objectTypeFilter.has(type)).map(
+      (type) => OBJECT_COLORS[type]
+    );
   };
 
   // Get colors for selected edge types (in consistent order)
   const getEdgeColors = (): string[] => {
-    return EDGE_TYPE_ORDER
-      .filter(type => edgeTypeFilter.has(type))
-      .map(type => EDGE_COLORS[type]);
+    return EDGE_TYPE_ORDER.filter((type) => edgeTypeFilter.has(type)).map(
+      (type) => EDGE_COLORS[type]
+    );
   };
 
   const objectsLabel = getObjectsLabel();
@@ -116,18 +140,29 @@ export function FilterInfoBar() {
   );
 }
 
-function FilterBox({ label, value, colors, onClear }: { label: string; value: string; colors: string[]; onClear: () => void }) {
+function FilterBox({
+  label,
+  value,
+  colors,
+  onClear,
+}: {
+  label: string;
+  value: string;
+  colors: string[];
+  onClear: () => void;
+}) {
   // Create gradient for multiple colors, or solid color for single
-  const borderStyle = colors.length === 1
-    ? { borderLeftWidth: 3, borderLeftColor: colors[0] }
-    : {
-        borderLeftWidth: 3,
-        borderLeftColor: 'transparent',
-        backgroundImage: `linear-gradient(to bottom, ${colors.join(', ')})`,
-        backgroundSize: '3px 100%',
-        backgroundPosition: 'left',
-        backgroundRepeat: 'no-repeat'
-      };
+  const borderStyle =
+    colors.length === 1
+      ? { borderLeftWidth: 3, borderLeftColor: colors[0] }
+      : {
+          borderLeftWidth: 3,
+          borderLeftColor: "transparent",
+          backgroundImage: `linear-gradient(to bottom, ${colors.join(", ")})`,
+          backgroundSize: "3px 100%",
+          backgroundPosition: "left",
+          backgroundRepeat: "no-repeat",
+        };
 
   // Use first color for text when single, muted for multiple
   const textColor = colors.length === 1 ? colors[0] : undefined;
@@ -138,11 +173,13 @@ function FilterBox({ label, value, colors, onClear }: { label: string; value: st
       style={borderStyle}
     >
       <span className="text-muted-foreground">{label}:</span>
-      <span className="font-medium" style={textColor ? { color: textColor } : undefined}>{value}</span>
-      <button
-        onClick={onClear}
-        className="ml-1 hover:bg-muted rounded p-0.5"
+      <span
+        className="font-medium"
+        style={textColor ? { color: textColor } : undefined}
       >
+        {value}
+      </span>
+      <button onClick={onClear} className="ml-1 hover:bg-muted rounded p-0.5">
         <X className="w-3.5 h-3.5 text-muted-foreground" />
       </button>
     </div>

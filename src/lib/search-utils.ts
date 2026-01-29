@@ -1,4 +1,4 @@
-import type { SchemaGraph } from '@/features/schema-graph/types';
+import type { SchemaGraph } from "@/features/schema-graph/types";
 import type {
   GroupedSearchResults,
   TableSearchResult,
@@ -7,7 +7,7 @@ import type {
   TriggerSearchResult,
   ProcedureSearchResult,
   FunctionSearchResult,
-} from '@/features/toolbar/types';
+} from "@/features/toolbar/types";
 
 const MAX_RESULTS_PER_CATEGORY = 10;
 
@@ -56,7 +56,7 @@ export function searchSchema(
     if (score > 0) {
       tableResults.push({
         id: `table-${table.id}`,
-        type: 'table',
+        type: "table",
         tableId: table.id,
         schema: table.schema,
         label: table.name,
@@ -77,7 +77,7 @@ export function searchSchema(
     if (score > 0) {
       viewResults.push({
         id: `view-${view.id}`,
-        type: 'view',
+        type: "view",
         viewId: view.id,
         schema: view.schema,
         label: view.name,
@@ -96,10 +96,10 @@ export function searchSchema(
       if (score > 0) {
         columnResults.push({
           id: `column-${table.id}-${column.name}`,
-          type: 'column',
+          type: "column",
           columnName: column.name,
           parentId: table.id,
-          parentType: 'table',
+          parentType: "table",
           schema: table.schema,
           dataType: column.dataType,
           label: column.name,
@@ -116,10 +116,10 @@ export function searchSchema(
       if (score > 0) {
         columnResults.push({
           id: `column-${view.id}-${column.name}`,
-          type: 'column',
+          type: "column",
           columnName: column.name,
           parentId: view.id,
-          parentType: 'view',
+          parentType: "view",
           schema: view.schema,
           dataType: column.dataType,
           label: column.name,
@@ -140,7 +140,7 @@ export function searchSchema(
     if (score > 0) {
       triggerResults.push({
         id: `trigger-${trigger.id}`,
-        type: 'trigger',
+        type: "trigger",
         triggerId: trigger.id,
         tableId: trigger.tableId,
         schema: trigger.schema,
@@ -161,7 +161,7 @@ export function searchSchema(
     if (score > 0) {
       procedureResults.push({
         id: `procedure-${procedure.id}`,
-        type: 'procedure',
+        type: "procedure",
         procedureId: procedure.id,
         schema: procedure.schema,
         label: procedure.name,
@@ -181,7 +181,7 @@ export function searchSchema(
     if (score > 0) {
       functionResults.push({
         id: `function-${fn.id}`,
-        type: 'function',
+        type: "function",
         functionId: fn.id,
         schema: fn.schema,
         label: fn.name,

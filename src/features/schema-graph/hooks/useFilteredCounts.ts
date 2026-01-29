@@ -71,7 +71,7 @@ export function useFilteredCounts(
 
     // Calculate focused neighbors (tables/views connected to focused table)
     const focusedNeighbors = focusedTableId
-      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
+      ? (schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>())
       : new Set<string>();
 
     const showTables = objectTypeFilter.has("tables");
@@ -98,7 +98,7 @@ export function useFilteredCounts(
     }
 
     // Filter views
-    let filteredViews = showViews ? (schema.views || []) : [];
+    let filteredViews = showViews ? schema.views || [] : [];
     if (hasSearch) {
       filteredViews = filteredViews.filter((v) =>
         matchesSearch(schemaIndex.viewSearch, v.id)
@@ -249,7 +249,10 @@ export function useFilteredCounts(
       filteredViews.forEach((view) => {
         const sources = schemaIndex.viewColumnSources.get(view.id) ?? [];
         sources.forEach((source) => {
-          if (tableIds.has(source.sourceTableId) || viewIds.has(source.sourceTableId)) {
+          if (
+            tableIds.has(source.sourceTableId) ||
+            viewIds.has(source.sourceTableId)
+          ) {
             viewDepCount++;
           }
         });
@@ -379,21 +382,55 @@ export function useFilteredCounts(
       filteredEdges,
       totalEdges: totalEdgeCount,
       breakdown: {
-        tables: { filtered: filteredTables.length, total: schema.tables.length },
-        views: { filtered: filteredViews.length, total: schema.views?.length || 0 },
-        triggers: { filtered: filteredTriggers.length, total: schema.triggers?.length || 0 },
-        storedProcedures: { filtered: filteredProcedures.length, total: schema.storedProcedures?.length || 0 },
-        scalarFunctions: { filtered: filteredFunctions.length, total: schema.scalarFunctions?.length || 0 },
+        tables: {
+          filtered: filteredTables.length,
+          total: schema.tables.length,
+        },
+        views: {
+          filtered: filteredViews.length,
+          total: schema.views?.length || 0,
+        },
+        triggers: {
+          filtered: filteredTriggers.length,
+          total: schema.triggers?.length || 0,
+        },
+        storedProcedures: {
+          filtered: filteredProcedures.length,
+          total: schema.storedProcedures?.length || 0,
+        },
+        scalarFunctions: {
+          filtered: filteredFunctions.length,
+          total: schema.scalarFunctions?.length || 0,
+        },
       },
       edgeBreakdown: {
         foreignKeys: { filtered: fkEdgeCount, total: totalFkEdges },
-        triggerDependencies: { filtered: triggerDepCount, total: totalTriggerDepEdges },
-        triggerWrites: { filtered: triggerWritesCount, total: totalTriggerWritesEdges },
-        procedureReads: { filtered: procReadsCount, total: totalProcReadsEdges },
-        procedureWrites: { filtered: procWritesCount, total: totalProcWritesEdges },
+        triggerDependencies: {
+          filtered: triggerDepCount,
+          total: totalTriggerDepEdges,
+        },
+        triggerWrites: {
+          filtered: triggerWritesCount,
+          total: totalTriggerWritesEdges,
+        },
+        procedureReads: {
+          filtered: procReadsCount,
+          total: totalProcReadsEdges,
+        },
+        procedureWrites: {
+          filtered: procWritesCount,
+          total: totalProcWritesEdges,
+        },
         viewDependencies: { filtered: viewDepCount, total: totalViewDepEdges },
         functionReads: { filtered: funcReadsCount, total: totalFuncReadsEdges },
       },
     };
-  }, [schema, searchFilter, schemaFilter, objectTypeFilter, edgeTypeFilter, focusedTableId]);
+  }, [
+    schema,
+    searchFilter,
+    schemaFilter,
+    objectTypeFilter,
+    edgeTypeFilter,
+    focusedTableId,
+  ]);
 }

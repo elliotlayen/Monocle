@@ -190,11 +190,7 @@ export async function exportToPdf(
       checkPageBreak(10);
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text(
-        `${fn.schema}.${fn.name} -> ${fn.returnType}`,
-        margin + 5,
-        yPos
-      );
+      doc.text(`${fn.schema}.${fn.name} -> ${fn.returnType}`, margin + 5, yPos);
       yPos += 5;
     });
   }

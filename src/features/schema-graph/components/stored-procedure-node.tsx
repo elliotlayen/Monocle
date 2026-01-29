@@ -56,7 +56,9 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
       {/* Parameters */}
       <div className="px-3 py-2 space-y-2">
         {procedure.parameters.length === 0 ? (
-          <span className="text-xs text-muted-foreground italic">No parameters</span>
+          <span className="text-xs text-muted-foreground italic">
+            No parameters
+          </span>
         ) : (
           <>
             {inputParams.length > 0 && (

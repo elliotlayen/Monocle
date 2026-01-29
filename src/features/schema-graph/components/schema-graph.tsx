@@ -196,7 +196,9 @@ function positionTier(
 
   rows.forEach((rowNodes) => {
     // Calculate max height in this row for proper spacing
-    const maxHeight = Math.max(...rowNodes.map((id) => getNodeHeight(id, schema)));
+    const maxHeight = Math.max(
+      ...rowNodes.map((id) => getNodeHeight(id, schema))
+    );
 
     // For "up" direction, first move up by maxHeight before positioning
     if (direction === "up") {
@@ -243,25 +245,28 @@ function calculateCompactLayout(
   const focusedHeight = getNodeHeight(focusedNodeId, schema);
 
   // Categorize neighbors by FK direction
-  const upstream: string[] = [];   // Tables that reference focused (FK points to focused)
+  const upstream: string[] = []; // Tables that reference focused (FK points to focused)
   const downstream: string[] = []; // Tables that focused references (FK points away)
-  const visibleNeighbors = [...neighbors].filter((id) => visibleNodeIds.has(id));
+  const visibleNeighbors = [...neighbors].filter((id) =>
+    visibleNodeIds.has(id)
+  );
 
   for (const neighborId of visibleNeighbors) {
     // Check if this is a table/view (not trigger/procedure)
-    const isTableOrView = schema.tables.some(t => t.id === neighborId) ||
-                          (schema.views || []).some(v => v.id === neighborId);
+    const isTableOrView =
+      schema.tables.some((t) => t.id === neighborId) ||
+      (schema.views || []).some((v) => v.id === neighborId);
 
     if (!isTableOrView) continue;
 
     // Check FK direction
     // referencedByFocused: focused table has FK pointing to this neighbor
     const referencedByFocused = schema.relationships.some(
-      rel => rel.from === focusedNodeId && rel.to === neighborId
+      (rel) => rel.from === focusedNodeId && rel.to === neighborId
     );
     // referencesFocused: this neighbor has FK pointing to focused table
     const referencesFocused = schema.relationships.some(
-      rel => rel.from === neighborId && rel.to === focusedNodeId
+      (rel) => rel.from === neighborId && rel.to === focusedNodeId
     );
 
     if (referencesFocused && !referencedByFocused) {
@@ -284,7 +289,13 @@ function calculateCompactLayout(
 
   // Position downstream tables (below focused) - first row at y = focusedHeight + TIER_GAP
   const downstreamBaseY = focusedHeight + TIER_GAP;
-  const bottomY = positionTier(downstream, downstreamBaseY, positions, "down", schema);
+  const bottomY = positionTier(
+    downstream,
+    downstreamBaseY,
+    positions,
+    "down",
+    schema
+  );
 
   // Position triggers near their parent tables
   (schema.triggers || []).forEach((trigger) => {
@@ -293,7 +304,9 @@ function calculateCompactLayout(
     if (parentPos) {
       // Count triggers for this table to stack them
       const existingTriggers = [...positions.keys()].filter((id) =>
-        (schema.triggers || []).some((t) => t.id === id && t.tableId === trigger.tableId)
+        (schema.triggers || []).some(
+          (t) => t.id === id && t.tableId === trigger.tableId
+        )
       );
       positions.set(trigger.id, {
         x: parentPos.x + TRIGGER_OFFSET_X,
@@ -304,9 +317,10 @@ function calculateCompactLayout(
 
   // Calculate bottom Y position for procedures/functions
   // Use bottomY from positionTier if downstream has nodes, otherwise calculate from positions
-  const allYPositions = [...positions.values()].map(p => p.y);
+  const allYPositions = [...positions.values()].map((p) => p.y);
   const maxY = Math.max(...allYPositions, 0);
-  const procedureY = downstream.length > 0 ? bottomY : maxY + NODE_HEIGHT + GAP_Y;
+  const procedureY =
+    downstream.length > 0 ? bottomY : maxY + NODE_HEIGHT + GAP_Y;
 
   // Position procedures below the main cluster
   let procIndex = 0;
@@ -338,7 +352,10 @@ interface ConvertOptions {
   onTableClick?: (table: TableNodeType, event: React.MouseEvent) => void;
   onViewClick?: (view: ViewNodeType, event: React.MouseEvent) => void;
   onTriggerClick?: (trigger: Trigger, event: React.MouseEvent) => void;
-  onProcedureClick?: (procedure: StoredProcedure, event: React.MouseEvent) => void;
+  onProcedureClick?: (
+    procedure: StoredProcedure,
+    event: React.MouseEvent
+  ) => void;
   onFunctionClick?: (fn: ScalarFunction, event: React.MouseEvent) => void;
 }
 
@@ -434,7 +451,8 @@ function buildBaseNodes(
         data: {
           trigger,
           isDimmed: false,
-          onClick: (e: React.MouseEvent) => options?.onTriggerClick?.(trigger, e),
+          onClick: (e: React.MouseEvent) =>
+            options?.onTriggerClick?.(trigger, e),
         },
       });
     });
@@ -457,7 +475,8 @@ function buildBaseNodes(
       data: {
         procedure,
         isDimmed: false,
-        onClick: (e: React.MouseEvent) => options?.onProcedureClick?.(procedure, e),
+        onClick: (e: React.MouseEvent) =>
+          options?.onProcedureClick?.(procedure, e),
       },
     })
   );
@@ -491,7 +510,10 @@ function buildBaseNodes(
 
 function buildBaseEdges(
   schema: SchemaGraphType,
-  viewColumnSources: Map<string, { columnName: string; sourceTableId: string; sourceColumn: string }[]>
+  viewColumnSources: Map<
+    string,
+    { columnName: string; sourceTableId: string; sourceColumn: string }[]
+  >
 ): EdgeMeta[] {
   const edges: EdgeMeta[] = [];
 
@@ -644,16 +666,17 @@ function buildEdgeState(
     const stroke = isSelected
       ? colors.selected
       : isDimmed
-      ? colors.dimmed
-      : colors.base;
+        ? colors.dimmed
+        : colors.base;
     const strokeWidth = isSelected ? 4 : isFocused ? 3 : isDimmed ? 1 : 2;
     const labelColor = isSelected
       ? colors.labelSelected
       : isDimmed
-      ? colors.labelDimmed
-      : colors.label;
+        ? colors.labelDimmed
+        : colors.label;
     const isHovered = hoveredEdgeId === edge.id;
-    const shouldShowLabel = (showLabels || isSelected || isHovered) && !isDimmed;
+    const shouldShowLabel =
+      (showLabels || isSelected || isHovered) && !isDimmed;
     const label = shouldShowLabel ? edge.label : undefined;
 
     return {
@@ -703,17 +726,28 @@ function SchemaGraphInner({
 }: SchemaGraphProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const { open: popoverOpen, data: popoverData, anchorRect, openPopover, closePopover } = useDetailPopover();
-  const { selectedEdgeIds, toggleEdgeSelection, clearEdgeSelection, focusMode, focusExpandThreshold } =
-    useSchemaStore(
-      useShallow((state) => ({
-        selectedEdgeIds: state.selectedEdgeIds,
-        toggleEdgeSelection: state.toggleEdgeSelection,
-        clearEdgeSelection: state.clearEdgeSelection,
-        focusMode: state.focusMode,
-        focusExpandThreshold: state.focusExpandThreshold,
-      }))
-    );
+  const {
+    open: popoverOpen,
+    data: popoverData,
+    anchorRect,
+    openPopover,
+    closePopover,
+  } = useDetailPopover();
+  const {
+    selectedEdgeIds,
+    toggleEdgeSelection,
+    clearEdgeSelection,
+    focusMode,
+    focusExpandThreshold,
+  } = useSchemaStore(
+    useShallow((state) => ({
+      selectedEdgeIds: state.selectedEdgeIds,
+      toggleEdgeSelection: state.toggleEdgeSelection,
+      clearEdgeSelection: state.clearEdgeSelection,
+      focusMode: state.focusMode,
+      focusExpandThreshold: state.focusExpandThreshold,
+    }))
+  );
 
   // React Flow hook for programmatic viewport control
   const { fitView } = useReactFlow();
@@ -723,7 +757,10 @@ function SchemaGraphInner({
     new Map()
   );
   // Track previous focus state to detect transitions (for one-time fitView)
-  const prevFocusStateRef = useRef<{ focusedTableId: string | null; focusMode: string }>({
+  const prevFocusStateRef = useRef<{
+    focusedTableId: string | null;
+    focusMode: string;
+  }>({
     focusedTableId: null,
     focusMode: "fade",
   });
@@ -745,12 +782,9 @@ function SchemaGraphInner({
     }
   }, [selectedEdgeIds.size, clearEdgeSelection]);
 
-  const onEdgeMouseEnter = useCallback(
-    (_event: unknown, edge: Edge) => {
-      setHoveredEdgeId(edge.id);
-    },
-    []
-  );
+  const onEdgeMouseEnter = useCallback((_event: unknown, edge: Edge) => {
+    setHoveredEdgeId(edge.id);
+  }, []);
 
   const onEdgeMouseLeave = useCallback(() => {
     setHoveredEdgeId(null);
@@ -762,42 +796,68 @@ function SchemaGraphInner({
     );
   }, []);
 
-  const handleNodeClick = useCallback((data: DetailSidebarData, event: React.MouseEvent) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    openPopover(data, rect);
-  }, [openPopover]);
+  const handleNodeClick = useCallback(
+    (data: DetailSidebarData, event: React.MouseEvent) => {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      openPopover(data, rect);
+    },
+    [openPopover]
+  );
 
-  const handleTableClick = useCallback((table: TableNodeType, event: React.MouseEvent) => {
-    handleNodeClick({ type: "table", data: table }, event);
-  }, [handleNodeClick]);
+  const handleTableClick = useCallback(
+    (table: TableNodeType, event: React.MouseEvent) => {
+      handleNodeClick({ type: "table", data: table }, event);
+    },
+    [handleNodeClick]
+  );
 
-  const handleViewClick = useCallback((view: ViewNodeType, event: React.MouseEvent) => {
-    handleNodeClick({ type: "view", data: view }, event);
-  }, [handleNodeClick]);
+  const handleViewClick = useCallback(
+    (view: ViewNodeType, event: React.MouseEvent) => {
+      handleNodeClick({ type: "view", data: view }, event);
+    },
+    [handleNodeClick]
+  );
 
-  const handleTriggerClick = useCallback((trigger: Trigger, event: React.MouseEvent) => {
-    handleNodeClick({ type: "trigger", data: trigger }, event);
-  }, [handleNodeClick]);
+  const handleTriggerClick = useCallback(
+    (trigger: Trigger, event: React.MouseEvent) => {
+      handleNodeClick({ type: "trigger", data: trigger }, event);
+    },
+    [handleNodeClick]
+  );
 
-  const handleProcedureClick = useCallback((procedure: StoredProcedure, event: React.MouseEvent) => {
-    handleNodeClick({ type: "storedProcedure", data: procedure }, event);
-  }, [handleNodeClick]);
+  const handleProcedureClick = useCallback(
+    (procedure: StoredProcedure, event: React.MouseEvent) => {
+      handleNodeClick({ type: "storedProcedure", data: procedure }, event);
+    },
+    [handleNodeClick]
+  );
 
-  const handleFunctionClick = useCallback((fn: ScalarFunction, event: React.MouseEvent) => {
-    handleNodeClick({ type: "scalarFunction", data: fn }, event);
-  }, [handleNodeClick]);
+  const handleFunctionClick = useCallback(
+    (fn: ScalarFunction, event: React.MouseEvent) => {
+      handleNodeClick({ type: "scalarFunction", data: fn }, event);
+    },
+    [handleNodeClick]
+  );
 
-  const handleSidebarItemClick = useCallback((data: DetailSidebarData, rect: DOMRect) => {
-    openPopover(data, rect);
-  }, [openPopover]);
+  const handleSidebarItemClick = useCallback(
+    (data: DetailSidebarData, rect: DOMRect) => {
+      openPopover(data, rect);
+    },
+    [openPopover]
+  );
 
   const options: ConvertOptions = useMemo(
     () => ({
-      onTableClick: (table: TableNodeType, event: React.MouseEvent) => handleTableClick(table, event),
-      onViewClick: (view: ViewNodeType, event: React.MouseEvent) => handleViewClick(view, event),
-      onTriggerClick: (trigger: Trigger, event: React.MouseEvent) => handleTriggerClick(trigger, event),
-      onProcedureClick: (procedure: StoredProcedure, event: React.MouseEvent) => handleProcedureClick(procedure, event),
-      onFunctionClick: (fn: ScalarFunction, event: React.MouseEvent) => handleFunctionClick(fn, event),
+      onTableClick: (table: TableNodeType, event: React.MouseEvent) =>
+        handleTableClick(table, event),
+      onViewClick: (view: ViewNodeType, event: React.MouseEvent) =>
+        handleViewClick(view, event),
+      onTriggerClick: (trigger: Trigger, event: React.MouseEvent) =>
+        handleTriggerClick(trigger, event),
+      onProcedureClick: (procedure: StoredProcedure, event: React.MouseEvent) =>
+        handleProcedureClick(procedure, event),
+      onFunctionClick: (fn: ScalarFunction, event: React.MouseEvent) =>
+        handleFunctionClick(fn, event),
     }),
     [
       handleTableClick,
@@ -810,8 +870,7 @@ function SchemaGraphInner({
 
   const schemaIndex = useMemo(() => getSchemaIndex(schema), [schema]);
   const baseNodes = useMemo(
-    () =>
-      buildBaseNodes(schema, options, schemaIndex.columnsWithHandles),
+    () => buildBaseNodes(schema, options, schemaIndex.columnsWithHandles),
     [schema, options, schemaIndex.columnsWithHandles]
   );
   const baseEdges = useMemo(
@@ -872,7 +931,7 @@ function SchemaGraphInner({
       filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
     }
 
-    let filteredViews = showViews ? (schema.views || []) : [];
+    let filteredViews = showViews ? schema.views || [] : [];
     if (hasSearch) {
       filteredViews = filteredViews.filter((v) =>
         matchesSearch(schemaIndex.viewSearch, v.id)
@@ -894,8 +953,10 @@ function SchemaGraphInner({
       );
     }
 
-    let filteredProcedures = showProcedures ? (schema.storedProcedures || []) : [];
-    let filteredFunctions = showFunctions ? (schema.scalarFunctions || []) : [];
+    let filteredProcedures = showProcedures
+      ? schema.storedProcedures || []
+      : [];
+    let filteredFunctions = showFunctions ? schema.scalarFunctions || [] : [];
 
     if (schemaFilter && schemaFilter !== "all") {
       filteredProcedures = filteredProcedures.filter(
@@ -927,7 +988,7 @@ function SchemaGraphInner({
     ]);
 
     const focusedNeighbors = focusedTableId
-      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
+      ? (schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>())
       : new Set<string>();
 
     // Calculate which nodes would be dimmed for focus mode
@@ -943,26 +1004,47 @@ function SchemaGraphInner({
         // Triggers: dimmed if their table is not focused and not a neighbor
         else if (visibleTriggerIds.has(nodeId)) {
           const trigger = (schema.triggers || []).find((t) => t.id === nodeId);
-          if (trigger && trigger.tableId !== focusedTableId && !focusedNeighbors.has(trigger.tableId)) {
+          if (
+            trigger &&
+            trigger.tableId !== focusedTableId &&
+            !focusedNeighbors.has(trigger.tableId)
+          ) {
             dimmedNodeIds.add(nodeId);
           }
         }
         // Procedures: dimmed if none of their tables are focused or neighbors
         else if (visibleProcedureIds.has(nodeId)) {
-          const procedure = (schema.storedProcedures || []).find((p) => p.id === nodeId);
+          const procedure = (schema.storedProcedures || []).find(
+            (p) => p.id === nodeId
+          );
           if (procedure) {
-            const refs = [...(procedure.referencedTables || []), ...(procedure.affectedTables || [])];
-            if (!refs.some((tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId))) {
+            const refs = [
+              ...(procedure.referencedTables || []),
+              ...(procedure.affectedTables || []),
+            ];
+            if (
+              !refs.some(
+                (tableId) =>
+                  tableId === focusedTableId || focusedNeighbors.has(tableId)
+              )
+            ) {
               dimmedNodeIds.add(nodeId);
             }
           }
         }
         // Functions: dimmed if none of their tables are focused or neighbors
         else if (visibleFunctionIds.has(nodeId)) {
-          const fn = (schema.scalarFunctions || []).find((f) => f.id === nodeId);
+          const fn = (schema.scalarFunctions || []).find(
+            (f) => f.id === nodeId
+          );
           if (fn) {
             const refs = fn.referencedTables || [];
-            if (!refs.some((tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId))) {
+            if (
+              !refs.some(
+                (tableId) =>
+                  tableId === focusedTableId || focusedNeighbors.has(tableId)
+              )
+            ) {
               dimmedNodeIds.add(nodeId);
             }
           }
@@ -971,14 +1053,17 @@ function SchemaGraphInner({
     }
 
     // Count visible non-dimmed tables/views for per-node compact calculation
-    const visibleNonDimmedCount = [...visibleTableIds, ...visibleViewIds]
-      .filter((id) => !dimmedNodeIds.has(id)).length;
+    const visibleNonDimmedCount = [
+      ...visibleTableIds,
+      ...visibleViewIds,
+    ].filter((id) => !dimmedNodeIds.has(id)).length;
     const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
 
     // For edge building, exclude dimmed nodes when focus mode is "hide"
-    const edgeVisibleNodeIds = focusMode === "hide"
-      ? new Set([...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id)))
-      : visibleNodeIds;
+    const edgeVisibleNodeIds =
+      focusMode === "hide"
+        ? new Set([...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id)))
+        : visibleNodeIds;
 
     const { edges: nextEdges, handleEdgeTypes } = buildEdgeState(
       baseEdges,
@@ -996,7 +1081,8 @@ function SchemaGraphInner({
     const justEnteredFocus =
       focusMode === "hide" &&
       focusedTableId &&
-      (prevState.focusedTableId !== focusedTableId || prevState.focusMode !== "hide");
+      (prevState.focusedTableId !== focusedTableId ||
+        prevState.focusMode !== "hide");
 
     // Detect if we JUST exited focus mode (restore positions once, not continuously)
     const justExitedFocus =
@@ -1007,7 +1093,12 @@ function SchemaGraphInner({
     // Calculate compact positions when focus mode is "hide" and focused
     const shouldUseCompactLayout = focusMode === "hide" && focusedTableId;
     const compactPositions = shouldUseCompactLayout
-      ? calculateCompactLayout(focusedTableId, edgeVisibleNodeIds, focusedNeighbors, schema)
+      ? calculateCompactLayout(
+          focusedTableId,
+          edgeVisibleNodeIds,
+          focusedNeighbors,
+          schema
+        )
       : null;
 
     setNodes((currentNodes) =>
@@ -1028,11 +1119,16 @@ function SchemaGraphInner({
                 !focusedNeighbors.has(trigger.tableId);
             }
           } else if (node.type === "storedProcedureNode") {
-            const procedure = (node.data as { procedure?: StoredProcedure }).procedure;
+            const procedure = (node.data as { procedure?: StoredProcedure })
+              .procedure;
             if (procedure) {
-              const refs = [...(procedure.referencedTables || []), ...(procedure.affectedTables || [])];
+              const refs = [
+                ...(procedure.referencedTables || []),
+                ...(procedure.affectedTables || []),
+              ];
               isDimmed = !refs.some(
-                (tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId)
+                (tableId) =>
+                  tableId === focusedTableId || focusedNeighbors.has(tableId)
               );
             }
           } else if (node.type === "scalarFunctionNode") {
@@ -1040,7 +1136,8 @@ function SchemaGraphInner({
             if (fn) {
               const refs = fn.referencedTables || [];
               isDimmed = !refs.some(
-                (tableId) => tableId === focusedTableId || focusedNeighbors.has(tableId)
+                (tableId) =>
+                  tableId === focusedTableId || focusedNeighbors.has(tableId)
               );
             }
           }
@@ -1081,10 +1178,17 @@ function SchemaGraphInner({
         const shouldHide = !isVisible || (focusMode === "hide" && isDimmed);
 
         // Apply compact position (only when entering focus) or restore original (only when exiting)
-        let position = node.position;  // Keep current position by default (preserves user drag)
-        if (justEnteredFocus && compactPositions && compactPositions.has(node.id)) {
+        let position = node.position; // Keep current position by default (preserves user drag)
+        if (
+          justEnteredFocus &&
+          compactPositions &&
+          compactPositions.has(node.id)
+        ) {
           position = compactPositions.get(node.id)!;
-        } else if (justExitedFocus && originalPositionsRef.current.has(node.id)) {
+        } else if (
+          justExitedFocus &&
+          originalPositionsRef.current.has(node.id)
+        ) {
           // Only restore original position when JUST exiting focus mode
           position = originalPositionsRef.current.get(node.id)!;
         }
@@ -1107,7 +1211,10 @@ function SchemaGraphInner({
     }
 
     // Update ref for next comparison
-    prevFocusStateRef.current = { focusedTableId: focusedTableId ?? null, focusMode };
+    prevFocusStateRef.current = {
+      focusedTableId: focusedTableId ?? null,
+      focusMode,
+    };
   }, [
     baseEdges,
     edgeTypeFilter,

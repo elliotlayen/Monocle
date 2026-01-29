@@ -110,7 +110,9 @@ function ViewNodeComponent({ data }: NodeProps) {
             column={column}
             viewId={view.id}
             index={index}
-            hasHandle={columnsWithHandles?.has(`${view.id}-${column.name}`) ?? true}
+            hasHandle={
+              columnsWithHandles?.has(`${view.id}-${column.name}`) ?? true
+            }
             handleEdgeTypes={handleEdgeTypes}
             isCompact={isCompact}
           />

@@ -11,8 +11,12 @@ interface ScalarFunctionNodeData {
 }
 
 function ScalarFunctionNodeComponent({ data }: NodeProps) {
-  const { function: fn, isFocused, isDimmed, onClick } =
-    data as unknown as ScalarFunctionNodeData;
+  const {
+    function: fn,
+    isFocused,
+    isDimmed,
+    onClick,
+  } = data as unknown as ScalarFunctionNodeData;
 
   return (
     <div
@@ -71,7 +75,10 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
             </span>
             <div className="space-y-0.5">
               {fn.parameters.slice(0, 3).map((param) => (
-                <div key={param.name} className="flex items-center gap-2 text-xs">
+                <div
+                  key={param.name}
+                  className="flex items-center gap-2 text-xs"
+                >
                   <span className="text-foreground truncate">{param.name}</span>
                   <span className="text-muted-foreground text-[10px] ml-auto">
                     {param.dataType}

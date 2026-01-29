@@ -55,7 +55,11 @@ export function ThemeProvider({
       .getSettings()
       .then((settings) => {
         if (!isMounted || !settings.theme) return;
-        if (settings.theme === "dark" || settings.theme === "light" || settings.theme === "system") {
+        if (
+          settings.theme === "dark" ||
+          settings.theme === "light" ||
+          settings.theme === "system"
+        ) {
           localStorage.setItem(storageKey, settings.theme);
           setThemeState(settings.theme);
         }

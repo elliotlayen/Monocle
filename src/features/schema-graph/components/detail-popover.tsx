@@ -3,7 +3,11 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DetailSidebarData, DetailContent, getHeaderInfo } from "./detail-content";
+import {
+  DetailSidebarData,
+  DetailContent,
+  getHeaderInfo,
+} from "./detail-content";
 
 const POPOVER_WIDTH = 450;
 const POPOVER_MAX_HEIGHT = 600;
@@ -23,7 +27,10 @@ function calculatePopoverPosition(anchorRect: DOMRect): PopoverPosition {
   if (viewportWidth - anchorRect.right >= POPOVER_WIDTH + MARGIN) {
     return {
       left: anchorRect.right + MARGIN,
-      top: Math.max(MARGIN, Math.min(anchorRect.top, viewportHeight - POPOVER_MAX_HEIGHT - MARGIN)),
+      top: Math.max(
+        MARGIN,
+        Math.min(anchorRect.top, viewportHeight - POPOVER_MAX_HEIGHT - MARGIN)
+      ),
       placement: "right",
     };
   }
@@ -32,7 +39,10 @@ function calculatePopoverPosition(anchorRect: DOMRect): PopoverPosition {
   if (anchorRect.left >= POPOVER_WIDTH + MARGIN) {
     return {
       left: anchorRect.left - POPOVER_WIDTH - MARGIN,
-      top: Math.max(MARGIN, Math.min(anchorRect.top, viewportHeight - POPOVER_MAX_HEIGHT - MARGIN)),
+      top: Math.max(
+        MARGIN,
+        Math.min(anchorRect.top, viewportHeight - POPOVER_MAX_HEIGHT - MARGIN)
+      ),
       placement: "left",
     };
   }
@@ -40,7 +50,13 @@ function calculatePopoverPosition(anchorRect: DOMRect): PopoverPosition {
   // Center if neither side works
   return {
     left: Math.max(MARGIN, (viewportWidth - POPOVER_WIDTH) / 2),
-    top: Math.max(MARGIN, Math.min(anchorRect.bottom + MARGIN, viewportHeight - POPOVER_MAX_HEIGHT - MARGIN)),
+    top: Math.max(
+      MARGIN,
+      Math.min(
+        anchorRect.bottom + MARGIN,
+        viewportHeight - POPOVER_MAX_HEIGHT - MARGIN
+      )
+    ),
     placement: "right",
   };
 }
@@ -52,7 +68,12 @@ interface DetailPopoverProps {
   onClose: () => void;
 }
 
-export function DetailPopover({ open, data, anchorRect, onClose }: DetailPopoverProps) {
+export function DetailPopover({
+  open,
+  data,
+  anchorRect,
+  onClose,
+}: DetailPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Handle escape key
@@ -72,7 +93,10 @@ export function DetailPopover({ open, data, anchorRect, onClose }: DetailPopover
   // Handle click outside
   const handleClickOutside = useCallback(
     (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node)
+      ) {
         onClose();
       }
     },

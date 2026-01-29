@@ -69,7 +69,12 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   for (const trigger of schema.triggers || []) {
     triggerSearch.set(
       trigger.id,
-      buildSearchText([trigger.name, trigger.schema, trigger.id, trigger.tableId])
+      buildSearchText([
+        trigger.name,
+        trigger.schema,
+        trigger.id,
+        trigger.tableId,
+      ])
     );
   }
 
@@ -81,10 +86,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   }
 
   for (const fn of schema.scalarFunctions || []) {
-    functionSearch.set(
-      fn.id,
-      buildSearchText([fn.name, fn.schema, fn.id])
-    );
+    functionSearch.set(fn.id, buildSearchText([fn.name, fn.schema, fn.id]));
   }
 
   for (const rel of schema.relationships) {

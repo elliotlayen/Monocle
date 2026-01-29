@@ -90,7 +90,7 @@ export function DatabaseSelector() {
           <span className="truncate">
             {isSelecting
               ? "Loading..."
-              : selectedDatabase ?? "Select database..."}
+              : (selectedDatabase ?? "Select database...")}
           </span>
 
           {/* Right: Chevron icon */}
@@ -112,7 +112,9 @@ export function DatabaseSelector() {
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      selectedDatabase === database ? "opacity-100" : "opacity-0"
+                      selectedDatabase === database
+                        ? "opacity-100"
+                        : "opacity-0"
                     )}
                   />
                   {database}
