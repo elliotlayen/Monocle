@@ -8,6 +8,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -45,6 +49,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "eslint-config-prettier": "^10.1.0",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -56,6 +61,7 @@
     "tailwindcss": "^4.1.17",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.48.1",
+    "prettier": "^3.4.2",
     "vite": "^7.0.4",
     "vitest": "^2.1.2"
   }

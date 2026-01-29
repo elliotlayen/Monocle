@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import globals from "globals";
+import eslintConfigPrettier from "eslint-config-prettier";
 
 export default tseslint.config(
   js.configs.recommended,
@@ -13,10 +14,14 @@ export default tseslint.config(
       },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_" },
+      ],
     },
   },
   {
     ignores: ["dist/**", "src-tauri/**"],
-  }
+  },
+  eslintConfigPrettier
 );
