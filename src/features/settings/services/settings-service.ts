@@ -1,11 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { ConnectionHistory } from "@/features/connection/services/connection-service";
+import { tauri } from "@/services/tauri";
 
 export type ThemeSetting = "dark" | "light" | "system";
 export type FocusMode = "fade" | "hide";
 
 export interface AppSettings {
-  recentConnections: ConnectionHistory[];
   theme?: ThemeSetting;
   schemaFilter?: string;
   focusMode?: FocusMode;
@@ -20,8 +18,6 @@ export interface SettingsUpdate {
 }
 
 export const settingsService = {
-  getSettings: () => invoke<AppSettings>("get_settings"),
-
-  saveSettings: (settings: SettingsUpdate) =>
-    invoke<AppSettings>("save_settings", { settings }),
+  getSettings: () => tauri.getSettings(),
+  saveSettings: (settings: SettingsUpdate) => tauri.saveSettings(settings),
 };
