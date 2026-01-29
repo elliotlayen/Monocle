@@ -23,9 +23,15 @@ npm run build
 
 # Run tests
 npm run test
-```
 
-Note: Always lint, test, and typecheck updated files. Use project-wide build sparingly.
+# Lint code
+npm run lint
+npm run lint:fix    # Auto-fix issues
+
+# Format code
+npm run format      # Write formatted files
+npm run format:check  # Check without writing
+```
 
 ## Architecture
 
@@ -37,33 +43,72 @@ The frontend uses a feature-based architecture with a services layer for Tauri I
 src/
   features/
     connection/
-      components/connection-form.tsx  - Database connection UI with recent connections
-      services/connection-service.ts  - Tauri IPC for connection history
+      components/
+        home-screen.tsx             - Landing page with recent connections
+        connection-modal.tsx        - Database connection dialog
+        monocle-logo.tsx            - Logo component
+      services/
+        connection-service.ts       - Tauri IPC for connection history
+        database-service.ts         - Tauri IPC for database operations
     schema-graph/
-      components/                     - React Flow visualization components
-        schema-graph.tsx              - Main graph view with filtering/focus
-        table-node.tsx                - Custom node for tables
-        view-node.tsx                 - Custom node for views
-        trigger-node.tsx              - Custom node for triggers
-        stored-procedure-node.tsx     - Custom node for procedures
-        scalar-function-node.tsx      - Custom node for functions
-        detail-modal.tsx              - SQL definition modal
-      hooks/useFilteredCounts.ts      - Filter statistics hook
-      services/schema-service.ts      - Tauri IPC for schema loading
-      store.ts                        - Zustand store for schema state
-      types.ts                        - TypeScript types (SchemaGraph, TableNode, etc.)
+      components/
+        schema-graph.tsx            - Main graph view with filtering/focus
+        schema-browser-sidebar.tsx  - Sidebar for browsing schema objects
+        sidebar-toggle.tsx          - Toggle button for sidebar
+        table-node.tsx              - Custom node for tables
+        view-node.tsx               - Custom node for views
+        trigger-node.tsx            - Custom node for triggers
+        stored-procedure-node.tsx   - Custom node for procedures
+        scalar-function-node.tsx    - Custom node for functions
+        detail-popover.tsx          - Popover for object details
+        detail-content.tsx          - Content for detail popover
+        sql-code-block.tsx          - SQL syntax highlighting
+      hooks/
+        useFilteredCounts.ts        - Filter statistics hook
+        use-detail-popover.ts       - Detail popover state hook
+      services/
+        schema-service.ts           - Tauri IPC for schema loading
+      store.ts                      - Zustand store for schema state
+      types.ts                      - TypeScript types (SchemaGraph, TableNode, etc.)
     settings/
-      components/settings-sheet.tsx   - Settings panel
-      services/settings-service.ts    - Tauri IPC for settings persistence
+      components/
+        settings-sheet.tsx          - Settings panel
+      services/
+        settings-service.ts         - Tauri IPC for settings persistence
     toolbar/
-      components/toolbar.tsx          - Search, schema filter, focus controls
-      components/search-bar.tsx       - Fuzzy search component
-      types.ts                        - Search result types
+      components/
+        toolbar.tsx                 - Main toolbar with controls
+        search-bar.tsx              - Fuzzy search component
+        filter-info-bar.tsx         - Active filter display
+        database-selector.tsx       - Database dropdown
+      types.ts                      - Search result types
+    export/
+      components/
+        export-button.tsx           - Export dropdown button
+      hooks/
+        useExport.ts                - Export logic hook
+      services/
+        export-service.ts           - Export service
+      utils/
+        png-export.ts               - PNG export logic
+        pdf-export.ts               - PDF export logic
+        json-export.ts              - JSON export logic
+    notifications/
+      store.ts                      - Notification state
+  services/
+    tauri.ts                        - Centralized Tauri IPC wrapper
+    events.ts                       - Event hub for Tauri events
+  utils/
+    index.ts                        - Utility exports
+    formatting.ts                   - String/number formatting helpers
   components/
-    ui/                               - shadcn/ui components
-    status-bar.tsx                    - Bottom status bar
-    update-checker.tsx                - Auto-update notification
-  App.tsx                             - Root component
+    ui/                             - shadcn/ui components
+  constants/
+    edge-colors.ts                  - Edge color constants
+  providers/
+    theme-provider.tsx              - Theme context provider
+  App.tsx                           - Root component
+  main.tsx                          - Entry point
 ```
 
 ### Backend (Rust + Tauri)
@@ -71,17 +116,20 @@ src/
 ```
 src-tauri/src/
   lib.rs              - Tauri app setup, registers commands and state
+  main.rs             - Entry point
   state.rs            - AppState with Mutex<AppSettings> for thread-safe persistence
   commands/
     schema.rs         - load_schema_cmd (real database)
     mock.rs           - load_schema_mock (test data)
     connections.rs    - Connection history CRUD commands
+    databases.rs      - Database listing commands
     settings.rs       - Settings persistence commands
   db/
     connection.rs     - Tiberius connection management
     queries.rs        - SQL queries for metadata
     schema_loader.rs  - Parses results into SchemaGraph
-  types/              - Rust type definitions mirroring frontend types
+  types/
+    schema.rs         - Rust type definitions mirroring frontend types
 ```
 
 ### Key Data Flow
@@ -99,9 +147,55 @@ src-tauri/src/
 - Connection history (last 10) saved automatically on successful connect
 - Schema filter preference restored on app launch
 
+## Architecture Guidelines
+
+### Frontend Guidelines
+
+- **Components**: Presentational only. Props in, UI out. No direct Tauri IPC calls.
+- **Hooks**: Own state, side effects, and event wiring.
+- **Services**: All Tauri IPC goes through `src/features/*/services/`.
+- **Store**: Schema state managed via Zustand in `src/features/schema-graph/store.ts`.
+- **UI Components**: Use shadcn/ui from `src/components/ui/`.
+
+### Backend Guidelines
+
+- Keep Tauri commands thin - delegate to modules in `db/` and `commands/`.
+- Put database query logic in `src-tauri/src/db/queries.rs`.
+- Put connection logic in `src-tauri/src/db/connection.rs`.
+- State mutations go through `AppState` in `src-tauri/src/state.rs`.
+
+## Common Changes (Where to Look First)
+
+- **UI layout or styling**: `src/features/*/components/*` and `src/components/ui/*`
+- **Schema visualization**: `src/features/schema-graph/components/*`
+- **Connection handling**: `src/features/connection/*` and `src-tauri/src/commands/connections.rs`
+- **Tauri IPC shape**: `src/services/tauri.ts`, `src/features/*/services/*`, and `src-tauri/src/lib.rs`
+- **Schema queries**: `src-tauri/src/db/queries.rs`
+- **Settings persistence**: `src/features/settings/*` and `src-tauri/src/commands/settings.rs`
+- **App state**: `src-tauri/src/state.rs`
+- **Graph layout/nodes**: `src/features/schema-graph/components/table-node.tsx`, `schema-graph.tsx`
+- **Export functionality**: `src/features/export/*`
+
+## Adding a New Tauri Command
+
+1. Define the command in `src-tauri/src/commands/*.rs`
+2. Register it in `src-tauri/src/lib.rs` (`tauri::generate_handler!`)
+3. Add the command to `src/services/tauri.ts` (centralized IPC wrapper)
+4. Add the service wrapper in `src/features/*/services/*-service.ts`
+5. Call the service from your component or hook
+
 ## Type Consistency
 
 TypeScript types in `src/features/schema-graph/types.ts` must stay in sync with Rust types in `src-tauri/src/types/schema.rs`. Both use camelCase field names (Rust uses `#[serde(rename_all = "camelCase")]`).
+
+## Validation
+
+At the end of a task:
+
+1. Run `npm run lint`
+2. Run `npm run test` when you touched schema-graph, connection, settings, or services
+3. Run `npm run build` (includes typecheck)
+4. If you changed Rust code, run `cargo check` in `src-tauri/`
 
 ## Prerequisites
 
@@ -115,6 +209,13 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - **No emojis**: Do not use emojis anywhere in code, comments, commits, or documentation
 - **Commit messages**: Do not include "Generated with Claude Code" or "Co-Authored-By" lines
 - **Components**: Use shadcn/ui for UI components
+
+## Notes
+
+- React Flow nodes require unique IDs matching the data model
+- Schema filter state persists across sessions via settings
+- Connection passwords are not stored - only connection metadata
+- The app uses React Flow's dagre layout for automatic positioning
 
 ## Release Workflow
 
