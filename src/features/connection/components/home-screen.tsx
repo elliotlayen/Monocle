@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { MonocleLogo } from "./monocle-logo";
 import { ConnectionModal } from "./connection-modal";
-import { connectionService, type ConnectionHistory } from "../services/connection-service";
 import { useTheme } from "@/providers/theme-provider";
 import { useAppVersion } from "@/hooks/useAppVersion";
 
@@ -30,17 +29,8 @@ export function HomeScreen() {
   const [connectionModalOpen, setConnectionModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [recentConnections, setRecentConnections] = useState<ConnectionHistory[]>([]);
   const { theme, setTheme } = useTheme();
   const version = useAppVersion();
-
-  // Load recent connections on mount (for connection modal)
-  useEffect(() => {
-    connectionService
-      .getRecentConnections()
-      .then(setRecentConnections)
-      .catch(() => {});
-  }, []);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -61,7 +51,9 @@ export function HomeScreen() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const isMac = typeof navigator !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  const isMac =
+    typeof navigator !== "undefined" &&
+    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
   const modKey = isMac ? "⌘" : "Ctrl+";
 
   return (
@@ -69,7 +61,12 @@ export function HomeScreen() {
       {/* Hero - Logo and Title */}
       <div className="flex items-center mb-12">
         <MonocleLogo className="w-16 h-16" />
-        <h1 className="text-5xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Monocle</h1>
+        <h1
+          className="text-5xl font-bold"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          Monocle
+        </h1>
       </div>
 
       {/* Action Buttons */}
@@ -118,11 +115,6 @@ export function HomeScreen() {
       <ConnectionModal
         open={connectionModalOpen}
         onOpenChange={setConnectionModalOpen}
-        recentConnections={recentConnections}
-        onConnectionSuccess={() => {
-          // Refresh recent connections after successful connection
-          connectionService.getRecentConnections().then(setRecentConnections).catch(() => {});
-        }}
       />
 
       {/* Settings Sheet */}
@@ -160,9 +152,16 @@ export function HomeScreen() {
           </DialogHeader>
           <div className="flex flex-col items-center py-4">
             <MonocleLogo className="w-20 h-20 mb-4" />
-            <h2 className="text-2xl font-bold mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Monocle</h2>
+            <h2
+              className="text-2xl font-bold mb-1"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Monocle
+            </h2>
             {version && (
-              <p className="text-sm text-muted-foreground mb-4">Version {version}</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Version {version}
+              </p>
             )}
             <p className="text-sm text-muted-foreground">By Elliot Layen</p>
           </div>

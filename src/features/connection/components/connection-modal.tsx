@@ -18,12 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  MockDataModal,
-  type MockDataSize,
-} from "@/components/mock-data-modal";
-import type { ServerConnectionParams, AuthType } from "@/features/schema-graph/types";
-import { connectionService, type ConnectionHistory } from "../services/connection-service";
+import { MockDataModal, type MockDataSize } from "@/components/mock-data-modal";
+import type {
+  ServerConnectionParams,
+  AuthType,
+} from "@/features/schema-graph/types";
 import { useToastStore } from "@/features/notifications/store";
 
 const STORAGE_KEY = "monocle-connection-settings";
@@ -31,6 +30,7 @@ const STORAGE_KEY = "monocle-connection-settings";
 interface SavedSettings {
   server: string;
   authType: AuthType;
+  username?: string; // Only persisted when authType is "sqlServer"
 }
 
 function loadSavedSettings(): SavedSettings | null {
@@ -47,30 +47,38 @@ function loadSavedSettings(): SavedSettings | null {
 
 function saveSettings(settings: SavedSettings) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    // Only include username when using SQL Server auth
+    const toSave: SavedSettings = {
+      server: settings.server,
+      authType: settings.authType,
+    };
+    if (settings.authType === "sqlServer" && settings.username) {
+      toSave.username = settings.username;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch {
     // Ignore storage errors
   }
 }
 
-interface FormData extends ServerConnectionParams {
-  // ServerConnectionParams already has all fields we need
-}
+type FormData = ServerConnectionParams;
 
 interface ConnectionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  recentConnections: ConnectionHistory[];
-  onConnectionSuccess?: () => void;
 }
 
 export function ConnectionModal({
   open,
   onOpenChange,
-  recentConnections,
-  onConnectionSuccess,
 }: ConnectionModalProps) {
-  const { connectToServer, loadMockSchema, isLoading, isDatabasesLoading, error } = useSchemaStore(
+  const {
+    connectToServer,
+    loadMockSchema,
+    isLoading,
+    isDatabasesLoading,
+    error,
+  } = useSchemaStore(
     useShallow((state) => ({
       connectToServer: state.connectToServer,
       loadMockSchema: state.loadMockSchema,
@@ -87,7 +95,7 @@ export function ConnectionModal({
     return {
       server: saved?.server ?? "",
       authType: saved?.authType ?? "sqlServer",
-      username: "",
+      username: saved?.authType === "sqlServer" ? (saved?.username ?? "") : "",
       password: "",
       trustServerCertificate: true,
     };
@@ -100,8 +108,9 @@ export function ConnectionModal({
     saveSettings({
       server: formData.server,
       authType: formData.authType,
+      username: formData.username,
     });
-  }, [formData.server, formData.authType]);
+  }, [formData.server, formData.authType, formData.username]);
 
   const handleLoadMock = (size: MockDataSize) => {
     void loadMockSchema(size);
@@ -126,17 +135,6 @@ export function ConnectionModal({
     const connected = await connectToServer(params);
 
     if (connected) {
-      connectionService
-        .saveConnection({
-          server: formData.server,
-          database: "",
-          username: formData.username || "",
-        })
-        .then(() => {
-          onConnectionSuccess?.();
-        })
-        .catch(() => {});
-
       addToast({
         type: "success",
         title: "Connected",
@@ -146,14 +144,6 @@ export function ConnectionModal({
 
       onOpenChange(false);
     }
-  };
-
-  const handleSelectRecent = (connection: ConnectionHistory) => {
-    setFormData((prev) => ({
-      ...prev,
-      server: connection.server,
-      username: connection.username,
-    }));
   };
 
   const handleChange = (
@@ -175,32 +165,6 @@ export function ConnectionModal({
             <DialogTitle>Connect to Server</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
-            {recentConnections.length > 0 && (
-              <div className="space-y-1">
-                <Label htmlFor="recent">Recent Servers</Label>
-                <Select
-                  value=""
-                  onValueChange={(value) => {
-                    const idx = parseInt(value, 10);
-                    if (!isNaN(idx) && recentConnections[idx]) {
-                      handleSelectRecent(recentConnections[idx]);
-                    }
-                  }}
-                >
-                  <SelectTrigger id="recent">
-                    <SelectValue placeholder="Select a recent server" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {recentConnections.map((conn, idx) => (
-                      <SelectItem key={`${conn.server}-${idx}`} value={String(idx)}>
-                        {conn.server}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="space-y-1">
               <Label htmlFor="server">Server</Label>
               <Input
