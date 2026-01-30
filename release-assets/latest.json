@@ -1,0 +1,19 @@
+{
+  "version": "0.2.9",
+  "notes": "See release notes at https://github.com/elliotlayen/Monocle/releases/v0.2.9",
+  "pub_date": "2026-01-30T00:31:54Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVST1N0OW5hdHFFaThwVEZMM0I2UUxnR21VZEJqclVBWks3REluMWJ1WEFUU25ZQlZaRGpubHpLU0x2TFdWWW9TNzV3SWgwV2N2bXJiTFEremt2ZzN2eXVRd201MFlnVVFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY5NzMyOTQyCWZpbGU6TW9ub2NsZS5hcHAudGFyLmd6CkhRTys0UnI4ckZXZmV3eU1iQTR4RmgzK2Z3OFcxaE5PaFBNcEE0MnQvUG1hbm5zZ1l4a0c5OGNtNU1PZGtvQnkzbXhwSTVnZEdOdWNNTU9lbXh4akR3PT0K",
+      "url": "https://github.com/elliotlayen/Monocle/releases/download/v0.2.9/Monocle_aarch64.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVST1N0OW5hdHFFaTBmSm9veVpkMVFMd1huNWpnSC9UMWlUTFZhSGdJR2lvWS9wQjZZdkh1V2p4VURkQXNjOXRrczRhTnFQcHJxQjJKdjZqcnhQQ1BPNjI2bVZScGxJcXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY5NzMyOTkzCWZpbGU6TW9ub2NsZS5hcHAudGFyLmd6ClhnNGlDS1lneFlwczFUeTM1dkI0QVMxYnh4L0lqQWVGb2NyTURNVGNrVEZHNTJIK1g5K1pYc2Y0eDNLbVpQdDVza2lFNjd5QlhZbUw5cUJ6ekhya0FRPT0K",
+      "url": "https://github.com/elliotlayen/Monocle/releases/download/v0.2.9/Monocle_x86_64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVST1N0OW5hdHFFaTV0SUZ4b2hpZDlsdUhGaG1iYXpsTDZSNWRCcUt6a3RWK2NERTQ5SVBsbjdtK2RoVWFrRGRLelZoZGpKWEdRb2J3eDh0SmNFdXRNeHlEYVY4OUR5TEFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY5NzMzMDk1CWZpbGU6TW9ub2NsZV8wLjIuOV94NjQtc2V0dXAuZXhlCndXUFJoOE5HQWhlNno1QUN1aUgyU1I2UlFhSnkyU1ZBZnhxOC81WFVnSTdNbnA3ZTdWa0dVeGsxMDh0R0FucERyaGFVaUVCdU9vTXRYUExJL1pyaUR3PT0K",
+      "url": "https://github.com/elliotlayen/Monocle/releases/download/v0.2.9/Monocle_0.2.9_x64-setup.exe"
+    }
+  }
+}
