@@ -4,7 +4,15 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { useToastStore } from "@/features/notifications/store";
 import { useAppVersion } from "@/hooks/useAppVersion";
 
-export function UpdateChecker() {
+interface UpdateCheckerProps {
+  checkRequested?: boolean;
+  onCheckComplete?: () => void;
+}
+
+export function UpdateChecker({
+  checkRequested,
+  onCheckComplete,
+}: UpdateCheckerProps) {
   const updateRef = useRef<Update | null>(null);
   const toastIdRef = useRef<string | null>(null);
   const currentVersion = useAppVersion();
@@ -14,15 +22,41 @@ export function UpdateChecker() {
     checkForUpdates();
   }, []);
 
-  async function checkForUpdates() {
+  // Handle manual check requests from menu
+  useEffect(() => {
+    if (checkRequested) {
+      checkForUpdates(true);
+      onCheckComplete?.();
+    }
+  }, [checkRequested, onCheckComplete]);
+
+  async function checkForUpdates(isManual = false) {
     try {
       const updateResult = await check();
       if (updateResult) {
         updateRef.current = updateResult;
         showUpdateAvailableToast(updateResult.version);
+      } else if (isManual) {
+        // Only show "up to date" message for manual checks
+        addToast({
+          type: "success",
+          title: "Up to Date",
+          message: currentVersion
+            ? `You're running the latest version (${currentVersion}).`
+            : "You're running the latest version.",
+          duration: 3000,
+        });
       }
     } catch (err) {
       console.error("Failed to check for updates:", err);
+      if (isManual) {
+        addToast({
+          type: "error",
+          title: "Update Check Failed",
+          message: "Could not check for updates. Please try again later.",
+          duration: 5000,
+        });
+      }
     }
   }
 
