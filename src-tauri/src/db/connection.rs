@@ -2,6 +2,7 @@ use tiberius::{AuthMethod, Client, Config, EncryptionLevel};
 use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
+use crate::db::ssrp::resolve_instance_port;
 use crate::types::{AuthType, ConnectionParams, ServerConnectionParams};
 
 #[derive(Debug, thiserror::Error)]
@@ -17,8 +18,8 @@ pub enum ConnectionError {
 pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
     let mut config = Config::new();
 
-    // Parse server and port (format: "server" or "server,port" or "server:port")
-    let (host, port) = parse_server(&params.server);
+    // Parse server and port (format: "server", "server,port", "server:port", or "server\instance")
+    let (host, port) = parse_server_async(&params.server).await;
     config.host(&host);
     config.port(port);
     config.database(&params.database);
@@ -64,8 +65,8 @@ pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_uti
 pub async fn create_server_client(params: &ServerConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
     let mut config = Config::new();
 
-    // Parse server and port (format: "server" or "server,port" or "server:port")
-    let (host, port) = parse_server(&params.server);
+    // Parse server and port (format: "server", "server,port", "server:port", or "server\instance")
+    let (host, port) = parse_server_async(&params.server).await;
     config.host(&host);
     config.port(port);
     config.database("master"); // Connect to master database for listing databases
@@ -107,19 +108,49 @@ pub async fn create_server_client(params: &ServerConnectionParams) -> Result<Cli
     Ok(client)
 }
 
-/// Parse server string into host and port.
-/// Supports formats: "server", "server,port", "server:port"
-fn parse_server(server: &str) -> (String, u16) {
+/// Parse server string into host and port, resolving named instances via SSRP.
+/// Supports formats: "server", "server,port", "server:port", "server\instance"
+async fn parse_server_async(server: &str) -> (String, u16) {
     const DEFAULT_PORT: u16 = 1433;
 
-    // Try comma separator first (SQL Server style)
+    // Check for explicit port (comma separator - SQL Server style)
     if let Some((host, port_str)) = server.split_once(',') {
         if let Ok(port) = port_str.trim().parse::<u16>() {
             return (host.trim().to_string(), port);
         }
     }
 
-    // Try colon separator
+    // Check for explicit port (colon separator)
+    if let Some((host, port_str)) = server.rsplit_once(':') {
+        if let Ok(port) = port_str.trim().parse::<u16>() {
+            return (host.trim().to_string(), port);
+        }
+    }
+
+    // Check for named instance (backslash separator)
+    if let Some((host, instance)) = server.split_once('\\') {
+        if let Some(port) = resolve_instance_port(host, instance).await {
+            return (host.to_string(), port);
+        }
+        // SSRP failed - return host with default port (will likely fail to connect,
+        // but provides a more informative error than a port resolution error)
+        return (host.to_string(), DEFAULT_PORT);
+    }
+
+    (server.to_string(), DEFAULT_PORT)
+}
+
+/// Synchronous version for testing - does not support named instances
+#[cfg(test)]
+fn parse_server(server: &str) -> (String, u16) {
+    const DEFAULT_PORT: u16 = 1433;
+
+    if let Some((host, port_str)) = server.split_once(',') {
+        if let Ok(port) = port_str.trim().parse::<u16>() {
+            return (host.trim().to_string(), port);
+        }
+    }
+
     if let Some((host, port_str)) = server.rsplit_once(':') {
         if let Ok(port) = port_str.trim().parse::<u16>() {
             return (host.trim().to_string(), port);
