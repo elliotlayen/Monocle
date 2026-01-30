@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod menu;
 mod state;
 mod types;
 
@@ -24,6 +25,12 @@ pub fn run() {
                 .expect("Failed to get app data directory");
             let state = AppState::new(app_data_dir);
             app.manage(state);
+
+            // Setup native menu bar
+            let menu = menu::setup_menu(app)?;
+            app.set_menu(menu)?;
+            menu::setup_menu_events(app);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
