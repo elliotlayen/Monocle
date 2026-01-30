@@ -36,6 +36,16 @@ import { SidebarToggle } from "./sidebar-toggle";
 import { useDetailPopover } from "../hooks/use-detail-popover";
 import type { DetailSidebarData } from "./detail-content";
 import { cn } from "@/lib/utils";
+import {
+  menuToggleSidebarHub,
+  menuFitViewHub,
+  menuActualSizeHub,
+  menuExportPngHub,
+  menuExportPdfHub,
+  menuExportJsonHub,
+  useTauriEvent,
+} from "@/services/events";
+import { useExport } from "@/features/export/hooks/useExport";
 
 const GRID_COLS = 3;
 const NODE_WIDTH = 300;
@@ -245,8 +255,9 @@ function calculateCompactLayout(
   const focusedHeight = getNodeHeight(focusedNodeId, schema);
 
   // Categorize neighbors by FK direction
-  const upstream: string[] = []; // Tables that reference focused (FK points to focused)
-  const downstream: string[] = []; // Tables that focused references (FK points away)
+  const upstream: string[] = [];
+  const downstream: string[] = [];
+
   const visibleNeighbors = [...neighbors].filter((id) =>
     visibleNodeIds.has(id)
   );
@@ -269,33 +280,35 @@ function calculateCompactLayout(
       (rel) => rel.from === neighborId && rel.to === focusedNodeId
     );
 
+    // Upstream: tables that the focused table references (FK points TO them)
+    // Downstream: tables that reference the focused table (FK points FROM them)
     if (referencesFocused && !referencedByFocused) {
       upstream.push(neighborId);
-    } else if (referencedByFocused && !referencesFocused) {
-      downstream.push(neighborId);
     } else {
-      // Bidirectional or view dependency - put in upstream
-      upstream.push(neighborId);
+      downstream.push(neighborId);
     }
   }
 
   // Gap between focused node and tiers
   const TIER_GAP = 60;
 
-  // Position upstream tables (above focused) - position so bottom of first row ends at y = -TIER_GAP
-  // Focused node at (0, 0) occupies y from 0 to focusedHeight (top-left positioning)
-  const upstreamBaseY = -TIER_GAP;
-  positionTier(upstream, upstreamBaseY, positions, "up", schema);
+  // Position upstream tables (above focused)
+  let upstreamY = -TIER_GAP;
+  if (upstream.length > 0) {
+    upstreamY = positionTier(upstream, upstreamY, positions, "up", schema);
+  }
 
-  // Position downstream tables (below focused) - first row at y = focusedHeight + TIER_GAP
-  const downstreamBaseY = focusedHeight + TIER_GAP;
-  const bottomY = positionTier(
-    downstream,
-    downstreamBaseY,
-    positions,
-    "down",
-    schema
-  );
+  // Position downstream tables (below focused)
+  let downstreamY = focusedHeight + TIER_GAP;
+  if (downstream.length > 0) {
+    downstreamY = positionTier(
+      downstream,
+      downstreamY,
+      positions,
+      "down",
+      schema
+    );
+  }
 
   // Position triggers near their parent tables
   (schema.triggers || []).forEach((trigger) => {
@@ -316,11 +329,9 @@ function calculateCompactLayout(
   });
 
   // Calculate bottom Y position for procedures/functions
-  // Use bottomY from positionTier if downstream has nodes, otherwise calculate from positions
   const allYPositions = [...positions.values()].map((p) => p.y);
   const maxY = Math.max(...allYPositions, 0);
-  const procedureY =
-    downstream.length > 0 ? bottomY : maxY + NODE_HEIGHT + GAP_Y;
+  const procedureY = maxY + NODE_HEIGHT + GAP_Y;
 
   // Position procedures below the main cluster
   let procIndex = 0;
@@ -750,13 +761,50 @@ function SchemaGraphInner({
   );
 
   // React Flow hook for programmatic viewport control
-  const { fitView } = useReactFlow();
+  const { fitView, setViewport, getViewport } = useReactFlow();
+
+  // Export hooks
+  const { exportPng, exportPdf, exportJson } = useExport();
+
+  // Menu event handlers
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
+  }, []);
+
+  const handleFitView = useCallback(() => {
+    fitView({ padding: 0.2, duration: 300 });
+  }, [fitView]);
+
+  const handleActualSize = useCallback(() => {
+    const viewport = getViewport();
+    setViewport({ x: viewport.x, y: viewport.y, zoom: 1 }, { duration: 300 });
+  }, [getViewport, setViewport]);
+
+  const handleExportPng = useCallback(() => {
+    exportPng();
+  }, [exportPng]);
+
+  const handleExportPdf = useCallback(() => {
+    exportPdf(true);
+  }, [exportPdf]);
+
+  const handleExportJson = useCallback(() => {
+    exportJson();
+  }, [exportJson]);
+
+  // Subscribe to menu events
+  useTauriEvent(menuToggleSidebarHub.subscribe, handleToggleSidebar);
+  useTauriEvent(menuFitViewHub.subscribe, handleFitView);
+  useTauriEvent(menuActualSizeHub.subscribe, handleActualSize);
+  useTauriEvent(menuExportPngHub.subscribe, handleExportPng);
+  useTauriEvent(menuExportPdfHub.subscribe, handleExportPdf);
+  useTauriEvent(menuExportJsonHub.subscribe, handleExportJson);
 
   // Store original positions for restoration when focus is cleared
   const originalPositionsRef = useRef<Map<string, { x: number; y: number }>>(
     new Map()
   );
-  // Track previous focus state to detect transitions (for one-time fitView)
+  // Track previous focus state to detect exit transitions
   const prevFocusStateRef = useRef<{
     focusedTableId: string | null;
     focusMode: string;
@@ -764,6 +812,8 @@ function SchemaGraphInner({
     focusedTableId: null,
     focusMode: "fade",
   });
+  // Track if fitView has been called for current focus session
+  const fitViewCalledRef = useRef(false);
 
   const [zoom, setZoom] = useState(0.8);
   const showEdgeLabels = zoom >= EDGE_LABEL_ZOOM;
@@ -987,9 +1037,13 @@ function SchemaGraphInner({
       ...visibleFunctionIds,
     ]);
 
+    // Get direct neighbors of focused node
     const focusedNeighbors = focusedTableId
-      ? (schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>())
+      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
       : new Set<string>();
+
+    // Helper to check if a node is a direct neighbor
+    const isNeighbor = (nodeId: string) => focusedNeighbors.has(nodeId);
 
     // Calculate which nodes would be dimmed for focus mode
     const dimmedNodeIds = new Set<string>();
@@ -997,7 +1051,7 @@ function SchemaGraphInner({
       visibleNodeIds.forEach((nodeId) => {
         // Tables and views: dimmed if not focused and not a neighbor
         if (visibleTableIds.has(nodeId) || visibleViewIds.has(nodeId)) {
-          if (nodeId !== focusedTableId && !focusedNeighbors.has(nodeId)) {
+          if (nodeId !== focusedTableId && !isNeighbor(nodeId)) {
             dimmedNodeIds.add(nodeId);
           }
         }
@@ -1007,12 +1061,12 @@ function SchemaGraphInner({
           if (
             trigger &&
             trigger.tableId !== focusedTableId &&
-            !focusedNeighbors.has(trigger.tableId)
+            !isNeighbor(trigger.tableId)
           ) {
             dimmedNodeIds.add(nodeId);
           }
         }
-        // Procedures: dimmed if none of their tables are focused or neighbors
+        // Procedures: dimmed if none of their tables are focused or a neighbor
         else if (visibleProcedureIds.has(nodeId)) {
           const procedure = (schema.storedProcedures || []).find(
             (p) => p.id === nodeId
@@ -1025,14 +1079,14 @@ function SchemaGraphInner({
             if (
               !refs.some(
                 (tableId) =>
-                  tableId === focusedTableId || focusedNeighbors.has(tableId)
+                  tableId === focusedTableId || isNeighbor(tableId)
               )
             ) {
               dimmedNodeIds.add(nodeId);
             }
           }
         }
-        // Functions: dimmed if none of their tables are focused or neighbors
+        // Functions: dimmed if none of their tables are focused or a neighbor
         else if (visibleFunctionIds.has(nodeId)) {
           const fn = (schema.scalarFunctions || []).find(
             (f) => f.id === nodeId
@@ -1042,7 +1096,7 @@ function SchemaGraphInner({
             if (
               !refs.some(
                 (tableId) =>
-                  tableId === focusedTableId || focusedNeighbors.has(tableId)
+                  tableId === focusedTableId || isNeighbor(tableId)
               )
             ) {
               dimmedNodeIds.add(nodeId);
@@ -1076,15 +1130,8 @@ function SchemaGraphInner({
     );
     setEdges(nextEdges);
 
-    // Check if we're entering or exiting focus mode (for one-time position changes)
-    const prevState = prevFocusStateRef.current;
-    const justEnteredFocus =
-      focusMode === "hide" &&
-      focusedTableId &&
-      (prevState.focusedTableId !== focusedTableId ||
-        prevState.focusMode !== "hide");
-
     // Detect if we JUST exited focus mode (restore positions once, not continuously)
+    const prevState = prevFocusStateRef.current;
     const justExitedFocus =
       !(focusMode === "hide" && focusedTableId) &&
       prevState.focusMode === "hide" &&
@@ -1110,13 +1157,13 @@ function SchemaGraphInner({
         if (focusedTableId) {
           if (node.type === "tableNode" || node.type === "viewNode") {
             isFocused = node.id === focusedTableId;
-            isDimmed = !isFocused && !focusedNeighbors.has(node.id);
+            isDimmed = !isFocused && !isNeighbor(node.id);
           } else if (node.type === "triggerNode") {
             const trigger = (node.data as { trigger?: Trigger }).trigger;
             if (trigger) {
               isDimmed =
                 trigger.tableId !== focusedTableId &&
-                !focusedNeighbors.has(trigger.tableId);
+                !isNeighbor(trigger.tableId);
             }
           } else if (node.type === "storedProcedureNode") {
             const procedure = (node.data as { procedure?: StoredProcedure })
@@ -1128,7 +1175,7 @@ function SchemaGraphInner({
               ];
               isDimmed = !refs.some(
                 (tableId) =>
-                  tableId === focusedTableId || focusedNeighbors.has(tableId)
+                  tableId === focusedTableId || isNeighbor(tableId)
               );
             }
           } else if (node.type === "scalarFunctionNode") {
@@ -1137,7 +1184,7 @@ function SchemaGraphInner({
               const refs = fn.referencedTables || [];
               isDimmed = !refs.some(
                 (tableId) =>
-                  tableId === focusedTableId || focusedNeighbors.has(tableId)
+                  tableId === focusedTableId || isNeighbor(tableId)
               );
             }
           }
@@ -1162,8 +1209,8 @@ function SchemaGraphInner({
             if (node.id === focusedTableId) {
               // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM)
               nodeIsCompact = false;
-            } else if (focusedNeighbors.has(node.id)) {
-              // Neighbors: expand based on count thresholds
+            } else if (isNeighbor(node.id)) {
+              // Neighbors a neighbor: expand based on count thresholds
               if (visibleNonDimmedCount <= focusExpandThreshold) {
                 nodeIsCompact = false;
               } else if (visibleNonDimmedCount <= moderateThreshold) {
@@ -1177,13 +1224,9 @@ function SchemaGraphInner({
         // Hide node if not visible by filters, or if dimmed and focus mode is "hide"
         const shouldHide = !isVisible || (focusMode === "hide" && isDimmed);
 
-        // Apply compact position (only when entering focus) or restore original (only when exiting)
+        // Apply compact position when in focus mode, or restore original when exiting
         let position = node.position; // Keep current position by default (preserves user drag)
-        if (
-          justEnteredFocus &&
-          compactPositions &&
-          compactPositions.has(node.id)
-        ) {
+        if (shouldUseCompactLayout && compactPositions?.has(node.id)) {
           position = compactPositions.get(node.id)!;
         } else if (
           justExitedFocus &&
@@ -1203,11 +1246,13 @@ function SchemaGraphInner({
     );
 
     // Call fitView when entering focus mode
-    // minZoom: 0.6 ensures we zoom in enough for full node rendering (not compact mode)
-    if (justEnteredFocus) {
+    if (shouldUseCompactLayout && !fitViewCalledRef.current) {
+      fitViewCalledRef.current = true;
       setTimeout(() => {
         fitView({ padding: 0.2, maxZoom: 1.5, minZoom: 0.6, duration: 300 });
       }, 50);
+    } else if (!focusedTableId) {
+      fitViewCalledRef.current = false;
     }
 
     // Update ref for next comparison
