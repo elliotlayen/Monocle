@@ -26,9 +26,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Target, Box, Network, Search } from "lucide-react";
+import { Target, Box, Network, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SettingsSheet } from "@/features/settings/components/settings-sheet";
 import { ExportButton } from "@/features/export/components/export-button";
 import { DatabaseSelector } from "./database-selector";
 import {
@@ -45,7 +44,11 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   scalarFunctions: "Scalar Functions",
 };
 
-export function Toolbar() {
+interface ToolbarProps {
+  onOpenSettings?: () => void;
+}
+
+export function Toolbar({ onOpenSettings }: ToolbarProps) {
   const {
     schema,
     serverConnection,
@@ -393,7 +396,21 @@ export function Toolbar() {
         )}
 
         {/* Settings */}
-        <SettingsSheet />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-2"
+                onClick={onOpenSettings}
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );
