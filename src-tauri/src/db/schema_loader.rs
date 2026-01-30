@@ -37,31 +37,29 @@ impl serde::Serialize for SchemaError {
 pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, SchemaError> {
     let mut client = create_client(params).await?;
 
-    // Load tables and columns
+    // Core data - must succeed
     let tables = load_tables_and_columns(&mut client).await?;
-
-    // Load views and columns
     let mut views = load_views_and_columns(&mut client).await?;
 
-    // Populate view column sources (from SQL Server dependency metadata)
-    load_view_column_sources(&mut client, &mut views).await?;
+    // Optional enrichment - continue if fails (DMV queries can fail on broken references)
+    load_view_column_sources(&mut client, &mut views).await;
 
     let name_to_id = build_name_lookup(&tables, &views);
 
     // Populate view references (needs tables to be loaded first)
     load_views_with_references(&mut views, &name_to_id);
 
-    // Load foreign key relationships
-    let relationships = load_foreign_keys(&mut client).await?;
-
-    // Load triggers with table reference parsing
-    let triggers = load_triggers(&mut client, &name_to_id).await?;
-
-    // Load stored procedures with table reference parsing
-    let stored_procedures = load_stored_procedures(&mut client, &name_to_id).await?;
-
-    // Load scalar functions with table reference parsing
-    let scalar_functions = load_scalar_functions(&mut client, &name_to_id).await?;
+    // Optional data - continue with empty if fails
+    let relationships = load_foreign_keys(&mut client).await.unwrap_or_default();
+    let triggers = load_triggers(&mut client, &name_to_id)
+        .await
+        .unwrap_or_default();
+    let stored_procedures = load_stored_procedures(&mut client, &name_to_id)
+        .await
+        .unwrap_or_default();
+    let scalar_functions = load_scalar_functions(&mut client, &name_to_id)
+        .await
+        .unwrap_or_default();
 
     Ok(SchemaGraph {
         tables,
@@ -169,33 +167,46 @@ async fn load_views_and_columns(
     Ok(views.into_values().map(|(v, _)| v).collect())
 }
 
+/// Load view column sources from SQL Server dependency metadata.
+/// This is optional enrichment - errors are silently ignored to handle databases
+/// with broken object references (views referencing non-existent columns/tables).
 async fn load_view_column_sources(
     client: &mut Client<Compat<TcpStream>>,
     views: &mut [ViewNode],
-) -> Result<(), SchemaError> {
+) {
     let mut column_sources: HashMap<String, HashMap<String, (String, String)>> = HashMap::new();
 
-    let stream = client.query(VIEW_COLUMN_SOURCES_QUERY, &[]).await?;
+    // Query can fail if views reference non-existent objects
+    let stream = match client.query(VIEW_COLUMN_SOURCES_QUERY, &[]).await {
+        Ok(s) => s,
+        Err(_) => return, // Continue without column sources
+    };
+
     let mut row_stream = stream.into_row_stream();
 
-    while let Some(row) = row_stream.try_next().await? {
-        let view_schema: &str = row.get(0).unwrap_or_default();
-        let view_name: &str = row.get(1).unwrap_or_default();
-        let view_column: &str = row.get(2).unwrap_or_default();
-        let source_table: &str = row.get(3).unwrap_or_default();
-        let source_column: &str = row.get(4).unwrap_or_default();
+    // Handle errors while iterating (DMV can fail mid-stream on broken references)
+    loop {
+        match row_stream.try_next().await {
+            Ok(Some(row)) => {
+                let view_schema: &str = row.get(0).unwrap_or_default();
+                let view_name: &str = row.get(1).unwrap_or_default();
+                let view_column: &str = row.get(2).unwrap_or_default();
+                let source_table: &str = row.get(3).unwrap_or_default();
+                let source_column: &str = row.get(4).unwrap_or_default();
 
-        let view_id = format!("{}.{}", view_schema, view_name);
+                let view_id = format!("{}.{}", view_schema, view_name);
 
-        column_sources
-            .entry(view_id)
-            .or_default()
-            .insert(
-                view_column.to_string(),
-                (source_table.to_string(), source_column.to_string()),
-            );
+                column_sources.entry(view_id).or_default().insert(
+                    view_column.to_string(),
+                    (source_table.to_string(), source_column.to_string()),
+                );
+            }
+            Ok(None) => break,
+            Err(_) => break, // Stop on error, keep what we have
+        }
     }
 
+    // Apply collected sources to views
     for view in views.iter_mut() {
         if let Some(view_sources) = column_sources.get(&view.id) {
             for column in view.columns.iter_mut() {
@@ -206,8 +217,6 @@ async fn load_view_column_sources(
             }
         }
     }
-
-    Ok(())
 }
 
 fn load_views_with_references(views: &mut [ViewNode], name_to_id: &HashMap<String, String>) {
