@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
@@ -10,6 +10,11 @@ import { SchemaGraphView } from "@/features/schema-graph/components";
 import { UpdateChecker } from "@/components/update-checker";
 import { ToastContainer } from "@/components/toast-container";
 import { settingsService } from "@/features/settings/services/settings-service";
+import { useMenuEvents } from "@/hooks/use-menu-events";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { ConnectionModal } from "@/features/connection/components/connection-modal";
+import { AboutDialog } from "@/components/about-dialog";
+import { AppSettingsSheet } from "@/components/app-settings-sheet";
 
 function App() {
   const {
@@ -22,6 +27,7 @@ function App() {
     objectTypeFilter,
     edgeTypeFilter,
     hydrateSettings,
+    disconnect,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
@@ -33,8 +39,59 @@ function App() {
       objectTypeFilter: state.objectTypeFilter,
       edgeTypeFilter: state.edgeTypeFilter,
       hydrateSettings: state.hydrateSettings,
+      disconnect: state.disconnect,
     }))
   );
+
+  const [connectionModalOpen, setConnectionModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [checkUpdatesRequested, setCheckUpdatesRequested] = useState(false);
+
+  const handleNewConnection = useCallback(() => {
+    setConnectionModalOpen(true);
+  }, []);
+
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
+
+  const handleSettings = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+
+  const handleAbout = useCallback(() => {
+    setAboutOpen(true);
+  }, []);
+
+  const handleDocumentation = useCallback(() => {
+    openUrl("https://github.com/elliotlayen/Monocle").catch(console.error);
+  }, []);
+
+  const handleCheckUpdates = useCallback(() => {
+    setCheckUpdatesRequested(true);
+  }, []);
+
+  const menuHandlers = useMemo(
+    () => ({
+      onNewConnection: handleNewConnection,
+      onDisconnect: handleDisconnect,
+      onSettings: handleSettings,
+      onAbout: handleAbout,
+      onDocumentation: handleDocumentation,
+      onCheckUpdates: handleCheckUpdates,
+    }),
+    [
+      handleNewConnection,
+      handleDisconnect,
+      handleSettings,
+      handleAbout,
+      handleDocumentation,
+      handleCheckUpdates,
+    ]
+  );
+
+  useMenuEvents(menuHandlers);
 
   useEffect(() => {
     let isMounted = true;
@@ -57,13 +114,26 @@ function App() {
   return (
     <>
       <ToastContainer />
-      <UpdateChecker />
+      <UpdateChecker
+        checkRequested={checkUpdatesRequested}
+        onCheckComplete={() => setCheckUpdatesRequested(false)}
+      />
+      <ConnectionModal
+        open={connectionModalOpen}
+        onOpenChange={setConnectionModalOpen}
+      />
+      <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      <AppSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
       {showHome ? (
-        <HomeScreen />
+        <HomeScreen
+          onOpenConnectionModal={() => setConnectionModalOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenAbout={() => setAboutOpen(true)}
+        />
       ) : (
         <ReactFlowProvider>
           <div className="flex flex-col h-screen">
-            <Toolbar />
+            <Toolbar onOpenSettings={() => setSettingsOpen(true)} />
             <main className="relative flex-1 overflow-hidden">
               {schema ? (
                 <>
