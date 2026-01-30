@@ -293,21 +293,13 @@ function calculateCompactLayout(
   const TIER_GAP = 60;
 
   // Position upstream tables (above focused)
-  let upstreamY = -TIER_GAP;
   if (upstream.length > 0) {
-    upstreamY = positionTier(upstream, upstreamY, positions, "up", schema);
+    positionTier(upstream, -TIER_GAP, positions, "up", schema);
   }
 
   // Position downstream tables (below focused)
-  let downstreamY = focusedHeight + TIER_GAP;
   if (downstream.length > 0) {
-    downstreamY = positionTier(
-      downstream,
-      downstreamY,
-      positions,
-      "down",
-      schema
-    );
+    positionTier(downstream, focusedHeight + TIER_GAP, positions, "down", schema);
   }
 
   // Position triggers near their parent tables
