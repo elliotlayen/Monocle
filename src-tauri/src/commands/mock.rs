@@ -91,11 +91,26 @@ const DATA_TYPES: [&str; 10] = [
     "nvarchar(max)",
 ];
 
+const MIN_COLUMNS: usize = 5;
+const MAX_COLUMNS: usize = 300;
+const WIDE_COLUMN_TIERS: [usize; 5] = [100, 150, 200, 250, 300];
+const TABLE_COLUMN_SEED: usize = 200;
+const VIEW_COLUMN_SEED: usize = 400;
+
 fn simple_hash(seed: usize, index: usize) -> usize {
     let mut h = seed.wrapping_add(index);
     h = h.wrapping_mul(2654435761);
     h ^= h >> 16;
     h
+}
+
+fn generate_column_count(index: usize, seed: usize) -> usize {
+    if index < WIDE_COLUMN_TIERS.len() {
+        return WIDE_COLUMN_TIERS[index];
+    }
+
+    let range = MAX_COLUMNS - MIN_COLUMNS + 1;
+    MIN_COLUMNS + (simple_hash(seed, index) % range)
 }
 
 fn generate_tables(config: &MockConfig) -> Vec<TableNode> {
@@ -113,7 +128,7 @@ fn generate_tables(config: &MockConfig) -> Vec<TableNode> {
         );
         let id = format!("{}.{}", schema, name);
 
-        let num_columns = 3 + (simple_hash(i, 2) % 8);
+        let num_columns = generate_column_count(i, TABLE_COLUMN_SEED);
         let mut columns = Vec::with_capacity(num_columns);
 
         columns.push(Column {
@@ -194,35 +209,40 @@ fn generate_views(tables: &[TableNode], config: &MockConfig) -> Vec<ViewNode> {
         let name = format!("vw_Report{}", i);
         let id = format!("{}.{}", schema, name);
 
-        let num_source_tables = 1 + (simple_hash(i, 20) % 3).min(tables.len());
-        let mut referenced_tables = Vec::with_capacity(num_source_tables);
-        let mut columns = Vec::new();
+        let max_source_tables = 3.min(tables.len());
+        let num_source_tables = 1 + (simple_hash(i, 20) % max_source_tables);
+        let start_idx = simple_hash(i, 21) % tables.len();
+        let mut source_table_indices = Vec::with_capacity(num_source_tables);
+        for offset in 0..num_source_tables {
+            source_table_indices.push((start_idx + offset) % tables.len());
+        }
 
-        for t in 0..num_source_tables {
-            let table_idx = simple_hash(i * 10 + t, 21) % tables.len();
-            let table = &tables[table_idx];
-            referenced_tables.push(table.id.clone());
+        let referenced_tables = source_table_indices
+            .iter()
+            .map(|idx| tables[*idx].id.clone())
+            .collect::<Vec<_>>();
 
-            for col in table.columns.iter().take(3) {
-                columns.push(Column {
-                    name: format!("{}_{}", table.name, col.name),
-                    data_type: col.data_type.clone(),
-                    is_nullable: col.is_nullable,
-                    is_primary_key: false,
-                    source_columns: vec![ColumnSource {
-                        table: table.id.clone(),
-                        column: col.name.clone(),
-                    }],
-                    source_table: Some(table.id.clone()),
-                    source_column: Some(col.name.clone()),
-                });
-                if columns.len() >= 8 {
-                    break;
-                }
-            }
-            if columns.len() >= 8 {
-                break;
-            }
+        let target_column_count = generate_column_count(i, VIEW_COLUMN_SEED);
+        let mut columns = Vec::with_capacity(target_column_count);
+
+        for c in 0..target_column_count {
+            let source_table_idx =
+                source_table_indices[simple_hash(i * 1000 + c, 22) % source_table_indices.len()];
+            let source_table = &tables[source_table_idx];
+            let source_column = &source_table.columns[simple_hash(i * 1000 + c, 23) % source_table.columns.len()];
+
+            columns.push(Column {
+                name: format!("{}_{}_{}", source_table.name, source_column.name, c + 1),
+                data_type: source_column.data_type.clone(),
+                is_nullable: source_column.is_nullable,
+                is_primary_key: false,
+                source_columns: vec![ColumnSource {
+                    table: source_table.id.clone(),
+                    column: source_column.name.clone(),
+                }],
+                source_table: Some(source_table.id.clone()),
+                source_column: Some(source_column.name.clone()),
+            });
         }
 
         let definition = format!(
@@ -323,14 +343,20 @@ fn generate_procedures(tables: &[TableNode], config: &MockConfig) -> Vec<StoredP
             let read_count = simple_hash(i, 45) % 3;
             for r in 0..read_count {
                 let table_idx = simple_hash(i * 10 + r, 46) % tables.len();
-                referenced_tables.push(tables[table_idx].id.clone());
+                let table_id = tables[table_idx].id.clone();
+                if !referenced_tables.contains(&table_id) {
+                    referenced_tables.push(table_id);
+                }
             }
 
             if prefix == "Update" || prefix == "Delete" || prefix == "Insert" {
                 let write_count = 1 + simple_hash(i, 47) % 2;
                 for w in 0..write_count {
                     let table_idx = simple_hash(i * 10 + w, 48) % tables.len();
-                    affected_tables.push(tables[table_idx].id.clone());
+                    let table_id = tables[table_idx].id.clone();
+                    if !affected_tables.contains(&table_id) {
+                        affected_tables.push(table_id);
+                    }
                 }
             }
         }
@@ -425,4 +451,206 @@ pub fn load_schema_mock(size: String) -> Result<SchemaGraph, String> {
         stored_procedures,
         scalar_functions,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    const SIZES: [&str; 4] = ["small", "medium", "large", "stress"];
+
+    fn table_column_counts_for(size: &str) -> Vec<usize> {
+        let config = MockConfig::from_size(size);
+        generate_tables(&config)
+            .iter()
+            .map(|table| table.columns.len())
+            .collect()
+    }
+
+    fn view_column_counts_for(size: &str) -> Vec<usize> {
+        let config = MockConfig::from_size(size);
+        let tables = generate_tables(&config);
+        generate_views(&tables, &config)
+            .iter()
+            .map(|view| view.columns.len())
+            .collect()
+    }
+
+    fn collect_generated_edges(
+        relationships: &[RelationshipEdge],
+        triggers: &[Trigger],
+        procedures: &[StoredProcedure],
+        functions: &[ScalarFunction],
+    ) -> Vec<(String, String, String)> {
+        let mut edges = Vec::new();
+
+        for relationship in relationships {
+            edges.push((
+                relationship.id.clone(),
+                relationship.from.clone(),
+                relationship.to.clone(),
+            ));
+        }
+
+        for trigger in triggers {
+            edges.push((
+                format!("trigger-edge-{}", trigger.id),
+                trigger.table_id.clone(),
+                trigger.id.clone(),
+            ));
+
+            for table_id in &trigger.referenced_tables {
+                if *table_id == trigger.table_id {
+                    continue;
+                }
+                edges.push((
+                    format!("trigger-ref-edge-{}-{}", trigger.id, table_id),
+                    trigger.id.clone(),
+                    table_id.clone(),
+                ));
+            }
+
+            for table_id in &trigger.affected_tables {
+                if *table_id == trigger.table_id {
+                    continue;
+                }
+                edges.push((
+                    format!("trigger-affects-{}-{}", trigger.id, table_id),
+                    trigger.id.clone(),
+                    table_id.clone(),
+                ));
+            }
+        }
+
+        for procedure in procedures {
+            for table_id in &procedure.referenced_tables {
+                edges.push((
+                    format!("proc-edge-{}-{}", procedure.id, table_id),
+                    table_id.clone(),
+                    procedure.id.clone(),
+                ));
+            }
+            for table_id in &procedure.affected_tables {
+                edges.push((
+                    format!("proc-affects-{}-{}", procedure.id, table_id),
+                    procedure.id.clone(),
+                    table_id.clone(),
+                ));
+            }
+        }
+
+        for function in functions {
+            for table_id in &function.referenced_tables {
+                edges.push((
+                    format!("func-edge-{}-{}", function.id, table_id),
+                    table_id.clone(),
+                    function.id.clone(),
+                ));
+            }
+        }
+
+        edges
+    }
+
+    #[test]
+    fn tables_and_views_columns_stay_within_range_for_all_presets() {
+        for size in SIZES {
+            for count in table_column_counts_for(size) {
+                assert!(
+                    (MIN_COLUMNS..=MAX_COLUMNS).contains(&count),
+                    "table column count {count} out of range for preset {size}"
+                );
+            }
+            for count in view_column_counts_for(size) {
+                assert!(
+                    (MIN_COLUMNS..=MAX_COLUMNS).contains(&count),
+                    "view column count {count} out of range for preset {size}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tiered_wide_counts_present_for_tables_and_views_when_available() {
+        for size in SIZES {
+            let table_counts = table_column_counts_for(size);
+            if table_counts.len() >= WIDE_COLUMN_TIERS.len() {
+                assert_eq!(&table_counts[..WIDE_COLUMN_TIERS.len()], &WIDE_COLUMN_TIERS);
+            }
+
+            let view_counts = view_column_counts_for(size);
+            if view_counts.len() >= WIDE_COLUMN_TIERS.len() {
+                assert_eq!(&view_counts[..WIDE_COLUMN_TIERS.len()], &WIDE_COLUMN_TIERS);
+            }
+        }
+    }
+
+    #[test]
+    fn mock_column_counts_are_deterministic_for_same_preset() {
+        for size in SIZES {
+            let table_counts_first = table_column_counts_for(size);
+            let table_counts_second = table_column_counts_for(size);
+            assert_eq!(
+                table_counts_first, table_counts_second,
+                "table counts should be deterministic for preset {size}"
+            );
+
+            let view_counts_first = view_column_counts_for(size);
+            let view_counts_second = view_column_counts_for(size);
+            assert_eq!(
+                view_counts_first, view_counts_second,
+                "view counts should be deterministic for preset {size}"
+            );
+        }
+    }
+
+    #[test]
+    fn generated_edge_ids_are_unique_and_endpoints_exist_for_all_presets() {
+        for size in SIZES {
+            let config = MockConfig::from_size(size);
+            let tables = generate_tables(&config);
+            let views = generate_views(&tables, &config);
+            let relationships = generate_relationships(&tables, &config);
+            let triggers = generate_triggers(&tables, &config);
+            let procedures = generate_procedures(&tables, &config);
+            let functions = generate_functions(&tables, &config);
+
+            let mut object_ids = HashSet::new();
+            for table in &tables {
+                object_ids.insert(table.id.clone());
+            }
+            for view in &views {
+                object_ids.insert(view.id.clone());
+            }
+            for trigger in &triggers {
+                object_ids.insert(trigger.id.clone());
+            }
+            for procedure in &procedures {
+                object_ids.insert(procedure.id.clone());
+            }
+            for function in &functions {
+                object_ids.insert(function.id.clone());
+            }
+
+            let edges =
+                collect_generated_edges(&relationships, &triggers, &procedures, &functions);
+
+            let mut seen_edge_ids = HashSet::new();
+            for (edge_id, source, target) in edges {
+                assert!(
+                    seen_edge_ids.insert(edge_id.clone()),
+                    "duplicate edge id {edge_id} in preset {size}"
+                );
+                assert!(
+                    object_ids.contains(&source),
+                    "edge {edge_id} source endpoint {source} missing in preset {size}"
+                );
+                assert!(
+                    object_ids.contains(&target),
+                    "edge {edge_id} target endpoint {target} missing in preset {size}"
+                );
+            }
+        }
+    }
 }
