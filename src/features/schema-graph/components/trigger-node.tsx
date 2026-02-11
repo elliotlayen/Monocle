@@ -2,17 +2,20 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Trigger } from "../types";
 import { cn } from "@/lib/utils";
+import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 interface TriggerNodeData {
   trigger: Trigger;
   isFocused?: boolean;
   isDimmed?: boolean;
+  canvasMode?: boolean;
   onClick?: (event: React.MouseEvent) => void;
 }
 
 function TriggerNodeComponent({ data }: NodeProps) {
-  const { trigger, isFocused, isDimmed, onClick } =
+  const { trigger, isFocused, isDimmed, canvasMode, onClick } =
     data as unknown as TriggerNodeData;
+  const nodeHandleBase = buildNodeHandleBase(trigger.id);
 
   const events = [
     trigger.firesOnInsert && "I",
@@ -31,21 +34,21 @@ function TriggerNodeComponent({ data }: NodeProps) {
       )}
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-amber-600 to-amber-500 text-white px-3 py-2 relative">
+      <div className="bg-amber-600 text-white px-3 py-2 relative">
         {/* Left handle for connection FROM parent table - inside header */}
         <Handle
           type="target"
           position={Position.Left}
-          id={trigger.id}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-target`}
+          className={canvasMode ? "!w-2 !h-2 !bg-amber-400 !border-amber-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
         {/* Right handle for outgoing connections (affects edges) - inside header */}
         <Handle
           type="source"
           position={Position.Right}
-          id={`${trigger.id}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-source`}
+          className={canvasMode ? "!w-2 !h-2 !bg-amber-400 !border-amber-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
         <div className="flex items-center gap-2">

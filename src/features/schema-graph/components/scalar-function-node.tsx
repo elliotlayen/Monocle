@@ -2,11 +2,13 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { ScalarFunction } from "../types";
 import { cn } from "@/lib/utils";
+import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 interface ScalarFunctionNodeData {
   function: ScalarFunction;
   isFocused?: boolean;
   isDimmed?: boolean;
+  canvasMode?: boolean;
   onClick?: (event: React.MouseEvent) => void;
 }
 
@@ -15,8 +17,10 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
     function: fn,
     isFocused,
     isDimmed,
+    canvasMode,
     onClick,
   } = data as unknown as ScalarFunctionNodeData;
+  const nodeHandleBase = buildNodeHandleBase(fn.id);
 
   return (
     <div
@@ -29,21 +33,21 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
       )}
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-cyan-600 to-cyan-500 text-white px-3 py-2 relative">
+      <div className="bg-cyan-600 text-white px-3 py-2 relative">
         {/* Target handle for incoming connections */}
         <Handle
           type="target"
           position={Position.Left}
-          id={`${fn.id}-target`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-target`}
+          className={canvasMode ? "!w-2 !h-2 !bg-cyan-400 !border-cyan-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
         {/* Source handle for outgoing connections */}
         <Handle
           type="source"
           position={Position.Right}
-          id={`${fn.id}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-source`}
+          className={canvasMode ? "!w-2 !h-2 !bg-cyan-400 !border-cyan-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
         <span className="text-[10px] text-cyan-200 uppercase tracking-wide block">

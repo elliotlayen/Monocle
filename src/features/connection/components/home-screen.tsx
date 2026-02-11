@@ -1,17 +1,20 @@
-import { Server, Settings, Info } from "lucide-react";
+import { Server, Settings, Info, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MonocleLogo } from "./monocle-logo";
+
 
 interface HomeScreenProps {
   onOpenConnectionModal?: () => void;
   onOpenSettings?: () => void;
   onOpenAbout?: () => void;
+  onEnterCanvasMode?: () => void;
 }
 
 export function HomeScreen({
   onOpenConnectionModal,
   onOpenSettings,
   onOpenAbout,
+  onEnterCanvasMode,
 }: HomeScreenProps) {
 
   const isMac =
@@ -45,6 +48,20 @@ export function HomeScreen({
           </span>
           <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             {modKey}+N
+          </kbd>
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full h-12 justify-between px-4"
+          onClick={onEnterCanvasMode}
+        >
+          <span className="flex items-center gap-3">
+            <PenTool className="w-5 h-5" />
+            Canvas Mode
+          </span>
+          <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+            {modKey}+K
           </kbd>
         </Button>
 

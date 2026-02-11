@@ -1,4 +1,5 @@
 import type { SchemaGraph } from "@/features/schema-graph/types";
+import { buildColumnHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 export interface ViewColumnSource {
   columnName: string;
@@ -15,6 +16,11 @@ export interface SchemaIndex {
   nameToId: Map<string, string>;
   viewColumnSources: Map<string, ViewColumnSource[]>;
   columnsWithHandles: Set<string>;
+  fkColumnUsage: Map<string, { outgoing: number; incoming: number }>;
+  fkColumnLinks: Map<
+    string,
+    { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
+  >;
   neighbors: Map<string, Set<string>>;
 }
 
@@ -37,6 +43,14 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   const nameToId = new Map<string, string>();
   const viewColumnSources = new Map<string, ViewColumnSource[]>();
   const columnsWithHandles = new Set<string>();
+  const fkColumnUsage = new Map<
+    string,
+    { outgoing: number; incoming: number }
+  >();
+  const fkColumnLinks = new Map<
+    string,
+    { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
+  >();
   const neighbors = new Map<string, Set<string>>();
 
   const addNeighbor = (from: string, to: string) => {
@@ -90,8 +104,46 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   }
 
   for (const rel of schema.relationships) {
-    columnsWithHandles.add(`${rel.from}-${rel.fromColumn}`);
-    columnsWithHandles.add(`${rel.to}-${rel.toColumn}`);
+    if (rel.fromColumn) {
+      const key = buildColumnHandleBase(rel.from, rel.fromColumn);
+      columnsWithHandles.add(key);
+      const current = fkColumnUsage.get(key) ?? { outgoing: 0, incoming: 0 };
+      fkColumnUsage.set(key, {
+        ...current,
+        outgoing: current.outgoing + 1,
+      });
+      const links = fkColumnLinks.get(key) ?? [];
+      if (rel.toColumn) {
+        links.push({
+          direction: "outgoing",
+          tableId: rel.to,
+          column: rel.toColumn,
+        });
+      } else {
+        links.push({ direction: "outgoing", tableId: rel.to, column: "" });
+      }
+      fkColumnLinks.set(key, links);
+    }
+    if (rel.toColumn) {
+      const key = buildColumnHandleBase(rel.to, rel.toColumn);
+      columnsWithHandles.add(key);
+      const current = fkColumnUsage.get(key) ?? { outgoing: 0, incoming: 0 };
+      fkColumnUsage.set(key, {
+        ...current,
+        incoming: current.incoming + 1,
+      });
+      const links = fkColumnLinks.get(key) ?? [];
+      if (rel.fromColumn) {
+        links.push({
+          direction: "incoming",
+          tableId: rel.from,
+          column: rel.fromColumn,
+        });
+      } else {
+        links.push({ direction: "incoming", tableId: rel.from, column: "" });
+      }
+      fkColumnLinks.set(key, links);
+    }
     addNeighbor(rel.from, rel.to);
     addNeighbor(rel.to, rel.from);
   }
@@ -126,31 +178,46 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   }
 
   for (const view of schema.views || []) {
+    const seenSources = new Set<string>();
     for (const col of view.columns) {
-      if (!col.sourceTable || !col.sourceColumn) continue;
+      const sources =
+        col.sourceColumns && col.sourceColumns.length > 0
+          ? col.sourceColumns
+          : col.sourceTable && col.sourceColumn
+            ? [{ table: col.sourceTable, column: col.sourceColumn }]
+            : [];
+      if (sources.length === 0) continue;
 
-      const normalizedSource = col.sourceTable.replace(/[[\]]/g, "");
-      const sourceKey = normalizedSource.toLowerCase();
-      let sourceTableId = nameToId.get(sourceKey);
-      if (!sourceTableId) {
-        const shortName = sourceKey.split(".").pop();
-        if (shortName && shortName !== sourceKey) {
-          sourceTableId = nameToId.get(shortName);
+      for (const source of sources) {
+        const normalizedSource = source.table.replace(/[[\]]/g, "");
+        const sourceKey = normalizedSource.toLowerCase();
+        let sourceTableId = nameToId.get(sourceKey);
+        if (!sourceTableId) {
+          const shortName = sourceKey.split(".").pop();
+          if (shortName && shortName !== sourceKey) {
+            sourceTableId = nameToId.get(shortName);
+          }
+        }
+        if (!sourceTableId) continue;
+
+        columnsWithHandles.add(buildColumnHandleBase(view.id, col.name));
+        columnsWithHandles.add(
+          buildColumnHandleBase(sourceTableId, source.column)
+        );
+
+        if (!viewColumnSources.has(view.id)) {
+          viewColumnSources.set(view.id, []);
+        }
+        const key = `${col.name}::${sourceTableId}::${source.column}`;
+        if (!seenSources.has(key)) {
+          seenSources.add(key);
+          viewColumnSources.get(view.id)!.push({
+            columnName: col.name,
+            sourceTableId,
+            sourceColumn: source.column,
+          });
         }
       }
-      if (!sourceTableId) continue;
-
-      columnsWithHandles.add(`${view.id}-${col.name}`);
-      columnsWithHandles.add(`${sourceTableId}-${col.sourceColumn}`);
-
-      if (!viewColumnSources.has(view.id)) {
-        viewColumnSources.set(view.id, []);
-      }
-      viewColumnSources.get(view.id)!.push({
-        columnName: col.name,
-        sourceTableId,
-        sourceColumn: col.sourceColumn,
-      });
     }
   }
 
@@ -172,6 +239,8 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
     nameToId,
     viewColumnSources,
     columnsWithHandles,
+    fkColumnUsage,
+    fkColumnLinks,
     neighbors,
   };
 }

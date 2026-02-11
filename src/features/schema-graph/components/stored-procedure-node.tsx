@@ -2,17 +2,20 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { StoredProcedure } from "../types";
 import { cn } from "@/lib/utils";
+import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 interface StoredProcedureNodeData {
   procedure: StoredProcedure;
   isFocused?: boolean;
   isDimmed?: boolean;
+  canvasMode?: boolean;
   onClick?: (event: React.MouseEvent) => void;
 }
 
 function StoredProcedureNodeComponent({ data }: NodeProps) {
-  const { procedure, isFocused, isDimmed, onClick } =
+  const { procedure, isFocused, isDimmed, canvasMode, onClick } =
     data as unknown as StoredProcedureNodeData;
+  const nodeHandleBase = buildNodeHandleBase(procedure.id);
 
   const inputParams = procedure.parameters.filter((p) => !p.isOutput);
   const outputParams = procedure.parameters.filter((p) => p.isOutput);
@@ -28,21 +31,21 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
       )}
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-violet-600 to-violet-500 text-white px-3 py-2 relative">
+      <div className="bg-violet-600 text-white px-3 py-2 relative">
         {/* Target handle for incoming connections from referenced tables - inside header */}
         <Handle
           type="target"
           position={Position.Left}
-          id={`${procedure.id}-target`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-target`}
+          className={canvasMode ? "!w-2 !h-2 !bg-violet-400 !border-violet-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
         {/* Source handle for outgoing connections (affects edges) - inside header */}
         <Handle
           type="source"
           position={Position.Right}
-          id={`${procedure.id}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-source`}
+          className={canvasMode ? "!w-2 !h-2 !bg-violet-400 !border-violet-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
         <span className="text-[10px] text-violet-200 uppercase tracking-wide block">

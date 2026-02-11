@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { EDGE_TYPE_LABELS } from "@/constants/edge-colors";
 
 export function StatusBar() {
   const {
@@ -19,6 +20,8 @@ export function StatusBar() {
     edgeTypeFilter,
     selectedEdgeIds,
     connectionInfo,
+    mode,
+    canvasFilePath,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
@@ -29,6 +32,8 @@ export function StatusBar() {
       edgeTypeFilter: state.edgeTypeFilter,
       selectedEdgeIds: state.selectedEdgeIds,
       connectionInfo: state.connectionInfo,
+      mode: state.mode,
+      canvasFilePath: state.canvasFilePath,
     }))
   );
 
@@ -41,8 +46,11 @@ export function StatusBar() {
     focusedTableId
   );
 
+  const isCanvasMode = mode === "canvas";
+
   const allObjectsSelected = objectTypeFilter.size === 5;
-  const allEdgesSelected = edgeTypeFilter.size === 7;
+  const allEdgesSelected =
+    edgeTypeFilter.size === Object.keys(EDGE_TYPE_LABELS).length;
   const hasActiveFilters =
     debouncedSearchFilter !== "" ||
     schemaFilter !== "all" ||
@@ -138,8 +146,8 @@ export function StatusBar() {
           <div className="text-xs">
             <div className="font-medium mb-1">Edges</div>
             <div>
-              Foreign Keys: {counts.edgeBreakdown.foreignKeys.filtered} /{" "}
-              {counts.edgeBreakdown.foreignKeys.total}
+              Relationships: {counts.edgeBreakdown.relationships.filtered} /{" "}
+              {counts.edgeBreakdown.relationships.total}
             </div>
             <div>
               Trigger Dependencies:{" "}
@@ -182,12 +190,20 @@ export function StatusBar() {
         </span>
       )}
 
-      {/* Connection info */}
-      {connectionInfo && (
+      {/* Connection or canvas info */}
+      {isCanvasMode ? (
         <span>
-          {connectionInfo.server}
-          {connectionInfo.database ? ` / ${connectionInfo.database}` : ""}
+          {canvasFilePath
+            ? canvasFilePath.split("/").pop()?.split("\\").pop()
+            : "Untitled"}
         </span>
+      ) : (
+        connectionInfo && (
+          <span>
+            {connectionInfo.server}
+            {connectionInfo.database ? ` / ${connectionInfo.database}` : ""}
+          </span>
+        )
       )}
     </div>
   );

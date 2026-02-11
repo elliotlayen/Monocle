@@ -26,7 +26,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Target, Box, Network, Search, Settings } from "lucide-react";
+import {
+  Target,
+  Box,
+  Network,
+  Search,
+  Settings,
+  Save,
+  FolderOpen,
+  Home,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ExportButton } from "@/features/export/components/export-button";
 import { DatabaseSelector } from "./database-selector";
@@ -35,6 +44,7 @@ import {
   EDGE_COLORS,
   OBJECT_COLORS,
 } from "@/constants/edge-colors";
+import { AddObjectMenu } from "@/features/canvas/components/add-object-menu";
 
 const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   tables: "Tables",
@@ -46,15 +56,29 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
 
 interface ToolbarProps {
   onOpenSettings?: () => void;
+  canvasMode?: boolean;
+  onSave?: () => void;
+  onOpen?: () => void;
+  onExitCanvas?: () => void;
+  onImport?: () => void;
 }
 
-export function Toolbar({ onOpenSettings }: ToolbarProps) {
+export function Toolbar({
+  onOpenSettings,
+  canvasMode,
+  onSave,
+  onOpen,
+  onExitCanvas,
+  onImport,
+}: ToolbarProps) {
   const {
     schema,
     serverConnection,
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
+    canvasFilePath,
+    canvasIsDirty,
     setFocusedTable,
     clearFocus,
     toggleObjectType,
@@ -68,6 +92,8 @@ export function Toolbar({ onOpenSettings }: ToolbarProps) {
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
       edgeTypeFilter: state.edgeTypeFilter,
+      canvasFilePath: state.canvasFilePath,
+      canvasIsDirty: state.canvasIsDirty,
       setFocusedTable: state.setFocusedTable,
       clearFocus: state.clearFocus,
       toggleObjectType: state.toggleObjectType,
@@ -83,7 +109,7 @@ export function Toolbar({ onOpenSettings }: ToolbarProps) {
   const hasScrolledOnOpenRef = useRef(false);
 
   const hasSchema = Boolean(schema);
-  const showDatabaseSelector = Boolean(serverConnection);
+  const showDatabaseSelector = Boolean(serverConnection) && !canvasMode;
 
   const filterItems = (items: { id: string }[]) =>
     items.filter((item) =>
@@ -91,7 +117,8 @@ export function Toolbar({ onOpenSettings }: ToolbarProps) {
     );
 
   const allObjectsSelected = objectTypeFilter.size === 5;
-  const allEdgesSelected = edgeTypeFilter.size === 7;
+  const allEdgesSelected =
+    edgeTypeFilter.size === Object.keys(EDGE_TYPE_LABELS).length;
 
   useEffect(() => {
     if (!isFocusOpen) {
@@ -148,20 +175,43 @@ export function Toolbar({ onOpenSettings }: ToolbarProps) {
         scalarFunctions: [],
       };
 
+  // Canvas mode file name display
+  const canvasFileName = canvasFilePath
+    ? canvasFilePath.split("/").pop()?.split("\\").pop() ?? "Untitled"
+    : "Untitled";
+
   return (
     <div className="relative z-20 flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
-      {/* Left: Monocle branding */}
-      <span
-        className="font-semibold text-base"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-      >
-        Monocle
-      </span>
+      {/* Left: Monocle branding + canvas controls */}
+      <div className="flex items-center gap-2">
+        <span
+          className="font-semibold text-base"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          Monocle
+        </span>
 
-      {/* Center: Database selector */}
+        {canvasMode && (
+          <>
+            <TooltipProvider>
+              <AddObjectMenu onImport={onImport} />
+            </TooltipProvider>
+          </>
+        )}
+      </div>
+
+      {/* Center: Database selector or canvas filename */}
       {showDatabaseSelector && (
         <div className="absolute left-1/2 -translate-x-1/2">
           <DatabaseSelector />
+        </div>
+      )}
+      {canvasMode && (
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 text-sm text-muted-foreground">
+          <span>{canvasFileName}</span>
+          {canvasIsDirty && (
+            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+          )}
         </div>
       )}
 
@@ -169,6 +219,30 @@ export function Toolbar({ onOpenSettings }: ToolbarProps) {
 
       {/* Right: Button group + Settings */}
       <div className="flex items-center gap-2">
+        {/* Canvas mode file buttons */}
+        {canvasMode && (
+          <TooltipProvider>
+            <div className="flex gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={onOpen}>
+                    <FolderOpen className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open File</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={onSave}>
+                    <Save className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+        )}
+
         {/* Button group - only show when schema loaded */}
         {hasSchema && (
           <TooltipProvider>
@@ -392,6 +466,20 @@ export function Toolbar({ onOpenSettings }: ToolbarProps) {
         {hasSchema && (
           <TooltipProvider>
             <ExportButton />
+          </TooltipProvider>
+        )}
+
+        {/* Canvas exit button */}
+        {canvasMode && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={onExitCanvas}>
+                  <Home className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Home</TooltipContent>
+            </Tooltip>
           </TooltipProvider>
         )}
 

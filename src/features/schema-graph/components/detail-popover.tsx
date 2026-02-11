@@ -66,6 +66,7 @@ interface DetailPopoverProps {
   data: DetailSidebarData | null;
   anchorRect: DOMRect | null;
   onClose: () => void;
+  onEdit?: (data: DetailSidebarData) => void;
 }
 
 export function DetailPopover({
@@ -73,6 +74,7 @@ export function DetailPopover({
   data,
   anchorRect,
   onClose,
+  onEdit,
 }: DetailPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -149,15 +151,29 @@ export function DetailPopover({
             <h2 className="text-lg font-semibold truncate">{name}</h2>
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 flex-shrink-0"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </Button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {onEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onEdit(data);
+                  onClose();
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </div>
         </div>
       </div>
 

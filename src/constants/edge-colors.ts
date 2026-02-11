@@ -1,7 +1,7 @@
 import { EdgeType, ObjectType } from "@/features/schema-graph/store";
 
 export const EDGE_COLORS: Record<EdgeType, string> = {
-  foreignKeys: "#3b82f6",
+  relationships: "#3b82f6",
   triggerDependencies: "#f59e0b",
   triggerWrites: "#ef4444",
   procedureReads: "#8b5cf6",
@@ -11,7 +11,7 @@ export const EDGE_COLORS: Record<EdgeType, string> = {
 };
 
 export const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
-  foreignKeys: "Foreign Keys",
+  relationships: "Relationships",
   triggerDependencies: "Trigger Dependencies",
   triggerWrites: "Trigger Writes",
   procedureReads: "Procedure Reads",

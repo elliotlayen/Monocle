@@ -1,11 +1,21 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { TbCircleDashedLetterN } from "react-icons/tb";
+import { TbCircleDashedLetterN, TbLink } from "react-icons/tb";
 import { IoMdKey } from "react-icons/io";
 import { TableNode as TableNodeType, Column } from "../types";
 import { EdgeType } from "../store";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS } from "@/constants/edge-colors";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  buildColumnHandleBase,
+  buildNodeHandleBase,
+} from "@/features/schema-graph/utils/handle-ids";
 
 function HandleIndicators({
   edgeTypes,
@@ -33,7 +43,13 @@ interface TableNodeData {
   isFocused?: boolean;
   isDimmed?: boolean;
   isCompact?: boolean;
+  canvasMode?: boolean;
   columnsWithHandles?: Set<string>;
+  fkColumnUsage?: Map<string, { outgoing: number; incoming: number }>;
+  fkColumnLinks?: Map<
+    string,
+    { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
+  >;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
   onClick?: (event: React.MouseEvent) => void;
 }
@@ -44,10 +60,14 @@ function TableNodeComponent({ data }: NodeProps) {
     isFocused,
     isDimmed,
     isCompact,
+    canvasMode,
     columnsWithHandles,
+    fkColumnUsage,
+    fkColumnLinks,
     handleEdgeTypes,
     onClick,
   } = data as unknown as TableNodeData;
+  const nodeHandleBase = buildNodeHandleBase(table.id);
 
   return (
     <div
@@ -60,20 +80,20 @@ function TableNodeComponent({ data }: NodeProps) {
       )}
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-3 py-2 flex items-center relative">
+      <div className="bg-slate-700 text-white px-3 py-2 flex items-center relative">
         {/* Generic target handle for incoming procedure/trigger references - inside header */}
         <Handle
           type="target"
           position={Position.Left}
-          id={`${table.id}-target`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-target`}
+          className={canvasMode ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
 
         {/* Left header indicators - fixed width for alignment */}
         <div className="w-4 shrink-0">
           <HandleIndicators
-            edgeTypes={handleEdgeTypes?.get(`${table.id}-target`)}
+            edgeTypes={handleEdgeTypes?.get(`${nodeHandleBase}-target`)}
             isCompact={isCompact}
           />
         </div>
@@ -88,7 +108,7 @@ function TableNodeComponent({ data }: NodeProps) {
         {/* Right header indicators - fixed width for alignment */}
         <div className="w-4 shrink-0 flex justify-end">
           <HandleIndicators
-            edgeTypes={handleEdgeTypes?.get(`${table.id}-source`)}
+            edgeTypes={handleEdgeTypes?.get(`${nodeHandleBase}-source`)}
             isCompact={isCompact}
           />
         </div>
@@ -97,8 +117,8 @@ function TableNodeComponent({ data }: NodeProps) {
         <Handle
           type="source"
           position={Position.Right}
-          id={`${table.id}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          id={`${nodeHandleBase}-source`}
+          className={canvasMode ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
       </div>
@@ -112,10 +132,15 @@ function TableNodeComponent({ data }: NodeProps) {
             tableId={table.id}
             index={index}
             hasHandle={
-              columnsWithHandles?.has(`${table.id}-${column.name}`) ?? true
+              columnsWithHandles?.has(
+                buildColumnHandleBase(table.id, column.name)
+              ) ?? true
             }
+            fkColumnUsage={fkColumnUsage}
+            fkColumnLinks={fkColumnLinks}
             handleEdgeTypes={handleEdgeTypes}
             isCompact={isCompact}
+            canvasMode={canvasMode}
           />
         ))}
       </div>
@@ -133,39 +158,72 @@ interface ColumnRowProps {
   tableId: string;
   index: number;
   hasHandle: boolean;
+  fkColumnUsage?: Map<string, { outgoing: number; incoming: number }>;
+  fkColumnLinks?: Map<
+    string,
+    { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
+  >;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
   isCompact?: boolean;
+  canvasMode?: boolean;
 }
 
 function ColumnRow({
   column,
   tableId,
   hasHandle,
+  fkColumnUsage,
+  fkColumnLinks,
   handleEdgeTypes,
   isCompact,
+  canvasMode,
 }: ColumnRowProps) {
-  const handleId = `${tableId}-${column.name}`;
+  const handleId = buildColumnHandleBase(tableId, column.name);
   const targetEdgeTypes = handleEdgeTypes?.get(`${handleId}-target`);
   const sourceEdgeTypes = handleEdgeTypes?.get(`${handleId}-source`);
+  const fkUsage = fkColumnUsage?.get(handleId);
+  const fkLinks = fkColumnLinks?.get(handleId) ?? [];
+  const hasFkOut = (fkUsage?.outgoing ?? 0) > 0;
+  const hasFkIn = (fkUsage?.incoming ?? 0) > 0;
+  const fkClass = hasFkOut && hasFkIn
+    ? "text-violet-500"
+    : hasFkOut
+    ? "text-blue-500"
+    : "text-emerald-500";
+  const fkOutgoingTargets = fkLinks
+    .filter((link) => link.direction === "outgoing")
+    .map((link) =>
+      link.column ? `${link.tableId}.${link.column}` : link.tableId
+    );
+  const fkIncomingTargets = fkLinks
+    .filter((link) => link.direction === "incoming")
+    .map((link) =>
+      link.column ? `${link.tableId}.${link.column}` : link.tableId
+    );
+  // In canvas mode, all columns get handles and they're visible
+  const showHandle = hasHandle || canvasMode;
+  const handleClass = canvasMode
+    ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full"
+    : "!w-0 !h-0 !bg-transparent !border-0";
 
   if (isCompact) {
     return (
       <div className="relative h-3">
-        {hasHandle && (
+        {showHandle && (
           <Handle
             type="target"
             position={Position.Left}
             id={`${handleId}-target`}
-            className="!w-0 !h-0 !bg-transparent !border-0"
+            className={handleClass}
             style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
           />
         )}
-        {hasHandle && (
+        {showHandle && (
           <Handle
             type="source"
             position={Position.Right}
             id={`${handleId}-source`}
-            className="!w-0 !h-0 !bg-transparent !border-0"
+            className={handleClass}
             style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
           />
         )}
@@ -175,13 +233,13 @@ function ColumnRow({
 
   return (
     <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
-      {/* Left handle for incoming FKs (target) - only render if column has relationships */}
-      {hasHandle && (
+      {/* Left handle for incoming FKs (target) */}
+      {showHandle && (
         <Handle
           type="target"
           position={Position.Left}
           id={`${handleId}-target`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          className={handleClass}
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
       )}
@@ -204,6 +262,49 @@ function ColumnRow({
         {column.isPrimaryKey && (
           <IoMdKey className="text-slate-400 w-3.5 h-3.5 shrink-0 -ml-1" />
         )}
+        {(hasFkOut || hasFkIn) && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <TbLink className={`${fkClass} w-3.5 h-3.5 shrink-0 -ml-1`} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="start" className="max-w-xs">
+                <div className="space-y-2 text-xs">
+                  {fkOutgoingTargets.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-medium text-muted-foreground">
+                        References
+                      </div>
+                      <ul className="list-disc pl-4">
+                        {fkOutgoingTargets.map((target) => (
+                          <li key={target} className="font-mono text-[11px]">
+                            {target}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {fkIncomingTargets.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-medium text-muted-foreground">
+                        Referenced by
+                      </div>
+                      <ul className="list-disc pl-4">
+                        {fkIncomingTargets.map((target) => (
+                          <li key={target} className="font-mono text-[11px]">
+                            {target}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <span className="text-[10px] text-muted-foreground shrink-0 ml-auto">
           {column.dataType}
         </span>
@@ -217,13 +318,13 @@ function ColumnRow({
         <HandleIndicators edgeTypes={sourceEdgeTypes} />
       </div>
 
-      {/* Right handle for outgoing FKs (source) - only render if column has relationships */}
-      {hasHandle && (
+      {/* Right handle for outgoing FKs (source) */}
+      {showHandle && (
         <Handle
           type="source"
           position={Position.Right}
           id={`${handleId}-source`}
-          className="!w-0 !h-0 !bg-transparent !border-0"
+          className={handleClass}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
       )}

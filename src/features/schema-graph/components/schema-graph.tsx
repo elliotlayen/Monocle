@@ -10,6 +10,8 @@ import {
   type Node,
   type Edge,
   type EdgeMouseHandler,
+  type Connection,
+  type NodeMouseHandler,
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -46,6 +48,20 @@ import {
   useTauriEvent,
 } from "@/services/events";
 import { useExport } from "@/features/export/hooks/useExport";
+import { CanvasContextMenu } from "@/features/canvas/components/canvas-context-menu";
+import { ImportFromDatabaseDialog } from "@/features/canvas/components/import-from-database-dialog";
+import { CreateTableDialog } from "@/features/canvas/components/create-table-dialog";
+import { CreateViewDialog } from "@/features/canvas/components/create-view-dialog";
+import { CreateTriggerDialog } from "@/features/canvas/components/create-trigger-dialog";
+import { CreateProcedureDialog } from "@/features/canvas/components/create-procedure-dialog";
+import { CreateFunctionDialog } from "@/features/canvas/components/create-function-dialog";
+import { CreateEdgeDialog } from "@/features/canvas/components/create-edge-dialog";
+import { getAllowedEdgeKinds } from "@/features/canvas/utils/edge-kinds";
+import {
+  buildColumnHandleBase,
+  buildNodeHandleBase,
+  parseHandleBase,
+} from "@/features/schema-graph/utils/handle-ids";
 
 const GRID_COLS = 3;
 const NODE_WIDTH = 300;
@@ -90,13 +106,13 @@ const EDGE_STYLE: Record<
     labelSelected: string;
   }
 > = {
-  foreignKeys: {
+  relationships: {
     base: "#3b82f6",
-    dimmed: "#cbd5e1",
-    selected: "#1d4ed8",
-    label: "#475569",
-    labelDimmed: "#94a3b8",
-    labelSelected: "#1e40af",
+    dimmed: "#93c5fd",
+    selected: "#2563eb",
+    label: "#2563eb",
+    labelDimmed: "#93c5fd",
+    labelSelected: "#1d4ed8",
   },
   triggerDependencies: {
     base: "#f59e0b",
@@ -175,6 +191,19 @@ interface SchemaGraphProps {
   schemaFilter?: string;
   objectTypeFilter?: Set<ObjectType>;
   edgeTypeFilter?: Set<EdgeType>;
+  canvasMode?: boolean;
+  importDialogOpen?: boolean;
+  onImportDialogOpenChange?: (open: boolean) => void;
+}
+
+function parseHandleId(handleId: string | null | undefined): {
+  tableId: string;
+  columnName: string;
+} {
+  if (!handleId) return { tableId: "", columnName: "" };
+  const withoutSuffix = handleId.replace(/-source$/, "").replace(/-target$/, "");
+  const parsed = parseHandleBase(withoutSuffix);
+  return { tableId: parsed.nodeId, columnName: parsed.columnName };
 }
 
 /**
@@ -370,12 +399,28 @@ interface EdgeMeta {
   sourceHandle?: string;
   targetHandle?: string;
   label?: string;
+  sourceColumn?: string;
+  targetColumn?: string;
+}
+
+interface EdgeEditState {
+  id: string;
+  edgeType: EdgeType;
+  sourceId: string;
+  targetId: string;
+  sourceColumn?: string;
+  targetColumn?: string;
 }
 
 function buildBaseNodes(
   schema: SchemaGraphType,
   options: ConvertOptions,
-  columnsWithHandles: Set<string>
+  columnsWithHandles: Set<string>,
+  fkColumnUsage: Map<string, { outgoing: number; incoming: number }>,
+  fkColumnLinks: Map<
+    string,
+    { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
+  >
 ): Node[] {
   const tablePositions: Record<string, { x: number; y: number }> = {};
 
@@ -398,6 +443,8 @@ function buildBaseNodes(
         isDimmed: false,
         isCompact: false,
         columnsWithHandles,
+        fkColumnUsage,
+        fkColumnLinks,
         handleEdgeTypes: undefined,
         onClick: (e: React.MouseEvent) => options?.onTableClick?.(table, e),
       },
@@ -424,6 +471,8 @@ function buildBaseNodes(
         isDimmed: false,
         isCompact: false,
         columnsWithHandles,
+        fkColumnUsage,
+        fkColumnLinks,
         handleEdgeTypes: undefined,
         onClick: (e: React.MouseEvent) => options?.onViewClick?.(view, e),
       },
@@ -521,14 +570,25 @@ function buildBaseEdges(
   const edges: EdgeMeta[] = [];
 
   schema.relationships.forEach((rel) => {
+    const sourceHandle = rel.fromColumn
+      ? `${buildColumnHandleBase(rel.from, rel.fromColumn)}-source`
+      : `${buildNodeHandleBase(rel.from)}-source`;
+    const targetHandle = rel.toColumn
+      ? `${buildColumnHandleBase(rel.to, rel.toColumn)}-target`
+      : `${buildNodeHandleBase(rel.to)}-target`;
     edges.push({
       id: rel.id,
-      type: "foreignKeys",
+      type: "relationships",
       source: rel.from,
       target: rel.to,
-      sourceHandle: `${rel.from}-${rel.fromColumn}-source`,
-      targetHandle: `${rel.to}-${rel.toColumn}-target`,
-      label: `${rel.fromColumn} → ${rel.toColumn}`,
+      sourceHandle,
+      targetHandle,
+      sourceColumn: rel.fromColumn,
+      targetColumn: rel.toColumn,
+      label:
+        rel.fromColumn && rel.toColumn
+          ? `${rel.fromColumn} → ${rel.toColumn}`
+          : undefined,
     });
   });
 
@@ -538,7 +598,8 @@ function buildBaseEdges(
       type: "triggerDependencies",
       source: trigger.tableId,
       target: trigger.id,
-      sourceHandle: `${trigger.tableId}-source`,
+      sourceHandle: `${buildNodeHandleBase(trigger.tableId)}-source`,
+      targetHandle: `${buildNodeHandleBase(trigger.id)}-target`,
       label: trigger.name,
     });
 
@@ -549,8 +610,8 @@ function buildBaseEdges(
         type: "triggerDependencies",
         source: trigger.id,
         target: tableId,
-        sourceHandle: `${trigger.id}-source`,
-        targetHandle: `${tableId}-target`,
+        sourceHandle: `${buildNodeHandleBase(trigger.id)}-source`,
+        targetHandle: `${buildNodeHandleBase(tableId)}-target`,
         label: trigger.name,
       });
     });
@@ -562,8 +623,8 @@ function buildBaseEdges(
         type: "triggerWrites",
         source: trigger.id,
         target: tableId,
-        sourceHandle: `${trigger.id}-source`,
-        targetHandle: `${tableId}-target`,
+        sourceHandle: `${buildNodeHandleBase(trigger.id)}-source`,
+        targetHandle: `${buildNodeHandleBase(tableId)}-target`,
         label: `${trigger.name} (writes)`,
       });
     });
@@ -576,8 +637,8 @@ function buildBaseEdges(
         type: "procedureReads",
         source: tableId,
         target: procedure.id,
-        sourceHandle: `${tableId}-source`,
-        targetHandle: `${procedure.id}-target`,
+        sourceHandle: `${buildNodeHandleBase(tableId)}-source`,
+        targetHandle: `${buildNodeHandleBase(procedure.id)}-target`,
         label: procedure.name,
       });
     });
@@ -588,8 +649,8 @@ function buildBaseEdges(
         type: "procedureWrites",
         source: procedure.id,
         target: tableId,
-        sourceHandle: `${procedure.id}-source`,
-        targetHandle: `${tableId}-target`,
+        sourceHandle: `${buildNodeHandleBase(procedure.id)}-source`,
+        targetHandle: `${buildNodeHandleBase(tableId)}-target`,
         label: `${procedure.name} (writes)`,
       });
     });
@@ -602,8 +663,8 @@ function buildBaseEdges(
         type: "functionReads",
         source: tableId,
         target: fn.id,
-        sourceHandle: `${tableId}-source`,
-        targetHandle: `${fn.id}-target`,
+        sourceHandle: `${buildNodeHandleBase(tableId)}-source`,
+        targetHandle: `${buildNodeHandleBase(fn.id)}-target`,
         label: fn.name,
       });
     });
@@ -613,13 +674,21 @@ function buildBaseEdges(
     const sources = viewColumnSources.get(view.id) ?? [];
     sources.forEach((source) => {
       edges.push({
-        id: `view-col-edge-${view.id}-${source.columnName}`,
+        id: `view-col-edge-${view.id}-${source.columnName}-${source.sourceTableId}-${source.sourceColumn}`,
         type: "viewDependencies",
         source: source.sourceTableId,
         target: view.id,
-        sourceHandle: `${source.sourceTableId}-${source.sourceColumn}-source`,
-        targetHandle: `${view.id}-${source.columnName}-target`,
+        sourceHandle: `${buildColumnHandleBase(
+          source.sourceTableId,
+          source.sourceColumn
+        )}-source`,
+        targetHandle: `${buildColumnHandleBase(
+          view.id,
+          source.columnName
+        )}-target`,
         label: view.name,
+        sourceColumn: source.sourceColumn,
+        targetColumn: source.columnName,
       });
     });
   });
@@ -689,6 +758,12 @@ function buildEdgeState(
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
       type: "smoothstep",
+      interactionWidth: 16,
+      data: {
+        edgeType: edge.type,
+        sourceColumn: edge.sourceColumn,
+        targetColumn: edge.targetColumn,
+      },
       hidden: !isVisible,
       style: {
         stroke,
@@ -726,9 +801,38 @@ function SchemaGraphInner({
   schemaFilter,
   objectTypeFilter,
   edgeTypeFilter,
+  canvasMode,
+  importDialogOpen,
+  onImportDialogOpenChange,
 }: SchemaGraphProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [editDialogState, setEditDialogState] = useState<{
+    type: string;
+    id: string;
+  } | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    screen: { x: number; y: number };
+    flow: { x: number; y: number };
+  } | null>(null);
+  const [contextMenuEdge, setContextMenuEdge] = useState<EdgeEditState | null>(
+    null
+  );
+  const [pendingConnection, setPendingConnection] = useState<{
+    sourceId: string;
+    targetId: string;
+    sourceColumn?: string;
+    targetColumn?: string;
+    edgeType?: EdgeType;
+    editEdge?: {
+      id: string;
+      edgeType: EdgeType;
+      sourceId: string;
+      targetId: string;
+      sourceColumn?: string;
+      targetColumn?: string;
+    };
+  } | null>(null);
   const {
     open: popoverOpen,
     data: popoverData,
@@ -742,6 +846,18 @@ function SchemaGraphInner({
     clearEdgeSelection,
     focusMode,
     focusExpandThreshold,
+    nodePositions: storedNodePositions,
+    updateNodePosition,
+    removeTable,
+    removeView,
+    removeTrigger,
+    removeStoredProcedure,
+    removeScalarFunction,
+    removeRelationship,
+    removeTriggerReference,
+    removeProcedureReference,
+    removeFunctionReference,
+    removeViewColumnSource,
   } = useSchemaStore(
     useShallow((state) => ({
       selectedEdgeIds: state.selectedEdgeIds,
@@ -749,6 +865,18 @@ function SchemaGraphInner({
       clearEdgeSelection: state.clearEdgeSelection,
       focusMode: state.focusMode,
       focusExpandThreshold: state.focusExpandThreshold,
+      nodePositions: state.nodePositions,
+      updateNodePosition: state.updateNodePosition,
+      removeTable: state.removeTable,
+      removeView: state.removeView,
+      removeTrigger: state.removeTrigger,
+      removeStoredProcedure: state.removeStoredProcedure,
+      removeScalarFunction: state.removeScalarFunction,
+      removeRelationship: state.removeRelationship,
+      removeTriggerReference: state.removeTriggerReference,
+      removeProcedureReference: state.removeProcedureReference,
+      removeFunctionReference: state.removeFunctionReference,
+      removeViewColumnSource: state.removeViewColumnSource,
     }))
   );
 
@@ -796,13 +924,15 @@ function SchemaGraphInner({
   const originalPositionsRef = useRef<Map<string, { x: number; y: number }>>(
     new Map()
   );
+  // Once the user drags a node in focus mode, stop reapplying the compact layout
+  const focusLayoutLockedRef = useRef(false);
   // Track previous focus state to detect exit transitions
   const prevFocusStateRef = useRef<{
     focusedTableId: string | null;
     focusMode: string;
   }>({
     focusedTableId: null,
-    focusMode: "fade",
+    focusMode: "hide",
   });
   // Track if fitView has been called for current focus session
   const fitViewCalledRef = useRef(false);
@@ -812,16 +942,18 @@ function SchemaGraphInner({
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
-      if (focusedTableId) return;
+      if (focusedTableId && !canvasMode) return;
       toggleEdgeSelection(edge.id);
     },
-    [toggleEdgeSelection, focusedTableId]
+    [toggleEdgeSelection, focusedTableId, canvasMode]
   );
 
   const onPaneClick = useCallback(() => {
     if (selectedEdgeIds.size > 0) {
       clearEdgeSelection();
     }
+    setContextMenuEdge(null);
+    setContextMenuPos(null);
   }, [selectedEdgeIds.size, clearEdgeSelection]);
 
   const onEdgeMouseEnter = useCallback((_event: unknown, edge: Edge) => {
@@ -832,11 +964,111 @@ function SchemaGraphInner({
     setHoveredEdgeId(null);
   }, []);
 
+  const onEdgeContextMenu = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      if (!canvasMode) return;
+      const edgeData = edge.data as
+        | {
+            edgeType?: EdgeType;
+            sourceColumn?: string;
+            targetColumn?: string;
+          }
+        | undefined;
+      if (!edgeData?.edgeType) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenuEdge({
+        id: edge.id,
+        edgeType: edgeData.edgeType,
+        sourceId: edge.source,
+        targetId: edge.target,
+        sourceColumn: edgeData.sourceColumn,
+        targetColumn: edgeData.targetColumn,
+      });
+      setContextMenuPos({
+        screen: { x: event.clientX, y: event.clientY },
+        flow: { x: 0, y: 0 },
+      });
+    },
+    [canvasMode]
+  );
+
   const onMove = useCallback((_event: unknown, viewport: { zoom: number }) => {
     setZoom((prev) =>
       Math.abs(prev - viewport.zoom) > 0.01 ? viewport.zoom : prev
     );
   }, []);
+
+  const removeEdgeDescriptor = useCallback(
+    (descriptor: EdgeEditState) => {
+      switch (descriptor.edgeType) {
+        case "relationships":
+          removeRelationship(descriptor.id);
+          break;
+        case "procedureReads":
+          removeProcedureReference(
+            descriptor.targetId,
+            descriptor.sourceId,
+            "reads"
+          );
+          break;
+        case "procedureWrites":
+          removeProcedureReference(
+            descriptor.sourceId,
+            descriptor.targetId,
+            "writes"
+          );
+          break;
+        case "functionReads":
+          removeFunctionReference(descriptor.targetId, descriptor.sourceId);
+          break;
+        case "triggerWrites":
+          removeTriggerReference(
+            descriptor.sourceId,
+            descriptor.targetId,
+            "writes"
+          );
+          break;
+        case "triggerDependencies": {
+          const targetIsTrigger = schema.triggers.some(
+            (t) => t.id === descriptor.targetId
+          );
+          if (targetIsTrigger) {
+            removeTrigger(descriptor.targetId);
+          } else {
+            removeTriggerReference(
+              descriptor.sourceId,
+              descriptor.targetId,
+              "reads"
+            );
+          }
+          break;
+        }
+        case "viewDependencies":
+          if (
+            descriptor.targetColumn &&
+            descriptor.sourceColumn
+          ) {
+            removeViewColumnSource(
+              descriptor.targetId,
+              descriptor.targetColumn,
+              descriptor.sourceId,
+              descriptor.sourceColumn
+            );
+          }
+          break;
+      }
+    },
+    [
+      removeFunctionReference,
+      removeProcedureReference,
+      removeRelationship,
+      removeTrigger,
+      removeTriggerReference,
+      removeViewColumnSource,
+      schema.triggers,
+    ]
+  );
 
   const handleNodeClick = useCallback(
     (data: DetailSidebarData, event: React.MouseEvent) => {
@@ -888,6 +1120,141 @@ function SchemaGraphInner({
     [openPopover]
   );
 
+  const handleEditFromPopover = useCallback(
+    (data: DetailSidebarData) => {
+      if (!canvasMode) return;
+      setEditDialogState({ type: data.type, id: data.data.id });
+    },
+    [canvasMode]
+  );
+
+  // Canvas mode: drag-to-connect edges (opens dialog)
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      if (!canvasMode) return;
+      const { tableId: sourceId, columnName: sourceColumn } = parseHandleId(
+        connection.sourceHandle
+      );
+      const { tableId: targetId, columnName: targetColumn } = parseHandleId(
+        connection.targetHandle
+      );
+      if (!sourceId || !targetId) return;
+      const allowedEdgeTypes = getAllowedEdgeKinds(schema, sourceId, targetId);
+      if (allowedEdgeTypes.length === 0) return;
+
+      setPendingConnection({
+        sourceId,
+        targetId,
+        sourceColumn,
+        targetColumn,
+        edgeType: allowedEdgeTypes.length === 1 ? allowedEdgeTypes[0] : undefined,
+      });
+    },
+    [canvasMode, schema]
+  );
+
+  const isValidConnection = useCallback(
+    (connection: Connection | Edge) => {
+      if (!canvasMode) return false;
+      const { tableId: sourceId } = parseHandleId(
+        connection.sourceHandle ?? null
+      );
+      const { tableId: targetId } = parseHandleId(
+        connection.targetHandle ?? null
+      );
+      if (!sourceId || !targetId) return false;
+      return getAllowedEdgeKinds(schema, sourceId, targetId).length > 0;
+    },
+    [canvasMode, schema]
+  );
+
+  // Persist node positions on drag stop
+  const onNodeDragStop: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      if (canvasMode) {
+        updateNodePosition(node.id, node.position);
+        return;
+      }
+      if (focusMode === "hide" && focusedTableId) {
+        focusLayoutLockedRef.current = true;
+      }
+    },
+    [canvasMode, updateNodePosition, focusMode, focusedTableId]
+  );
+
+  // Canvas mode: double-click to edit node
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      if (!canvasMode) return;
+      const typeMap: Record<string, string> = {
+        tableNode: "table",
+        viewNode: "view",
+        triggerNode: "trigger",
+        storedProcedureNode: "storedProcedure",
+        scalarFunctionNode: "scalarFunction",
+      };
+      const type = typeMap[node.type ?? ""];
+      if (type) {
+        setEditDialogState({ type, id: node.id });
+      }
+    },
+    [canvasMode]
+  );
+
+  // Canvas mode: delete selected nodes
+  const handleDeleteSelected = useCallback(
+    (selectedNodes: Node[]) => {
+      if (!canvasMode) return;
+      for (const node of selectedNodes) {
+        switch (node.type) {
+          case "tableNode":
+            removeTable(node.id);
+            break;
+          case "viewNode":
+            removeView(node.id);
+            break;
+          case "triggerNode":
+            removeTrigger(node.id);
+            break;
+          case "storedProcedureNode":
+            removeStoredProcedure(node.id);
+            break;
+          case "scalarFunctionNode":
+            removeScalarFunction(node.id);
+            break;
+        }
+      }
+    },
+    [
+      canvasMode,
+      removeTable,
+      removeView,
+      removeTrigger,
+      removeStoredProcedure,
+      removeScalarFunction,
+    ]
+  );
+
+  // Canvas mode: context menu
+  const { screenToFlowPosition } = useReactFlow();
+
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      if (!canvasMode) return;
+      event.preventDefault();
+      setContextMenuEdge(null);
+      const flowPos = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      setContextMenuPos({
+        screen: { x: event.clientX, y: event.clientY },
+        flow: flowPos,
+      });
+    },
+    [canvasMode, screenToFlowPosition]
+  );
+
   const options: ConvertOptions = useMemo(
     () => ({
       onTableClick: (table: TableNodeType, event: React.MouseEvent) =>
@@ -911,10 +1278,38 @@ function SchemaGraphInner({
   );
 
   const schemaIndex = useMemo(() => getSchemaIndex(schema), [schema]);
-  const baseNodes = useMemo(
-    () => buildBaseNodes(schema, options, schemaIndex.columnsWithHandles),
-    [schema, options, schemaIndex.columnsWithHandles]
-  );
+  const baseNodes = useMemo(() => {
+    const nodes = buildBaseNodes(
+      schema,
+      options,
+      schemaIndex.columnsWithHandles,
+      schemaIndex.fkColumnUsage,
+      schemaIndex.fkColumnLinks
+    );
+    // In canvas mode, override positions from stored positions and pass canvasMode to node data
+    if (canvasMode) {
+      return nodes.map((node) => {
+        const storedPos = storedNodePositions[node.id];
+        return {
+          ...node,
+          position: storedPos ?? node.position,
+          data: {
+            ...(node.data as Record<string, unknown>),
+            canvasMode: true,
+          },
+        };
+      });
+    }
+    return nodes;
+  }, [
+    schema,
+    options,
+    schemaIndex.columnsWithHandles,
+    schemaIndex.fkColumnUsage,
+    schemaIndex.fkColumnLinks,
+    canvasMode,
+    storedNodePositions,
+  ]);
   const baseEdges = useMemo(
     () => buildBaseEdges(schema, schemaIndex.viewColumnSources),
     [schema, schemaIndex.viewColumnSources]
@@ -922,6 +1317,72 @@ function SchemaGraphInner({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(baseNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  // Canvas mode: delete selected edges
+  const handleDeleteSelectedEdges = useCallback(() => {
+    if (!canvasMode) return;
+    const edgeMap = new Map(edges.map((edge) => [edge.id, edge]));
+    selectedEdgeIds.forEach((edgeId) => {
+      const edge = edgeMap.get(edgeId);
+      if (!edge) return;
+      const edgeData = edge.data as
+        | {
+            edgeType?: EdgeType;
+            sourceColumn?: string;
+            targetColumn?: string;
+          }
+        | undefined;
+      if (!edgeData?.edgeType) return;
+
+      const descriptor: EdgeEditState = {
+        id: edge.id,
+        edgeType: edgeData.edgeType,
+        sourceId: edge.source,
+        targetId: edge.target,
+        sourceColumn: edgeData.sourceColumn,
+        targetColumn: edgeData.targetColumn,
+      };
+      removeEdgeDescriptor(descriptor);
+    });
+    clearEdgeSelection();
+  }, [
+    canvasMode,
+    selectedEdgeIds,
+    edges,
+    removeEdgeDescriptor,
+    clearEdgeSelection,
+  ]);
+
+  // Canvas mode: keyboard handler for Delete/Backspace
+  useEffect(() => {
+    if (!canvasMode) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement
+        ) {
+          return;
+        }
+        if (selectedEdgeIds.size > 0) {
+          handleDeleteSelectedEdges();
+          return;
+        }
+        const selectedNodes = nodes.filter((n) => n.selected);
+        if (selectedNodes.length > 0) {
+          handleDeleteSelected(selectedNodes);
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [
+    canvasMode,
+    nodes,
+    selectedEdgeIds,
+    handleDeleteSelected,
+    handleDeleteSelectedEdges,
+  ]);
 
   useEffect(() => {
     setNodes(baseNodes);
@@ -1122,23 +1583,34 @@ function SchemaGraphInner({
     );
     setEdges(nextEdges);
 
-    // Detect if we JUST exited focus mode (restore positions once, not continuously)
     const prevState = prevFocusStateRef.current;
-    const justExitedFocus =
-      !(focusMode === "hide" && focusedTableId) &&
-      prevState.focusMode === "hide" &&
-      prevState.focusedTableId !== null;
+    const focusSessionActive = focusMode === "hide" && Boolean(focusedTableId);
+    const prevFocusSessionActive =
+      prevState.focusMode === "hide" && Boolean(prevState.focusedTableId);
+    const focusTargetChanged =
+      focusSessionActive &&
+      prevFocusSessionActive &&
+      prevState.focusedTableId !== focusedTableId;
+
+    if ((focusSessionActive && !prevFocusSessionActive) || focusTargetChanged) {
+      focusLayoutLockedRef.current = false;
+    }
+
+    // Detect if we JUST exited focus mode (restore positions once, not continuously)
+    const justExitedFocus = !focusSessionActive && prevFocusSessionActive;
 
     // Calculate compact positions when focus mode is "hide" and focused
-    const shouldUseCompactLayout = focusMode === "hide" && focusedTableId;
-    const compactPositions = shouldUseCompactLayout
-      ? calculateCompactLayout(
-          focusedTableId,
-          edgeVisibleNodeIds,
-          focusedNeighbors,
-          schema
-        )
-      : null;
+    const shouldUseCompactLayout =
+      focusSessionActive && !focusLayoutLockedRef.current;
+    const compactPositions =
+      shouldUseCompactLayout && focusedTableId
+        ? calculateCompactLayout(
+            focusedTableId,
+            edgeVisibleNodeIds,
+            focusedNeighbors,
+            schema
+          )
+        : null;
 
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
@@ -1222,6 +1694,7 @@ function SchemaGraphInner({
           position = compactPositions.get(node.id)!;
         } else if (
           justExitedFocus &&
+          !focusLayoutLockedRef.current &&
           originalPositionsRef.current.has(node.id)
         ) {
           // Only restore original position when JUST exiting focus mode
@@ -1252,6 +1725,9 @@ function SchemaGraphInner({
       focusedTableId: focusedTableId ?? null,
       focusMode,
     };
+    if (justExitedFocus) {
+      focusLayoutLockedRef.current = false;
+    }
   }, [
     baseEdges,
     edgeTypeFilter,
@@ -1272,6 +1748,49 @@ function SchemaGraphInner({
     fitView,
   ]);
 
+  const reactFlowContent = (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onEdgeClick={onEdgeClick}
+      onEdgeContextMenu={canvasMode ? onEdgeContextMenu : undefined}
+      onEdgeMouseEnter={onEdgeMouseEnter}
+      onEdgeMouseLeave={onEdgeMouseLeave}
+      onPaneClick={onPaneClick}
+      onMove={onMove}
+      onConnect={canvasMode ? onConnect : undefined}
+      isValidConnection={canvasMode ? isValidConnection : undefined}
+      onNodeDragStop={onNodeDragStop}
+      onNodeDoubleClick={canvasMode ? onNodeDoubleClick : undefined}
+      nodeTypes={nodeTypes}
+      fitView
+      fitViewOptions={{ padding: 0.2 }}
+      minZoom={0.1}
+      maxZoom={2}
+      defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+      proOptions={{ hideAttribution: true }}
+      onlyRenderVisibleElements={true}
+      nodesConnectable={canvasMode ?? false}
+      nodesDraggable={true}
+      selectionOnDrag={canvasMode}
+    >
+      <Background
+        className="!bg-background [&>pattern>circle]:!fill-border"
+        gap={20}
+      />
+      <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
+      <MiniMap
+        nodeColor={getMinimapNodeColor}
+        maskColor="var(--minimap-mask)"
+        className="!bg-background"
+        pannable
+        zoomable
+      />
+    </ReactFlow>
+  );
+
   return (
     <div className="w-full h-full relative flex">
       <SchemaBrowserSidebar
@@ -1285,6 +1804,7 @@ function SchemaGraphInner({
         data={popoverData}
         anchorRect={anchorRect}
         onClose={closePopover}
+        onEdit={canvasMode ? handleEditFromPopover : undefined}
       />
       <main
         className={cn(
@@ -1292,48 +1812,171 @@ function SchemaGraphInner({
           sidebarOpen && "ml-[280px]"
         )}
       >
-        <div className="relative w-full h-full">
+        <div
+          className="relative w-full h-full"
+          onContextMenu={canvasMode ? handleContextMenu : undefined}
+        >
           <SidebarToggle
             onClick={() => setSidebarOpen(true)}
             visible={!sidebarOpen}
           />
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onEdgeClick={onEdgeClick}
-            onEdgeMouseEnter={onEdgeMouseEnter}
-            onEdgeMouseLeave={onEdgeMouseLeave}
-            onPaneClick={onPaneClick}
-            onMove={onMove}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
-            minZoom={0.1}
-            maxZoom={2}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-            proOptions={{ hideAttribution: true }}
-            onlyRenderVisibleElements={true}
-            nodesConnectable={false}
-          >
-            <Background
-              className="!bg-background [&>pattern>circle]:!fill-border"
-              gap={20}
+          {reactFlowContent}
+          {canvasMode && contextMenuPos && !contextMenuEdge && (
+            <CanvasContextMenu
+              screenPosition={contextMenuPos.screen}
+              flowPosition={contextMenuPos.flow}
+              onClose={() => setContextMenuPos(null)}
+              nodes={nodes}
+              schema={schema}
+              onEdit={(type, id) => setEditDialogState({ type, id })}
+              onDelete={(nodeType, id) => {
+                switch (nodeType) {
+                  case "tableNode":
+                    removeTable(id);
+                    break;
+                  case "viewNode":
+                    removeView(id);
+                    break;
+                  case "triggerNode":
+                    removeTrigger(id);
+                    break;
+                  case "storedProcedureNode":
+                    removeStoredProcedure(id);
+                    break;
+                  case "scalarFunctionNode":
+                    removeScalarFunction(id);
+                    break;
+                }
+              }}
             />
-            <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
-            <MiniMap
-              nodeColor={getMinimapNodeColor}
-              maskColor="var(--minimap-mask)"
-              className="!bg-background"
-              pannable
-              zoomable
-            />
-          </ReactFlow>
+          )}
+          {canvasMode && contextMenuPos && contextMenuEdge && (
+            <div
+              style={{
+                position: "fixed",
+                left: contextMenuPos.screen.x,
+                top: contextMenuPos.screen.y,
+                zIndex: 100,
+              }}
+              className="bg-popover border border-border rounded-md shadow-md py-1 min-w-[140px]"
+            >
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                onClick={() => {
+                  setPendingConnection({
+                    sourceId: contextMenuEdge.sourceId,
+                    targetId: contextMenuEdge.targetId,
+                    sourceColumn: contextMenuEdge.sourceColumn,
+                    targetColumn: contextMenuEdge.targetColumn,
+                    edgeType: contextMenuEdge.edgeType,
+                    editEdge: contextMenuEdge,
+                  });
+                  setContextMenuEdge(null);
+                  setContextMenuPos(null);
+                }}
+              >
+                Edit
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted text-destructive"
+                onClick={() => {
+                  removeEdgeDescriptor(contextMenuEdge);
+                  clearEdgeSelection();
+                  setContextMenuEdge(null);
+                  setContextMenuPos(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </main>
+      {canvasMode && (
+        <>
+          <CanvasEditDialogs
+            editState={editDialogState}
+            onClose={() => setEditDialogState(null)}
+          />
+          <ImportFromDatabaseDialog
+            open={importDialogOpen ?? false}
+            onOpenChange={onImportDialogOpenChange ?? (() => {})}
+          />
+          <CreateEdgeDialog
+            open={pendingConnection !== null}
+            onOpenChange={(open) => {
+              if (!open) setPendingConnection(null);
+            }}
+            initialFrom={pendingConnection?.sourceId}
+            initialTo={pendingConnection?.targetId}
+            initialFromColumn={pendingConnection?.sourceColumn}
+            initialToColumn={pendingConnection?.targetColumn}
+            initialEdgeType={pendingConnection?.edgeType}
+            editEdge={pendingConnection?.editEdge ?? null}
+          />
+        </>
+      )}
     </div>
   );
+}
+
+function CanvasEditDialogs({
+  editState,
+  onClose,
+}: {
+  editState: { type: string; id: string } | null;
+  onClose: () => void;
+}) {
+  if (!editState) return null;
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) onClose();
+  };
+
+  switch (editState.type) {
+    case "table":
+      return (
+        <CreateTableDialog
+          open={true}
+          onOpenChange={handleOpenChange}
+          editId={editState.id}
+        />
+      );
+    case "view":
+      return (
+        <CreateViewDialog
+          open={true}
+          onOpenChange={handleOpenChange}
+          editId={editState.id}
+        />
+      );
+    case "trigger":
+      return (
+        <CreateTriggerDialog
+          open={true}
+          onOpenChange={handleOpenChange}
+          editId={editState.id}
+        />
+      );
+    case "storedProcedure":
+      return (
+        <CreateProcedureDialog
+          open={true}
+          onOpenChange={handleOpenChange}
+          editId={editState.id}
+        />
+      );
+    case "scalarFunction":
+      return (
+        <CreateFunctionDialog
+          open={true}
+          onOpenChange={handleOpenChange}
+          editId={editState.id}
+        />
+      );
+    default:
+      return null;
+  }
 }
 
 export function SchemaGraphView(props: SchemaGraphProps) {

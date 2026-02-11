@@ -16,7 +16,7 @@ interface FilteredCounts {
     scalarFunctions: { filtered: number; total: number };
   };
   edgeBreakdown: {
-    foreignKeys: { filtered: number; total: number };
+    relationships: { filtered: number; total: number };
     triggerDependencies: { filtered: number; total: number };
     triggerWrites: { filtered: number; total: number };
     procedureReads: { filtered: number; total: number };
@@ -49,7 +49,7 @@ export function useFilteredCounts(
           scalarFunctions: { filtered: 0, total: 0 },
         },
         edgeBreakdown: {
-          foreignKeys: { filtered: 0, total: 0 },
+          relationships: { filtered: 0, total: 0 },
           triggerDependencies: { filtered: 0, total: 0 },
           triggerWrites: { filtered: 0, total: 0 },
           procedureReads: { filtered: 0, total: 0 },
@@ -177,12 +177,17 @@ export function useFilteredCounts(
     }
 
     // Calculate edge counts
-    // FK edges
-    const fkEdgeCount = edgeTypeFilter.has("foreignKeys")
-      ? schema.relationships.filter(
-          (rel) => tableIds.has(rel.from) && tableIds.has(rel.to)
-        ).length
-      : 0;
+    let relationshipCount = 0;
+    if (edgeTypeFilter.has("relationships")) {
+      schema.relationships.forEach((rel) => {
+        if (
+          (tableIds.has(rel.from) || viewIds.has(rel.from)) &&
+          (tableIds.has(rel.to) || viewIds.has(rel.to))
+        ) {
+          relationshipCount++;
+        }
+      });
+    }
 
     // Trigger dependency edges (trigger to parent table + trigger to referenced tables)
     let triggerDepCount = 0;
@@ -281,9 +286,15 @@ export function useFilteredCounts(
     const allViewIds = new Set(allViews.map((v) => v.id));
 
     // Calculate total counts per edge type
-    const totalFkEdges = schema.relationships.filter(
-      (rel) => allTableIds.has(rel.from) && allTableIds.has(rel.to)
-    ).length;
+    let totalRelationshipEdges = 0;
+    schema.relationships.forEach((rel) => {
+      if (
+        (allTableIds.has(rel.from) || allViewIds.has(rel.from)) &&
+        (allTableIds.has(rel.to) || allViewIds.has(rel.to))
+      ) {
+        totalRelationshipEdges++;
+      }
+    });
 
     let totalTriggerDepEdges = 0;
     allTriggers.forEach((trigger) => {
@@ -345,7 +356,7 @@ export function useFilteredCounts(
     });
 
     const totalEdgeCount =
-      totalFkEdges +
+      totalRelationshipEdges +
       totalTriggerDepEdges +
       totalTriggerWritesEdges +
       totalProcReadsEdges +
@@ -354,7 +365,7 @@ export function useFilteredCounts(
       totalFuncReadsEdges;
 
     const filteredEdges =
-      fkEdgeCount +
+      relationshipCount +
       triggerDepCount +
       triggerWritesCount +
       procReadsCount +
@@ -404,7 +415,10 @@ export function useFilteredCounts(
         },
       },
       edgeBreakdown: {
-        foreignKeys: { filtered: fkEdgeCount, total: totalFkEdges },
+        relationships: {
+          filtered: relationshipCount,
+          total: totalRelationshipEdges,
+        },
         triggerDependencies: {
           filtered: triggerDepCount,
           total: totalTriggerDepEdges,

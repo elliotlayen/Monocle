@@ -158,35 +158,50 @@ export function ViewDetail({ view }: { view: ViewNode }) {
               </tr>
             </thead>
             <tbody>
-              {view.columns.map((col: Column, idx: number) => (
-                <tr
-                  key={col.name}
-                  className={cn(
-                    idx % 2 === 0 ? "bg-background" : "bg-muted/50"
-                  )}
-                >
-                  <td className="px-3 py-2 font-mono text-foreground">
-                    {col.name}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    <span className="flex items-center gap-2">
-                      {col.dataType}
-                      {col.isNullable && (
-                        <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {col.sourceTable && col.sourceColumn ? (
-                      <span className="font-mono text-xs">
-                        {col.sourceTable}.{col.sourceColumn}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/50">-</span>
+              {view.columns.map((col: Column, idx: number) => {
+                const sources =
+                  col.sourceColumns && col.sourceColumns.length > 0
+                    ? col.sourceColumns
+                    : col.sourceTable && col.sourceColumn
+                      ? [{ table: col.sourceTable, column: col.sourceColumn }]
+                      : [];
+
+                return (
+                  <tr
+                    key={col.name}
+                    className={cn(
+                      idx % 2 === 0 ? "bg-background" : "bg-muted/50"
                     )}
-                  </td>
-                </tr>
-              ))}
+                  >
+                    <td className="px-3 py-2 font-mono text-foreground">
+                      {col.name}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        {col.dataType}
+                        {col.isNullable && (
+                          <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {sources.length > 0 ? (
+                        <div className="flex flex-col gap-1 font-mono text-xs">
+                          {sources.map((source, sourceIdx) => (
+                            <span
+                              key={`${col.name}-${source.table}-${source.column}-${sourceIdx}`}
+                            >
+                              {source.table}.{source.column}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/50">-</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

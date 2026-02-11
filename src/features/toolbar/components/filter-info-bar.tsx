@@ -28,7 +28,7 @@ const OBJECT_TYPE_ORDER: ObjectType[] = [
   "scalarFunctions",
 ];
 const EDGE_TYPE_ORDER: EdgeType[] = [
-  "foreignKeys",
+  "relationships",
   "viewDependencies",
   "triggerDependencies",
   "triggerWrites",
@@ -59,7 +59,7 @@ export function FilterInfoBar() {
   );
 
   const allObjectsSelected = objectTypeFilter.size === 5;
-  const allEdgesSelected = edgeTypeFilter.size === 7;
+  const allEdgesSelected = edgeTypeFilter.size === EDGE_TYPE_ORDER.length;
 
   // Determine the type of the focused object
   const getFocusedObjectType = (): ObjectType | null => {

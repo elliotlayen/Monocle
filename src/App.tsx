@@ -15,12 +15,23 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ConnectionModal } from "@/features/connection/components/connection-modal";
 import { AboutDialog } from "@/components/about-dialog";
 import { AppSettingsSheet } from "@/components/app-settings-sheet";
+import { canvasFileService } from "@/features/canvas/services/canvas-file-service";
+import { useToastStore } from "@/features/notifications/store";
+import type { CanvasFile } from "@/features/canvas/types";
+import {
+  CanvasDirtyDialog,
+  type CanvasDirtyAction,
+} from "@/features/canvas/components/canvas-dirty-dialog";
 
 function App() {
   const {
     schema,
     isConnected,
     serverConnection,
+    mode,
+    canvasFilePath,
+    canvasIsDirty,
+    nodePositions,
     debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
@@ -28,11 +39,19 @@ function App() {
     edgeTypeFilter,
     hydrateSettings,
     disconnect,
+    enterCanvasMode,
+    exitCanvasMode,
+    setCanvasFilePath,
+    setCanvasDirty,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
       isConnected: state.isConnected,
       serverConnection: state.serverConnection,
+      mode: state.mode,
+      canvasFilePath: state.canvasFilePath,
+      canvasIsDirty: state.canvasIsDirty,
+      nodePositions: state.nodePositions,
       debouncedSearchFilter: state.debouncedSearchFilter,
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
@@ -40,13 +59,67 @@ function App() {
       edgeTypeFilter: state.edgeTypeFilter,
       hydrateSettings: state.hydrateSettings,
       disconnect: state.disconnect,
+      enterCanvasMode: state.enterCanvasMode,
+      exitCanvasMode: state.exitCanvasMode,
+      setCanvasFilePath: state.setCanvasFilePath,
+      setCanvasDirty: state.setCanvasDirty,
     }))
   );
+
+  const { addToast } = useToastStore();
 
   const [connectionModalOpen, setConnectionModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [checkUpdatesRequested, setCheckUpdatesRequested] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [canvasDirtyDialogOpen, setCanvasDirtyDialogOpen] = useState(false);
+  const [pendingCanvasAction, setPendingCanvasAction] =
+    useState<CanvasDirtyAction | null>(null);
+  const [isCanvasDirtySaving, setIsCanvasDirtySaving] = useState(false);
+
+  const isCanvasMode = mode === "canvas";
+  const canvasFileName = useMemo(() => {
+    return canvasFilePath
+      ? canvasFilePath.split("/").pop()?.split("\\").pop() ?? "Untitled"
+      : "Untitled";
+  }, [canvasFilePath]);
+
+  const performCanvasAction = useCallback(
+    async (action: CanvasDirtyAction) => {
+      switch (action) {
+        case "exit":
+          exitCanvasMode();
+          return;
+        case "open": {
+          const result = await canvasFileService.openFile();
+          if (result) {
+            enterCanvasMode(
+              result.data.schema,
+              result.data.nodePositions,
+              result.path
+            );
+          }
+          return;
+        }
+        case "enter":
+          enterCanvasMode();
+      }
+    },
+    [enterCanvasMode, exitCanvasMode]
+  );
+
+  const requestCanvasAction = useCallback(
+    (action: CanvasDirtyAction) => {
+      if (canvasIsDirty && isCanvasMode) {
+        setPendingCanvasAction(action);
+        setCanvasDirtyDialogOpen(true);
+        return;
+      }
+      void performCanvasAction(action);
+    },
+    [canvasIsDirty, isCanvasMode, performCanvasAction]
+  );
 
   const handleNewConnection = useCallback(() => {
     setConnectionModalOpen(true);
@@ -71,6 +144,109 @@ function App() {
   const handleCheckUpdates = useCallback(() => {
     setCheckUpdatesRequested(true);
   }, []);
+
+  const handleEnterCanvasMode = useCallback(() => {
+    if (isCanvasMode) return;
+    requestCanvasAction("enter");
+  }, [isCanvasMode, requestCanvasAction]);
+
+  const handleExitCanvasMode = useCallback(() => {
+    requestCanvasAction("exit");
+  }, [requestCanvasAction]);
+
+  const handleCanvasSave = useCallback(async () => {
+    if (!schema) return false;
+
+    const data: CanvasFile = {
+      metadata: {
+        version: "1.0",
+        createdAt: canvasFilePath
+          ? new Date().toISOString()
+          : new Date().toISOString(),
+        lastModifiedAt: new Date().toISOString(),
+      },
+      schema,
+      nodePositions,
+    };
+
+    const path = await canvasFileService.saveFile(
+      data,
+      canvasFilePath ?? undefined
+    );
+    if (!path) return false;
+
+    setCanvasFilePath(path);
+    setCanvasDirty(false);
+    addToast({
+      type: "success",
+      title: "Saved",
+      message: `Saved to ${path.split("/").pop()?.split("\\").pop()}`,
+      duration: 2000,
+    });
+    return true;
+  }, [
+    schema,
+    canvasFilePath,
+    nodePositions,
+    setCanvasFilePath,
+    setCanvasDirty,
+    addToast,
+  ]);
+
+  const handleCanvasOpen = useCallback(() => {
+    requestCanvasAction("open");
+  }, [requestCanvasAction]);
+
+  const handleImport = useCallback(() => {
+    setImportDialogOpen(true);
+  }, []);
+
+  const handleCanvasDirtyDialogOpenChange = useCallback((open: boolean) => {
+    setCanvasDirtyDialogOpen(open);
+    if (!open) {
+      setPendingCanvasAction(null);
+      setIsCanvasDirtySaving(false);
+    }
+  }, []);
+
+  const handleCanvasDirtySaveAndContinue = useCallback(async () => {
+    if (!pendingCanvasAction) return;
+    setIsCanvasDirtySaving(true);
+    const saved = await handleCanvasSave();
+    setIsCanvasDirtySaving(false);
+    if (!saved) return;
+    setCanvasDirtyDialogOpen(false);
+    const action = pendingCanvasAction;
+    setPendingCanvasAction(null);
+    void performCanvasAction(action);
+  }, [handleCanvasSave, pendingCanvasAction, performCanvasAction]);
+
+  const handleCanvasDirtyDiscardAndContinue = useCallback(() => {
+    if (!pendingCanvasAction) return;
+    setCanvasDirtyDialogOpen(false);
+    const action = pendingCanvasAction;
+    setPendingCanvasAction(null);
+    void performCanvasAction(action);
+  }, [pendingCanvasAction, performCanvasAction]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === "k") {
+        e.preventDefault();
+        if (!isCanvasMode) {
+          handleEnterCanvasMode();
+        }
+      }
+      if (mod && e.key === "s" && isCanvasMode) {
+        e.preventDefault();
+        void handleCanvasSave();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isCanvasMode, handleEnterCanvasMode, handleCanvasSave]);
 
   const menuHandlers = useMemo(
     () => ({
@@ -109,7 +285,8 @@ function App() {
     };
   }, [hydrateSettings]);
 
-  const showHome = !schema && (!isConnected || !serverConnection);
+  const showHome =
+    !schema && mode !== "canvas" && (!isConnected || !serverConnection);
 
   return (
     <>
@@ -124,16 +301,35 @@ function App() {
       />
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
       <AppSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
+      {pendingCanvasAction && (
+        <CanvasDirtyDialog
+          open={canvasDirtyDialogOpen}
+          action={pendingCanvasAction}
+          fileName={canvasFileName}
+          isSaving={isCanvasDirtySaving}
+          onOpenChange={handleCanvasDirtyDialogOpenChange}
+          onSaveAndContinue={handleCanvasDirtySaveAndContinue}
+          onDiscardAndContinue={handleCanvasDirtyDiscardAndContinue}
+        />
+      )}
       {showHome ? (
         <HomeScreen
           onOpenConnectionModal={() => setConnectionModalOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenAbout={() => setAboutOpen(true)}
+          onEnterCanvasMode={handleEnterCanvasMode}
         />
       ) : (
         <ReactFlowProvider>
           <div className="flex flex-col h-screen">
-            <Toolbar onOpenSettings={() => setSettingsOpen(true)} />
+            <Toolbar
+              onOpenSettings={() => setSettingsOpen(true)}
+              canvasMode={isCanvasMode}
+              onSave={handleCanvasSave}
+              onOpen={handleCanvasOpen}
+              onExitCanvas={handleExitCanvasMode}
+              onImport={handleImport}
+            />
             <main className="relative flex-1 overflow-hidden">
               {schema ? (
                 <>
@@ -145,6 +341,9 @@ function App() {
                     focusedTableId={focusedTableId}
                     objectTypeFilter={objectTypeFilter}
                     edgeTypeFilter={edgeTypeFilter}
+                    canvasMode={isCanvasMode}
+                    importDialogOpen={importDialogOpen}
+                    onImportDialogOpenChange={setImportDialogOpen}
                   />
                 </>
               ) : (
