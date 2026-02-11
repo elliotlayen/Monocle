@@ -1,156 +1,109 @@
+import { useEffect, useState } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/providers/theme-provider";
-import { useSchemaStore } from "@/features/schema-graph/store";
-import { useShallow } from "zustand/shallow";
-import { useAppVersion } from "@/hooks/useAppVersion";
+import { Info, Network, Palette } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { GraphSettingsSection } from "@/features/settings/components/sections/graph-settings-section";
+import { AppearanceSettingsSection } from "@/features/settings/components/sections/appearance-settings-section";
+import { AboutSettingsSection } from "@/features/settings/components/sections/about-settings-section";
 
 interface AppSettingsSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) {
-  const { theme, setTheme } = useTheme();
-  const version = useAppVersion();
-  const {
-    schema,
-    schemaFilter,
-    availableSchemas,
-    setSchemaFilter,
-    focusExpandThreshold,
-    setFocusExpandThreshold,
-    disconnect,
-    isConnected,
-  } = useSchemaStore(
-    useShallow((state) => ({
-      schema: state.schema,
-      schemaFilter: state.schemaFilter,
-      availableSchemas: state.availableSchemas,
-      setSchemaFilter: state.setSchemaFilter,
-      focusExpandThreshold: state.focusExpandThreshold,
-      setFocusExpandThreshold: state.setFocusExpandThreshold,
-      disconnect: state.disconnect,
-      isConnected: state.isConnected,
-    }))
-  );
+type SettingsSectionId = "graph" | "appearance" | "about";
 
-  const hasSchema = Boolean(schema);
+const SETTINGS_SECTIONS: Array<{
+  id: SettingsSectionId;
+  label: string;
+  icon: typeof Network;
+}> = [
+  { id: "graph", label: "Graph", icon: Network },
+  { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "about", label: "About", icon: Info },
+];
+
+export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) {
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>("graph");
+
+  useEffect(() => {
+    if (open) {
+      setActiveSection("graph");
+    }
+  }, [open]);
+
+  const renderActiveSection = () => {
+    switch (activeSection) {
+      case "graph":
+        return <GraphSettingsSection />;
+      case "appearance":
+        return <AppearanceSettingsSection />;
+      case "about":
+        return <AboutSettingsSection />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Settings</SheetTitle>
-        </SheetHeader>
-        <div className="mt-6 space-y-6 flex-1">
-          {hasSchema && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Schema Filter</label>
-              <Select value={schemaFilter} onValueChange={setSchemaFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All Schemas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Schemas</SelectItem>
-                  {availableSchemas.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Filter objects by database schema
-              </p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[90vh] max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:h-[min(90vh,42rem)] sm:max-w-3xl">
+        <DialogHeader className="h-16 justify-center px-6">
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 border-t">
+          <div className="border-b px-3 pb-3 sm:hidden">
+            <div className="grid grid-cols-3 gap-2">
+              {SETTINGS_SECTIONS.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                return (
+                  <Button
+                    key={section.id}
+                    variant={isActive ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn("w-full justify-center gap-2")}
+                    onClick={() => setActiveSection(section.id)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-xs">{section.label}</span>
+                  </Button>
+                );
+              })}
             </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Theme</label>
-            <Select value={theme} onValueChange={setTheme}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select theme" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="system">System</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Choose your preferred color scheme
-            </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Focus Expand Threshold</label>
-            <Select
-              value={String(focusExpandThreshold)}
-              onValueChange={(v) => setFocusExpandThreshold(Number(v))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5 nodes</SelectItem>
-                <SelectItem value="10">10 nodes</SelectItem>
-                <SelectItem value="15">15 nodes</SelectItem>
-                <SelectItem value="20">20 nodes</SelectItem>
-                <SelectItem value="25">25 nodes</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Max neighbors to show expanded in focus mode
-            </p>
+          <div className="flex h-full min-h-0">
+            <nav className="hidden w-52 shrink-0 flex-col gap-1 overflow-y-auto border-r p-2 sm:flex">
+              {SETTINGS_SECTIONS.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                return (
+                  <Button
+                    key={section.id}
+                    variant={isActive ? "secondary" : "ghost"}
+                    className="justify-start gap-2"
+                    onClick={() => setActiveSection(section.id)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{section.label}</span>
+                  </Button>
+                );
+              })}
+            </nav>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 sm:px-6 sm:pt-4">
+              {renderActiveSection()}
+            </div>
           </div>
         </div>
-
-        <div className="pt-6 mt-auto border-t border-border space-y-4">
-          {isConnected && (
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={() => {
-                disconnect();
-                onOpenChange(false);
-              }}
-            >
-              Disconnect
-            </Button>
-          )}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex flex-col">
-                <span
-                  className="font-semibold text-sm"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  Monocle
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  By Elliot Layen
-                </span>
-              </div>
-            </div>
-            {version && (
-              <span className="text-xs text-muted-foreground">v{version}</span>
-            )}
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

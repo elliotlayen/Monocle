@@ -10,9 +10,11 @@ pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schema_filter: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub focus_mode: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_expand_threshold: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edge_label_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_mini_map: Option<bool>,
 }
 
 pub struct AppState {
@@ -25,8 +27,9 @@ pub struct AppState {
 pub struct AppSettingsUpdate {
     pub theme: Option<String>,
     pub schema_filter: Option<String>,
-    pub focus_mode: Option<String>,
     pub focus_expand_threshold: Option<u32>,
+    pub edge_label_mode: Option<String>,
+    pub show_mini_map: Option<bool>,
 }
 
 impl AppState {
@@ -81,11 +84,14 @@ impl AppState {
         if let Some(schema_filter) = update.schema_filter {
             settings.schema_filter = Some(schema_filter);
         }
-        if let Some(focus_mode) = update.focus_mode {
-            settings.focus_mode = Some(focus_mode);
-        }
         if let Some(threshold) = update.focus_expand_threshold {
             settings.focus_expand_threshold = Some(threshold);
+        }
+        if let Some(edge_label_mode) = update.edge_label_mode {
+            settings.edge_label_mode = Some(edge_label_mode);
+        }
+        if let Some(show_mini_map) = update.show_mini_map {
+            settings.show_mini_map = Some(show_mini_map);
         }
 
         let updated = settings.clone();
@@ -110,8 +116,9 @@ mod tests {
             .update_settings(AppSettingsUpdate {
                 theme: Some("light".to_string()),
                 schema_filter: Some("sales".to_string()),
-                focus_mode: None,
                 focus_expand_threshold: None,
+                edge_label_mode: Some("auto".to_string()),
+                show_mini_map: Some(true),
             })
             .expect("update settings");
 
@@ -120,5 +127,7 @@ mod tests {
 
         assert_eq!(settings.theme.as_deref(), Some("light"));
         assert_eq!(settings.schema_filter.as_deref(), Some("sales"));
+        assert_eq!(settings.edge_label_mode.as_deref(), Some("auto"));
+        assert_eq!(settings.show_mini_map, Some(true));
     }
 }
