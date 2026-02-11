@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnSource {
+    pub table: String,
+    pub column: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Column {
@@ -7,6 +14,8 @@ pub struct Column {
     pub data_type: String,
     pub is_nullable: bool,
     pub is_primary_key: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub source_columns: Vec<ColumnSource>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub source_table: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -39,8 +48,10 @@ pub struct RelationshipEdge {
     pub id: String,
     pub from: String,
     pub to: String,
-    pub from_column: String,
-    pub to_column: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub from_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub to_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

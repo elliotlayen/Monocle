@@ -120,17 +120,23 @@ SELECT
     vs.name AS view_schema,
     v.name AS view_name,
     vc.name AS view_column,
-    ref.referenced_entity_name AS source_table,
-    ref.referenced_minor_name AS source_column
+    rs.name AS source_schema,
+    ro.name AS source_table,
+    rc.name AS source_column
 FROM sys.views v
 JOIN sys.schemas vs ON v.schema_id = vs.schema_id
 JOIN sys.columns vc ON v.object_id = vc.object_id
-CROSS APPLY sys.dm_sql_referenced_entities(
-    QUOTENAME(vs.name) + '.' + QUOTENAME(v.name), 'OBJECT'
-) ref
+JOIN sys.sql_expression_dependencies sed
+  ON sed.referencing_id = v.object_id
+ AND sed.referencing_minor_id = vc.column_id
+JOIN sys.objects ro ON sed.referenced_id = ro.object_id
+JOIN sys.schemas rs ON ro.schema_id = rs.schema_id
+JOIN sys.columns rc
+  ON rc.object_id = ro.object_id
+ AND rc.column_id = sed.referenced_minor_id
 WHERE v.is_ms_shipped = 0
-  AND ref.referenced_minor_name IS NOT NULL
-  AND ref.referenced_class_desc = 'OBJECT_OR_COLUMN'
+  AND sed.referenced_id IS NOT NULL
+  AND sed.referenced_minor_id IS NOT NULL
 ORDER BY vs.name, v.name, vc.column_id
 "#;
 

@@ -1,6 +1,6 @@
 use crate::types::{
-    Column, ProcedureParameter, RelationshipEdge, ScalarFunction, SchemaGraph, StoredProcedure,
-    TableNode, Trigger, ViewNode,
+    Column, ColumnSource, ProcedureParameter, RelationshipEdge, ScalarFunction, SchemaGraph,
+    StoredProcedure, TableNode, Trigger, ViewNode,
 };
 
 struct MockConfig {
@@ -173,8 +173,8 @@ fn generate_relationships(tables: &[TableNode], config: &MockConfig) -> Vec<Rela
             id: format!("FK_{}_{}_{}", from_table.name, to_table.name, i),
             from: from_table.id.clone(),
             to: to_table.id.clone(),
-            from_column: fk_col_name,
-            to_column: "Id".to_string(),
+            from_column: Some(fk_col_name),
+            to_column: Some("Id".to_string()),
         });
     }
 
@@ -209,7 +209,11 @@ fn generate_views(tables: &[TableNode], config: &MockConfig) -> Vec<ViewNode> {
                     data_type: col.data_type.clone(),
                     is_nullable: col.is_nullable,
                     is_primary_key: false,
-                    source_table: Some(table.name.clone()),
+                    source_columns: vec![ColumnSource {
+                        table: table.id.clone(),
+                        column: col.name.clone(),
+                    }],
+                    source_table: Some(table.id.clone()),
                     source_column: Some(col.name.clone()),
                 });
                 if columns.len() >= 8 {

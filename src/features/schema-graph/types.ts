@@ -1,11 +1,17 @@
+export interface ColumnSource {
+  table: string;
+  column: string;
+}
+
 // Column definition
 export interface Column {
   name: string;
   dataType: string;
   isNullable: boolean;
   isPrimaryKey: boolean;
-  sourceTable?: string; // Source table name (for view columns)
-  sourceColumn?: string; // Source column name (for view columns)
+  sourceColumns?: ColumnSource[]; // Source columns (for view columns)
+  sourceTable?: string; // Source table name (legacy view columns)
+  sourceColumn?: string; // Source column name (legacy view columns)
 }
 
 // Table node representation
@@ -31,8 +37,8 @@ export interface RelationshipEdge {
   id: string; // Unique FK identifier
   from: string; // Source table ID ("schema.table")
   to: string; // Target table ID ("schema.table")
-  fromColumn: string; // FK column in source
-  toColumn: string; // Referenced column in target
+  fromColumn?: string; // FK column in source (optional for column-less edges)
+  toColumn?: string; // Referenced column in target (optional for column-less edges)
 }
 
 // Trigger definition

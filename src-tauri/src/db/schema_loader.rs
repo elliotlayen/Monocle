@@ -13,8 +13,8 @@ use crate::db::{
     VIEW_COLUMN_SOURCES_QUERY,
 };
 use crate::types::{
-    Column, ConnectionParams, ProcedureParameter, RelationshipEdge, ScalarFunction, SchemaGraph,
-    StoredProcedure, TableNode, Trigger, ViewNode,
+    Column, ColumnSource, ConnectionParams, ProcedureParameter, RelationshipEdge, ScalarFunction,
+    SchemaGraph, StoredProcedure, TableNode, Trigger, ViewNode,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -98,6 +98,7 @@ async fn load_tables_and_columns(
             data_type: formatted_type,
             is_nullable,
             is_primary_key: is_primary_key != 0,
+            source_columns: Vec::new(),
             source_table: None,
             source_column: None,
         };
@@ -144,6 +145,7 @@ async fn load_views_and_columns(
             data_type: formatted_type,
             is_nullable,
             is_primary_key: false,
+            source_columns: Vec::new(),
             source_table: None,
             source_column: None,
         };
@@ -174,7 +176,7 @@ async fn load_view_column_sources(
     client: &mut Client<Compat<TcpStream>>,
     views: &mut [ViewNode],
 ) {
-    let mut column_sources: HashMap<String, HashMap<String, (String, String)>> = HashMap::new();
+    let mut column_sources: HashMap<String, HashMap<String, Vec<ColumnSource>>> = HashMap::new();
 
     // Query can fail if views reference non-existent objects
     let stream = match client.query(VIEW_COLUMN_SOURCES_QUERY, &[]).await {
@@ -191,15 +193,35 @@ async fn load_view_column_sources(
                 let view_schema: &str = row.get(0).unwrap_or_default();
                 let view_name: &str = row.get(1).unwrap_or_default();
                 let view_column: &str = row.get(2).unwrap_or_default();
-                let source_table: &str = row.get(3).unwrap_or_default();
-                let source_column: &str = row.get(4).unwrap_or_default();
+                let source_schema: &str = row.get(3).unwrap_or_default();
+                let source_table: &str = row.get(4).unwrap_or_default();
+                let source_column: &str = row.get(5).unwrap_or_default();
 
                 let view_id = format!("{}.{}", view_schema, view_name);
 
-                column_sources.entry(view_id).or_default().insert(
-                    view_column.to_string(),
-                    (source_table.to_string(), source_column.to_string()),
-                );
+                if !source_table.is_empty() && !source_column.is_empty() {
+                    let source_table_name = if source_schema.is_empty() {
+                        source_table.to_string()
+                    } else {
+                        format!("{}.{}", source_schema, source_table)
+                    };
+                    let entry = column_sources
+                        .entry(view_id)
+                        .or_default()
+                        .entry(view_column.to_string())
+                        .or_default();
+                    if !entry
+                        .iter()
+                        .any(|source| {
+                            source.table == source_table_name && source.column == source_column
+                        })
+                    {
+                        entry.push(ColumnSource {
+                            table: source_table_name,
+                            column: source_column.to_string(),
+                        });
+                    }
+                }
             }
             Ok(None) => break,
             Err(_) => break, // Stop on error, keep what we have
@@ -210,9 +232,12 @@ async fn load_view_column_sources(
     for view in views.iter_mut() {
         if let Some(view_sources) = column_sources.get(&view.id) {
             for column in view.columns.iter_mut() {
-                if let Some((source_table, source_column)) = view_sources.get(&column.name) {
-                    column.source_table = Some(source_table.clone());
-                    column.source_column = Some(source_column.clone());
+                if let Some(sources) = view_sources.get(&column.name) {
+                    column.source_columns = sources.clone();
+                    if let Some(first) = sources.first() {
+                        column.source_table = Some(first.table.clone());
+                        column.source_column = Some(first.column.clone());
+                    }
                 }
             }
         }
@@ -250,8 +275,8 @@ async fn load_foreign_keys(
             id: fk_name.to_string(),
             from: from_id,
             to: to_id,
-            from_column: src_column.to_string(),
-            to_column: ref_column.to_string(),
+            from_column: Some(src_column.to_string()),
+            to_column: Some(ref_column.to_string()),
         });
     }
 
