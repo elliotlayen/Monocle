@@ -48,7 +48,11 @@ export function useTauriEvent<T>(
 export const menuToggleSidebarHub = createEventHub<void>("menu:toggle-sidebar");
 export const menuFitViewHub = createEventHub<void>("menu:fit-view");
 export const menuActualSizeHub = createEventHub<void>("menu:actual-size");
+export const menuZoomInHub = createEventHub<void>("menu:zoom-in");
+export const menuZoomOutHub = createEventHub<void>("menu:zoom-out");
 export const menuExportPngHub = createEventHub<void>("menu:export-png");
 export const menuExportPdfHub = createEventHub<void>("menu:export-pdf");
 export const menuExportJsonHub = createEventHub<void>("menu:export-json");
 export const menuCheckUpdatesHub = createEventHub<void>("menu:check-updates");
+export const menuDeleteSelectionHub =
+  createEventHub<void>("menu:delete-selection");

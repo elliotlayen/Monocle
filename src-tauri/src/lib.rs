@@ -6,6 +6,7 @@ mod types;
 
 use commands::{
     get_settings, list_databases_cmd, load_schema_cmd, load_schema_mock, save_settings,
+    set_menu_ui_state_cmd,
 };
 use state::AppState;
 use tauri::Manager;
@@ -39,6 +40,7 @@ pub fn run() {
             list_databases_cmd,
             get_settings,
             save_settings,
+            set_menu_ui_state_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

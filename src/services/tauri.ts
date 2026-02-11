@@ -39,4 +39,11 @@ export const tauri = {
   getSettings: () => invokeCommand<AppSettings>("get_settings"),
   saveSettings: (settings: SettingsUpdate) =>
     invokeCommand<AppSettings>("save_settings", { settings }),
+
+  // Menu commands
+  setMenuUiState: (state: {
+    isCanvasMode: boolean;
+    hasFocus: boolean;
+    hasActiveFilters: boolean;
+  }) => invokeCommand<void>("set_menu_ui_state_cmd", { state }),
 };
