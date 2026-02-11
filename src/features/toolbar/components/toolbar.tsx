@@ -32,9 +32,9 @@ import {
   Network,
   Search,
   Settings,
+  LogOut,
   Save,
   FolderOpen,
-  Home,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ExportButton } from "@/features/export/components/export-button";
@@ -56,6 +56,7 @@ const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
 
 interface ToolbarProps {
   onOpenSettings?: () => void;
+  onDisconnect?: () => void;
   canvasMode?: boolean;
   onSave?: () => void;
   onOpen?: () => void;
@@ -65,6 +66,7 @@ interface ToolbarProps {
 
 export function Toolbar({
   onOpenSettings,
+  onDisconnect,
   canvasMode,
   onSave,
   onOpen,
@@ -74,6 +76,7 @@ export function Toolbar({
   const {
     schema,
     serverConnection,
+    isConnected,
     focusedTableId,
     objectTypeFilter,
     edgeTypeFilter,
@@ -89,6 +92,7 @@ export function Toolbar({
     useShallow((state) => ({
       schema: state.schema,
       serverConnection: state.serverConnection,
+      isConnected: state.isConnected,
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
       edgeTypeFilter: state.edgeTypeFilter,
@@ -469,20 +473,6 @@ export function Toolbar({
           </TooltipProvider>
         )}
 
-        {/* Canvas exit button */}
-        {canvasMode && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={onExitCanvas}>
-                  <Home className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Home</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-
         {/* Settings */}
         <TooltipProvider>
           <Tooltip>
@@ -499,6 +489,44 @@ export function Toolbar({
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
+        {/* Canvas leave */}
+        {canvasMode && onExitCanvas && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-9 px-2"
+                  onClick={onExitCanvas}
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Leave Canvas</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* Disconnect */}
+        {!canvasMode && isConnected && onDisconnect && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-9 px-2"
+                  onClick={onDisconnect}
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Disconnect</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
     </div>
   );

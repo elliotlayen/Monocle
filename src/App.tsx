@@ -16,6 +16,7 @@ import { ConnectionModal } from "@/features/connection/components/connection-mod
 import { AboutDialog } from "@/components/about-dialog";
 import { AppSettingsSheet } from "@/components/app-settings-sheet";
 import { canvasFileService } from "@/features/canvas/services/canvas-file-service";
+import { canvasMenuService } from "@/features/canvas/services/canvas-menu-service";
 import { useToastStore } from "@/features/notifications/store";
 import type { CanvasFile } from "@/features/canvas/types";
 import {
@@ -32,6 +33,7 @@ function App() {
     canvasFilePath,
     canvasIsDirty,
     nodePositions,
+    searchFilter,
     debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
@@ -43,6 +45,11 @@ function App() {
     exitCanvasMode,
     setCanvasFilePath,
     setCanvasDirty,
+    setSearchFilter,
+    setDebouncedSearchFilter,
+    clearFocus,
+    selectAllObjectTypes,
+    selectAllEdgeTypes,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
@@ -52,6 +59,7 @@ function App() {
       canvasFilePath: state.canvasFilePath,
       canvasIsDirty: state.canvasIsDirty,
       nodePositions: state.nodePositions,
+      searchFilter: state.searchFilter,
       debouncedSearchFilter: state.debouncedSearchFilter,
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
@@ -63,6 +71,11 @@ function App() {
       exitCanvasMode: state.exitCanvasMode,
       setCanvasFilePath: state.setCanvasFilePath,
       setCanvasDirty: state.setCanvasDirty,
+      setSearchFilter: state.setSearchFilter,
+      setDebouncedSearchFilter: state.setDebouncedSearchFilter,
+      clearFocus: state.clearFocus,
+      selectAllObjectTypes: state.selectAllObjectTypes,
+      selectAllEdgeTypes: state.selectAllEdgeTypes,
     }))
   );
 
@@ -201,6 +214,24 @@ function App() {
     setImportDialogOpen(true);
   }, []);
 
+  const handleResetFilters = useCallback(() => {
+    clearFocus();
+    selectAllObjectTypes();
+    selectAllEdgeTypes();
+    setSearchFilter("");
+    setDebouncedSearchFilter("");
+  }, [
+    clearFocus,
+    selectAllObjectTypes,
+    selectAllEdgeTypes,
+    setSearchFilter,
+    setDebouncedSearchFilter,
+  ]);
+
+  const handleClearFocus = useCallback(() => {
+    clearFocus();
+  }, [clearFocus]);
+
   const handleCanvasDirtyDialogOpenChange = useCallback((open: boolean) => {
     setCanvasDirtyDialogOpen(open);
     if (!open) {
@@ -256,6 +287,15 @@ function App() {
       onAbout: handleAbout,
       onDocumentation: handleDocumentation,
       onCheckUpdates: handleCheckUpdates,
+      onEnterCanvas: handleEnterCanvasMode,
+      onCanvasOpen: handleCanvasOpen,
+      onCanvasSave: () => {
+        void handleCanvasSave();
+      },
+      onExitCanvas: handleExitCanvasMode,
+      onCanvasImport: handleImport,
+      onResetFilters: handleResetFilters,
+      onClearFocus: handleClearFocus,
     }),
     [
       handleNewConnection,
@@ -264,10 +304,36 @@ function App() {
       handleAbout,
       handleDocumentation,
       handleCheckUpdates,
+      handleEnterCanvasMode,
+      handleCanvasOpen,
+      handleCanvasSave,
+      handleExitCanvasMode,
+      handleImport,
+      handleResetFilters,
+      handleClearFocus,
     ]
   );
 
   useMenuEvents(menuHandlers);
+
+  const hasFocus = focusedTableId !== null;
+  const hasActiveFilters =
+    hasFocus ||
+    searchFilter.trim() !== "" ||
+    objectTypeFilter.size !== 5 ||
+    edgeTypeFilter.size !== 7;
+
+  useEffect(() => {
+    canvasMenuService
+      .setMenuUiState({
+        isCanvasMode,
+        hasFocus,
+        hasActiveFilters,
+      })
+      .catch((error) => {
+        console.error("Failed to sync canvas menu state:", error);
+      });
+  }, [isCanvasMode, hasFocus, hasActiveFilters]);
 
   useEffect(() => {
     let isMounted = true;
@@ -324,6 +390,7 @@ function App() {
           <div className="flex flex-col h-screen">
             <Toolbar
               onOpenSettings={() => setSettingsOpen(true)}
+              onDisconnect={handleDisconnect}
               canvasMode={isCanvasMode}
               onSave={handleCanvasSave}
               onOpen={handleCanvasOpen}

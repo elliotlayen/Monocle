@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,23 @@ import type {
 } from "@/features/schema-graph/types";
 
 type Step = "connect" | "database" | "pick";
+type SectionKey =
+  | "tables"
+  | "views"
+  | "triggers"
+  | "storedProcedures"
+  | "scalarFunctions";
+
+const createDefaultExpandedSections = (): Record<SectionKey, boolean> => ({
+  tables: true,
+  views: true,
+  triggers: true,
+  storedProcedures: true,
+  scalarFunctions: true,
+});
+
+const sortById = (a: { id: string }, b: { id: string }) =>
+  a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
 
 interface ImportFromDatabaseDialogProps {
   open: boolean;
@@ -63,6 +81,9 @@ export function ImportFromDatabaseDialog({
   const [loadedSchema, setLoadedSchema] = useState<SchemaGraph | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterText, setFilterText] = useState("");
+  const [expandedSections, setExpandedSections] = useState<
+    Record<SectionKey, boolean>
+  >(createDefaultExpandedSections);
 
   const reset = useCallback(() => {
     setStep("connect");
@@ -72,6 +93,7 @@ export function ImportFromDatabaseDialog({
     setLoadedSchema(null);
     setSelectedIds(new Set());
     setFilterText("");
+    setExpandedSections(createDefaultExpandedSections());
   }, []);
 
   const handleOpenChange = useCallback(
@@ -120,15 +142,8 @@ export function ImportFromDatabaseDialog({
       };
       const schema = await schemaService.loadSchema(params);
       setLoadedSchema(schema);
-      // Select all by default
-      const allIds = new Set([
-        ...schema.tables.map((t) => t.id),
-        ...(schema.views || []).map((v) => v.id),
-        ...(schema.triggers || []).map((t) => t.id),
-        ...(schema.storedProcedures || []).map((p) => p.id),
-        ...(schema.scalarFunctions || []).map((f) => f.id),
-      ]);
-      setSelectedIds(allIds);
+      setSelectedIds(new Set());
+      setExpandedSections(createDefaultExpandedSections());
       setStep("pick");
     } catch (err) {
       setError(String(err));
@@ -158,6 +173,13 @@ export function ImportFromDatabaseDialog({
       });
       return next;
     });
+  };
+
+  const toggleSection = (key: SectionKey) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   const handleImport = () => {
@@ -318,7 +340,7 @@ export function ImportFromDatabaseDialog({
                 <SelectTrigger>
                   <SelectValue placeholder="Select a database" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent side="bottom" avoidCollisions={false}>
                   {databases.map((db) => (
                     <SelectItem key={db} value={db}>
                       {db}
@@ -360,31 +382,43 @@ export function ImportFromDatabaseDialog({
             <div className="max-h-[400px] overflow-y-auto space-y-2">
               {[
                 {
+                  key: "tables" as const,
                   label: "Tables",
                   items: loadedSchema.tables,
                 },
                 {
+                  key: "views" as const,
                   label: "Views",
                   items: loadedSchema.views || [],
                 },
                 {
+                  key: "triggers" as const,
                   label: "Triggers",
                   items: loadedSchema.triggers || [],
                 },
                 {
+                  key: "storedProcedures" as const,
                   label: "Stored Procedures",
                   items: loadedSchema.storedProcedures || [],
                 },
                 {
+                  key: "scalarFunctions" as const,
                   label: "Scalar Functions",
                   items: loadedSchema.scalarFunctions || [],
                 },
-              ].map(({ label, items }) => {
-                const filtered = items.filter((i) => filterMatch(i.id));
+              ].map(({ key, label, items }) => {
+                const totalCount = items.length;
+                const filtered = [...items]
+                  .sort(sortById)
+                  .filter((i) => filterMatch(i.id));
                 if (filtered.length === 0) return null;
+
+                const isExpanded =
+                  filterText.trim().length > 0 || expandedSections[key];
                 const allSelected = filtered.every((i) =>
                   selectedIds.has(i.id)
                 );
+
                 return (
                   <div key={label}>
                     <div className="flex items-center gap-2 mb-1">
@@ -398,23 +432,39 @@ export function ImportFromDatabaseDialog({
                         }
                       />
                       <span className="text-sm font-medium">
-                        {label} ({filtered.length})
+                        {label} ({filtered.length}/{totalCount})
                       </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="ml-auto h-7 w-7"
+                        onClick={() => toggleSection(key)}
+                        aria-label={`Toggle ${label}`}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
-                    <div className="pl-6 space-y-0.5">
-                      {filtered.map((item) => (
-                        <label
-                          key={item.id}
-                          className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted px-1 py-0.5 rounded"
-                        >
-                          <CheckboxUI
-                            checked={selectedIds.has(item.id)}
-                            onCheckedChange={() => toggleId(item.id)}
-                          />
-                          <span>{item.id}</span>
-                        </label>
-                      ))}
-                    </div>
+                    {isExpanded && (
+                      <div className="pl-6 space-y-0.5">
+                        {filtered.map((item) => (
+                          <label
+                            key={item.id}
+                            className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted px-1 py-0.5 rounded"
+                          >
+                            <CheckboxUI
+                              checked={selectedIds.has(item.id)}
+                              onCheckedChange={() => toggleId(item.id)}
+                            />
+                            <span>{item.id}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

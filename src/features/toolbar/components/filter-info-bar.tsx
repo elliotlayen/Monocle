@@ -37,6 +37,19 @@ const EDGE_TYPE_ORDER: EdgeType[] = [
   "functionReads",
 ];
 
+type BorderMode = "left-accent" | "full-border";
+
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return hex;
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export function FilterInfoBar() {
   const {
     schema,
@@ -117,6 +130,7 @@ export function FilterInfoBar() {
           label="Focus"
           value={focusedTableId}
           colors={[OBJECT_COLORS[focusedType]]}
+          borderMode="full-border"
           onClear={clearFocus}
         />
       )}
@@ -144,25 +158,29 @@ function FilterBox({
   label,
   value,
   colors,
+  borderMode = "left-accent",
   onClear,
 }: {
   label: string;
   value: string;
   colors: string[];
+  borderMode?: BorderMode;
   onClear: () => void;
 }) {
-  // Create gradient for multiple colors, or solid color for single
+  // Full-border mode is used for focus to match notification chips.
   const borderStyle =
-    colors.length === 1
-      ? { borderLeftWidth: 3, borderLeftColor: colors[0] }
-      : {
-          borderLeftWidth: 3,
-          borderLeftColor: "transparent",
-          backgroundImage: `linear-gradient(to bottom, ${colors.join(", ")})`,
-          backgroundSize: "3px 100%",
-          backgroundPosition: "left",
-          backgroundRepeat: "no-repeat",
-        };
+    borderMode === "full-border"
+      ? { borderColor: hexToRgba(colors[0], 0.3) }
+      : colors.length === 1
+        ? { borderLeftWidth: 3, borderLeftColor: colors[0] }
+        : {
+            borderLeftWidth: 3,
+            borderLeftColor: "transparent",
+            backgroundImage: `linear-gradient(to bottom, ${colors.join(", ")})`,
+            backgroundSize: "3px 100%",
+            backgroundPosition: "left",
+            backgroundRepeat: "no-repeat",
+          };
 
   // Use first color for text when single, muted for multiple
   const textColor = colors.length === 1 ? colors[0] : undefined;
