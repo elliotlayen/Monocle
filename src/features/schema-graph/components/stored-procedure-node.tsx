@@ -6,6 +6,7 @@ import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 interface StoredProcedureNodeData {
   procedure: StoredProcedure;
+  nodeWidth?: number;
   isFocused?: boolean;
   isDimmed?: boolean;
   canvasMode?: boolean;
@@ -13,7 +14,7 @@ interface StoredProcedureNodeData {
 }
 
 function StoredProcedureNodeComponent({ data }: NodeProps) {
-  const { procedure, isFocused, isDimmed, canvasMode, onClick } =
+  const { procedure, nodeWidth, isFocused, isDimmed, canvasMode, onClick } =
     data as unknown as StoredProcedureNodeData;
   const nodeHandleBase = buildNodeHandleBase(procedure.id);
 
@@ -23,8 +24,9 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
   return (
     <div
       onClick={onClick}
+      style={{ width: nodeWidth }}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[200px] max-w-[280px] overflow-hidden transition-all duration-200 cursor-pointer relative",
+        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-violet-500 ring-2 ring-violet-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -51,7 +53,7 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
         <span className="text-[10px] text-violet-200 uppercase tracking-wide block">
           Procedure
         </span>
-        <span className="text-sm font-semibold block truncate">
+        <span className="text-sm font-semibold block whitespace-nowrap">
           {procedure.name}
         </span>
       </div>
@@ -75,7 +77,7 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
                       key={param.name}
                       className="flex items-center gap-2 text-xs"
                     >
-                      <span className="text-foreground truncate">
+                      <span className="text-foreground whitespace-nowrap">
                         {param.name}
                       </span>
                       <span className="text-muted-foreground text-[10px] ml-auto">
@@ -105,7 +107,7 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
                       <span className="bg-violet-100 text-violet-800 text-[9px] font-bold px-1 py-0.5 rounded">
                         OUT
                       </span>
-                      <span className="text-foreground truncate">
+                      <span className="text-foreground whitespace-nowrap">
                         {param.name}
                       </span>
                       <span className="text-muted-foreground text-[10px] ml-auto">

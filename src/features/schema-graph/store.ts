@@ -15,7 +15,7 @@ import { databaseService } from "@/features/connection/services/database-service
 import {
   settingsService,
   type AppSettings,
-  type FocusMode,
+  type EdgeLabelMode,
 } from "@/features/settings/services/settings-service";
 import type {
   CreateTableInput,
@@ -55,8 +55,9 @@ interface SchemaStore {
   isConnected: boolean;
   connectionInfo: { server: string; database?: string } | null;
   preferredSchemaFilter: string;
-  focusMode: FocusMode;
   focusExpandThreshold: number;
+  edgeLabelMode: EdgeLabelMode;
+  showMiniMap: boolean;
 
   // Canvas mode state
   mode: "connected" | "canvas";
@@ -95,8 +96,9 @@ interface SchemaStore {
   setSchemaFilter: (schema: string) => void;
   clearError: () => void;
   hydrateSettings: (settings: AppSettings) => void;
-  setFocusMode: (mode: FocusMode) => void;
   setFocusExpandThreshold: (threshold: number) => void;
+  setEdgeLabelMode: (mode: EdgeLabelMode) => void;
+  setShowMiniMap: (show: boolean) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   toggleObjectType: (type: ObjectType) => void;
@@ -440,8 +442,9 @@ export const createInitialSchemaState = () => ({
   debouncedSearchFilter: "",
   schemaFilter: "all",
   preferredSchemaFilter: "all",
-  focusMode: "hide" as FocusMode,
   focusExpandThreshold: 15,
+  edgeLabelMode: "auto" as EdgeLabelMode,
+  showMiniMap: true,
   focusedTableId: null,
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
@@ -675,28 +678,26 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       }
     }
 
-    if (settings.focusMode === "hide") {
-      updates.focusMode = "hide";
-    } else if (settings.focusMode) {
-      settingsService.saveSettings({ focusMode: "hide" }).catch(() => {
-        // Ignore persistence errors
-      });
-    }
-
     if (settings.focusExpandThreshold !== undefined) {
       updates.focusExpandThreshold = settings.focusExpandThreshold;
+    }
+
+    if (settings.edgeLabelMode) {
+      updates.edgeLabelMode =
+        settings.edgeLabelMode === "auto" ||
+        settings.edgeLabelMode === "never" ||
+        settings.edgeLabelMode === "always"
+          ? settings.edgeLabelMode
+          : "auto";
+    }
+
+    if (typeof settings.showMiniMap === "boolean") {
+      updates.showMiniMap = settings.showMiniMap;
     }
 
     if (Object.keys(updates).length > 0) {
       set(updates);
     }
-  },
-
-  setFocusMode: (mode: FocusMode) => {
-    set({ focusMode: mode });
-    settingsService.saveSettings({ focusMode: mode }).catch(() => {
-      // Ignore persistence errors
-    });
   },
 
   setFocusExpandThreshold: (threshold: number) => {
@@ -706,6 +707,20 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       .catch(() => {
         // Ignore persistence errors
       });
+  },
+
+  setEdgeLabelMode: (mode: EdgeLabelMode) => {
+    set({ edgeLabelMode: mode });
+    settingsService.saveSettings({ edgeLabelMode: mode }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setShowMiniMap: (show: boolean) => {
+    set({ showMiniMap: show });
+    settingsService.saveSettings({ showMiniMap: show }).catch(() => {
+      // Ignore persistence errors
+    });
   },
 
   setFocusedTable: (tableId: string | null) => set({ focusedTableId: tableId }),

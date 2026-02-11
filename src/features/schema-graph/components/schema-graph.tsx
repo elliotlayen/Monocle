@@ -7,12 +7,12 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type Node,
   type Edge,
   type EdgeMouseHandler,
   type Connection,
   type NodeMouseHandler,
-  MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -32,6 +32,22 @@ import { ViewNode } from "./view-node";
 import { TriggerNode } from "./trigger-node";
 import { StoredProcedureNode } from "./stored-procedure-node";
 import { ScalarFunctionNode } from "./scalar-function-node";
+import {
+  DirectedEdge,
+  buildNodeHeightMap,
+  getPositionedBounds,
+  getNodeHeight,
+  layoutLayeredLeftToRight,
+  layoutSideBands,
+  layoutItemsInGridRows,
+} from "./layout";
+import {
+  buildNodeWidthMap,
+  getNodeWidth,
+  ROUTINE_MIN_WIDTH,
+  TABLE_VIEW_MIN_WIDTH,
+  TRIGGER_MIN_WIDTH,
+} from "./node-width";
 import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
 import { DetailPopover } from "./detail-popover";
 import { SidebarToggle } from "./sidebar-toggle";
@@ -42,9 +58,12 @@ import {
   menuToggleSidebarHub,
   menuFitViewHub,
   menuActualSizeHub,
+  menuZoomInHub,
+  menuZoomOutHub,
   menuExportPngHub,
   menuExportPdfHub,
   menuExportJsonHub,
+  menuDeleteSelectionHub,
   useTauriEvent,
 } from "@/services/events";
 import { useExport } from "@/features/export/hooks/useExport";
@@ -62,107 +81,35 @@ import {
   buildNodeHandleBase,
   parseHandleBase,
 } from "@/features/schema-graph/utils/handle-ids";
+import { deriveEdgeState, type EdgeMeta } from "./edge-state";
+import {
+  buildEdgeHoverCardContent,
+  type EdgeHoverEndpoint,
+} from "./edge-hover-card";
+import {
+  getFocusTransition,
+  isFocusSessionActive,
+  shouldForceEdgeFlush,
+  type FocusSnapshot,
+} from "./focus-transition";
 
-const GRID_COLS = 3;
-const NODE_WIDTH = 300;
-const NODE_HEIGHT = 250;
-const GAP_X = 120;
 const GAP_Y = 100;
-const TRIGGER_OFFSET_X = NODE_WIDTH + 60;
-const TRIGGER_GAP_Y = 120;
-const PROCEDURE_GAP_Y = 180;
-const PROCEDURE_OFFSET_X = NODE_WIDTH + GAP_X + 300;
-const FUNCTION_OFFSET_X = 320;
+const OVERVIEW_LAYER_GAP_X = 140;
+const OVERVIEW_LAYER_LANE_GAP_X = 72;
+const FOCUS_TIER_GAP_X = 60;
+const FOCUS_SIDE_BAND_GAP_X = 140;
+const FOCUS_SIDE_LANE_GAP_X = 72;
+const FOCUS_MAX_ROWS_PER_LANE = 5;
+const AUX_LANE_GAP_Y = 80;
+const AUX_NODE_GAP_X = 90;
+const AUX_MAX_COLS = 8;
 const COMPACT_ZOOM = 0.6;
 const FOCUS_COMPACT_ZOOM = 0.4;
 const FORCE_COMPACT_ZOOM = 0.3;
 const EDGE_LABEL_ZOOM = 0.8;
-
-/**
- * Calculate actual node height based on column count.
- * Expanded mode: 52 + (columnCount * 28) pixels
- * Default for triggers/procedures/functions: 150px
- */
-function getNodeHeight(nodeId: string, schema: SchemaGraphType): number {
-  const table = schema.tables.find((t) => t.id === nodeId);
-  if (table) {
-    return 52 + table.columns.length * 28;
-  }
-  const view = (schema.views || []).find((v) => v.id === nodeId);
-  if (view) {
-    return 52 + view.columns.length * 28;
-  }
-  return 150; // Default for triggers/procedures/functions
-}
-
-const EDGE_STYLE: Record<
-  EdgeType,
-  {
-    base: string;
-    dimmed: string;
-    selected: string;
-    label: string;
-    labelDimmed: string;
-    labelSelected: string;
-  }
-> = {
-  relationships: {
-    base: "#3b82f6",
-    dimmed: "#93c5fd",
-    selected: "#2563eb",
-    label: "#2563eb",
-    labelDimmed: "#93c5fd",
-    labelSelected: "#1d4ed8",
-  },
-  triggerDependencies: {
-    base: "#f59e0b",
-    dimmed: "#fcd34d",
-    selected: "#d97706",
-    label: "#b45309",
-    labelDimmed: "#fcd34d",
-    labelSelected: "#92400e",
-  },
-  triggerWrites: {
-    base: "#ef4444",
-    dimmed: "#fca5a5",
-    selected: "#dc2626",
-    label: "#dc2626",
-    labelDimmed: "#fca5a5",
-    labelSelected: "#991b1b",
-  },
-  procedureReads: {
-    base: "#8b5cf6",
-    dimmed: "#c4b5fd",
-    selected: "#7c3aed",
-    label: "#7c3aed",
-    labelDimmed: "#c4b5fd",
-    labelSelected: "#5b21b6",
-  },
-  procedureWrites: {
-    base: "#ef4444",
-    dimmed: "#fca5a5",
-    selected: "#dc2626",
-    label: "#dc2626",
-    labelDimmed: "#fca5a5",
-    labelSelected: "#991b1b",
-  },
-  viewDependencies: {
-    base: "#10b981",
-    dimmed: "#6ee7b7",
-    selected: "#059669",
-    label: "#047857",
-    labelDimmed: "#6ee7b7",
-    labelSelected: "#065f46",
-  },
-  functionReads: {
-    base: "#06b6d4",
-    dimmed: "#67e8f9",
-    selected: "#0891b2",
-    label: "#0891b2",
-    labelDimmed: "#67e8f9",
-    labelSelected: "#155e75",
-  },
-};
+const EDGE_HOVER_CARD_OFFSET_X = 12;
+const EDGE_HOVER_CARD_OFFSET_Y = 12;
+const DEFAULT_OBJECT_TEXT_COLOR = "var(--muted-foreground)";
 
 // Define custom node types outside component to prevent re-renders
 const nodeTypes = {
@@ -206,175 +153,205 @@ function parseHandleId(handleId: string | null | undefined): {
   return { tableId: parsed.nodeId, columnName: parsed.columnName };
 }
 
-/**
- * Position a tier of nodes with row wrapping.
- * Centers each row horizontally and stacks rows vertically.
- * Uses dynamic height calculation based on column count.
- * Returns the final Y position after positioning all rows.
- */
-function positionTier(
-  nodeIds: string[],
-  baseY: number,
-  positions: Map<string, { x: number; y: number }>,
-  direction: "up" | "down",
-  schema: SchemaGraphType
-): number {
-  if (nodeIds.length === 0) return baseY;
+function buildMainDirectedEdges(
+  schema: SchemaGraphType,
+  viewColumnSources: Map<
+    string,
+    { columnName: string; sourceTableId: string; sourceColumn: string }[]
+  >
+): DirectedEdge[] {
+  const edges: DirectedEdge[] = [];
+  const seen = new Set<string>();
+  const pushEdge = (from: string, to: string) => {
+    if (!from || !to || from === to) return;
+    const key = `${from}=>${to}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    edges.push({ from, to });
+  };
 
-  const MAX_PER_ROW = 4;
-  const NODE_GAP_X = NODE_WIDTH + 80; // 380px horizontal spacing
-  const VERTICAL_GAP = 60;
-
-  // Group nodes into rows
-  const rows: string[][] = [];
-  for (let i = 0; i < nodeIds.length; i += MAX_PER_ROW) {
-    rows.push(nodeIds.slice(i, i + MAX_PER_ROW));
-  }
-
-  let cumulativeY = baseY;
-
-  rows.forEach((rowNodes) => {
-    // Calculate max height in this row for proper spacing
-    const maxHeight = Math.max(
-      ...rowNodes.map((id) => getNodeHeight(id, schema))
-    );
-
-    // For "up" direction, first move up by maxHeight before positioning
-    if (direction === "up") {
-      cumulativeY -= maxHeight;
-    }
-
-    // Position nodes in this row (centered horizontally)
-    const rowWidth = rowNodes.length * NODE_GAP_X;
-    const startX = -rowWidth / 2 + NODE_GAP_X / 2;
-
-    rowNodes.forEach((id, col) => {
-      positions.set(id, {
-        x: startX + col * NODE_GAP_X,
-        y: cumulativeY,
-      });
-    });
-
-    // Move to next row position
-    if (direction === "up") {
-      cumulativeY -= VERTICAL_GAP; // Additional gap for next row above
-    } else {
-      cumulativeY += maxHeight + VERTICAL_GAP; // Move below current row
-    }
+  schema.relationships.forEach((rel) => {
+    pushEdge(rel.from, rel.to);
   });
 
-  return cumulativeY;
+  for (const [viewId, sources] of viewColumnSources.entries()) {
+    for (const source of sources) {
+      pushEdge(source.sourceTableId, viewId);
+    }
+  }
+
+  return edges;
+}
+
+const getAuxCols = (count: number) =>
+  Math.max(1, Math.min(AUX_MAX_COLS, Math.ceil(Math.sqrt(count))));
+
+function placeAuxLane(
+  positions: Map<string, { x: number; y: number }>,
+  nodeIds: string[],
+  startX: number,
+  startY: number,
+  nodeHeights: Map<string, number>,
+  nodeWidths: Map<string, number>,
+  fallbackWidth: number
+): number {
+  if (nodeIds.length === 0) return startY;
+
+  const laneLayout = layoutItemsInGridRows(
+    nodeIds.map((id) => ({ id })),
+    {
+      startX,
+      startY,
+      cols: getAuxCols(nodeIds.length),
+      nodeWidth: fallbackWidth,
+      gapX: AUX_NODE_GAP_X,
+      gapY: GAP_Y,
+      getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
+      getWidth: (nodeId) => getNodeWidth(nodeWidths, nodeId, fallbackWidth),
+    }
+  );
+
+  Object.entries(laneLayout.positions).forEach(([id, position]) => {
+    positions.set(id, position);
+  });
+
+  return laneLayout.maxBottom + AUX_LANE_GAP_Y;
 }
 
 /**
  * Calculate compact layout positions when focus mode is "hide".
- * Uses directional flow layout with upstream tables above and downstream below.
- * Calculates dynamic heights based on column count to prevent overlap.
+ * Uses directional left-to-right flow with upstream tables on the left
+ * and downstream tables on the right.
  */
 function calculateCompactLayout(
   focusedNodeId: string,
   visibleNodeIds: Set<string>,
   neighbors: Set<string>,
-  schema: SchemaGraphType
+  schema: SchemaGraphType,
+  nodeHeights: Map<string, number>,
+  nodeWidths: Map<string, number>,
+  directedEdges: DirectedEdge[]
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
 
-  // Focused node at center
   positions.set(focusedNodeId, { x: 0, y: 0 });
-  const focusedHeight = getNodeHeight(focusedNodeId, schema);
+  const focusedWidth = getNodeWidth(nodeWidths, focusedNodeId, TABLE_VIEW_MIN_WIDTH);
+  const tableOrViewIds = new Set<string>([
+    ...schema.tables.map((t) => t.id),
+    ...(schema.views || []).map((v) => v.id),
+  ]);
 
-  // Categorize neighbors by FK direction
+  const outgoingByNode = new Map<string, Set<string>>();
+  directedEdges.forEach((edge) => {
+    if (!outgoingByNode.has(edge.from)) {
+      outgoingByNode.set(edge.from, new Set());
+    }
+    outgoingByNode.get(edge.from)!.add(edge.to);
+  });
+
   const upstream: string[] = [];
   const downstream: string[] = [];
-
   const visibleNeighbors = [...neighbors].filter((id) =>
     visibleNodeIds.has(id)
   );
 
   for (const neighborId of visibleNeighbors) {
-    // Check if this is a table/view (not trigger/procedure)
-    const isTableOrView =
-      schema.tables.some((t) => t.id === neighborId) ||
-      (schema.views || []).some((v) => v.id === neighborId);
+    if (!tableOrViewIds.has(neighborId)) continue;
 
-    if (!isTableOrView) continue;
+    const focusedToNeighbor =
+      outgoingByNode.get(focusedNodeId)?.has(neighborId) ?? false;
+    const neighborToFocused =
+      outgoingByNode.get(neighborId)?.has(focusedNodeId) ?? false;
 
-    // Check FK direction
-    // referencedByFocused: focused table has FK pointing to this neighbor
-    const referencedByFocused = schema.relationships.some(
-      (rel) => rel.from === focusedNodeId && rel.to === neighborId
-    );
-    // referencesFocused: this neighbor has FK pointing to focused table
-    const referencesFocused = schema.relationships.some(
-      (rel) => rel.from === neighborId && rel.to === focusedNodeId
-    );
-
-    // Upstream: tables that the focused table references (FK points TO them)
-    // Downstream: tables that reference the focused table (FK points FROM them)
-    if (referencesFocused && !referencedByFocused) {
+    if (focusedToNeighbor && !neighborToFocused) {
       upstream.push(neighborId);
+    } else if (neighborToFocused && !focusedToNeighbor) {
+      downstream.push(neighborId);
     } else {
       downstream.push(neighborId);
     }
   }
 
-  // Gap between focused node and tiers
-  const TIER_GAP = 60;
-
-  // Position upstream tables (above focused)
-  if (upstream.length > 0) {
-    positionTier(upstream, -TIER_GAP, positions, "up", schema);
-  }
-
-  // Position downstream tables (below focused)
-  if (downstream.length > 0) {
-    positionTier(downstream, focusedHeight + TIER_GAP, positions, "down", schema);
-  }
-
-  // Position triggers near their parent tables
-  (schema.triggers || []).forEach((trigger) => {
-    if (!visibleNodeIds.has(trigger.id)) return;
-    const parentPos = positions.get(trigger.tableId);
-    if (parentPos) {
-      // Count triggers for this table to stack them
-      const existingTriggers = [...positions.keys()].filter((id) =>
-        (schema.triggers || []).some(
-          (t) => t.id === id && t.tableId === trigger.tableId
-        )
-      );
-      positions.set(trigger.id, {
-        x: parentPos.x + TRIGGER_OFFSET_X,
-        y: parentPos.y + existingTriggers.length * TRIGGER_GAP_Y,
-      });
-    }
+  const leftLayout = layoutSideBands({
+    nodeIds: upstream,
+    direction: "left",
+    anchorX: -FOCUS_TIER_GAP_X,
+    bandGapX: FOCUS_SIDE_BAND_GAP_X,
+    laneGapX: FOCUS_SIDE_LANE_GAP_X,
+    gapY: GAP_Y,
+    maxRowsPerLane: FOCUS_MAX_ROWS_PER_LANE,
+    getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
+    getWidth: (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH),
+  });
+  const rightLayout = layoutSideBands({
+    nodeIds: downstream,
+    direction: "right",
+    anchorX: focusedWidth + FOCUS_TIER_GAP_X,
+    bandGapX: FOCUS_SIDE_BAND_GAP_X,
+    laneGapX: FOCUS_SIDE_LANE_GAP_X,
+    gapY: GAP_Y,
+    maxRowsPerLane: FOCUS_MAX_ROWS_PER_LANE,
+    getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
+    getWidth: (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH),
   });
 
-  // Calculate bottom Y position for procedures/functions
-  const allYPositions = [...positions.values()].map((p) => p.y);
-  const maxY = Math.max(...allYPositions, 0);
-  const procedureY = maxY + NODE_HEIGHT + GAP_Y;
-
-  // Position procedures below the main cluster
-  let procIndex = 0;
-  (schema.storedProcedures || []).forEach((proc) => {
-    if (!visibleNodeIds.has(proc.id)) return;
-    positions.set(proc.id, {
-      x: -200 + procIndex * 320,
-      y: procedureY,
+  const applyCenteredBand = (
+    bandPositions: Record<string, { x: number; y: number }>,
+    bandBounds: { minY: number; maxBottom: number }
+  ) => {
+    const height = bandBounds.maxBottom - bandBounds.minY;
+    const yOffset = -height / 2;
+    Object.entries(bandPositions).forEach(([id, position]) => {
+      positions.set(id, { x: position.x, y: position.y + yOffset });
     });
-    procIndex++;
-  });
+  };
 
-  // Position functions next to procedures
-  let funcIndex = 0;
-  (schema.scalarFunctions || []).forEach((fn) => {
-    if (!visibleNodeIds.has(fn.id)) return;
-    positions.set(fn.id, {
-      x: -200 + (procIndex + funcIndex) * 320,
-      y: procedureY,
-    });
-    funcIndex++;
-  });
+  applyCenteredBand(leftLayout.positions, leftLayout.bounds);
+  applyCenteredBand(rightLayout.positions, rightLayout.bounds);
+
+  const mainBounds = getPositionedBounds(positions, (nodeId) =>
+    getNodeHeight(nodeHeights, nodeId),
+    (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH)
+  );
+
+  const visibleTriggers = (schema.triggers || [])
+    .map((trigger) => trigger.id)
+    .filter((id) => visibleNodeIds.has(id));
+  const visibleProcedures = (schema.storedProcedures || [])
+    .map((proc) => proc.id)
+    .filter((id) => visibleNodeIds.has(id));
+  const visibleFunctions = (schema.scalarFunctions || [])
+    .map((fn) => fn.id)
+    .filter((id) => visibleNodeIds.has(id));
+
+  let nextY = mainBounds.maxBottom + GAP_Y;
+  nextY = placeAuxLane(
+    positions,
+    visibleTriggers,
+    mainBounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    TRIGGER_MIN_WIDTH
+  );
+  nextY = placeAuxLane(
+    positions,
+    visibleProcedures,
+    mainBounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    ROUTINE_MIN_WIDTH
+  );
+  placeAuxLane(
+    positions,
+    visibleFunctions,
+    mainBounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    ROUTINE_MIN_WIDTH
+  );
 
   return positions;
 }
@@ -391,18 +368,6 @@ interface ConvertOptions {
   onFunctionClick?: (fn: ScalarFunction, event: React.MouseEvent) => void;
 }
 
-interface EdgeMeta {
-  id: string;
-  type: EdgeType;
-  source: string;
-  target: string;
-  sourceHandle?: string;
-  targetHandle?: string;
-  label?: string;
-  sourceColumn?: string;
-  targetColumn?: string;
-}
-
 interface EdgeEditState {
   id: string;
   edgeType: EdgeType;
@@ -412,26 +377,47 @@ interface EdgeEditState {
   targetColumn?: string;
 }
 
+interface EdgeHoverCardState {
+  edgeId: string;
+  title?: string;
+  from: EdgeHoverEndpoint;
+  to: EdgeHoverEndpoint;
+  x: number;
+  y: number;
+}
+
 function buildBaseNodes(
   schema: SchemaGraphType,
+  viewColumnSources: Map<
+    string,
+    { columnName: string; sourceTableId: string; sourceColumn: string }[]
+  >,
   options: ConvertOptions,
   columnsWithHandles: Set<string>,
   fkColumnUsage: Map<string, { outgoing: number; incoming: number }>,
   fkColumnLinks: Map<
     string,
     { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
-  >
+  >,
+  nodeHeights: Map<string, number>,
+  nodeWidths: Map<string, number>
 ): Node[] {
-  const tablePositions: Record<string, { x: number; y: number }> = {};
+  const tables = schema.tables;
+  const views = schema.views || [];
+  const mainNodeIds = [...tables.map((table) => table.id), ...views.map((view) => view.id)];
+  const layered = layoutLayeredLeftToRight({
+    nodeIds: mainNodeIds,
+    edges: buildMainDirectedEdges(schema, viewColumnSources),
+    layerGapX: OVERVIEW_LAYER_GAP_X,
+    laneGapX: OVERVIEW_LAYER_LANE_GAP_X,
+    gapY: GAP_Y,
+    getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
+    getWidth: (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH),
+  });
+  const mainPositions = layered.positions;
 
-  const tableNodes: Node[] = schema.tables.map((table, index) => {
-    const col = index % GRID_COLS;
-    const row = Math.floor(index / GRID_COLS);
-    const position = {
-      x: col * (NODE_WIDTH + GAP_X),
-      y: row * (NODE_HEIGHT + GAP_Y),
-    };
-    tablePositions[table.id] = position;
+  const tableNodes: Node[] = tables.map((table) => {
+    const position = mainPositions[table.id];
 
     return {
       id: table.id,
@@ -442,6 +428,7 @@ function buildBaseNodes(
         isFocused: false,
         isDimmed: false,
         isCompact: false,
+        nodeWidth: getNodeWidth(nodeWidths, table.id, TABLE_VIEW_MIN_WIDTH),
         columnsWithHandles,
         fkColumnUsage,
         fkColumnLinks,
@@ -451,25 +438,19 @@ function buildBaseNodes(
     };
   });
 
-  const tableRowCount = Math.ceil(schema.tables.length / GRID_COLS);
-  const viewStartY = tableRowCount * (NODE_HEIGHT + GAP_Y);
-
-  const viewNodes: Node[] = (schema.views || []).map((view, index) => {
-    const col = index % GRID_COLS;
-    const row = Math.floor(index / GRID_COLS);
+  const viewNodes: Node[] = views.map((view) => {
+    const position = mainPositions[view.id];
 
     return {
       id: view.id,
       type: "viewNode",
-      position: {
-        x: col * (NODE_WIDTH + GAP_X),
-        y: viewStartY + row * (NODE_HEIGHT + GAP_Y),
-      },
+      position,
       data: {
         view,
         isFocused: false,
         isDimmed: false,
         isCompact: false,
+        nodeWidth: getNodeWidth(nodeWidths, view.id, TABLE_VIEW_MIN_WIDTH),
         columnsWithHandles,
         fkColumnUsage,
         fkColumnLinks,
@@ -479,77 +460,79 @@ function buildBaseNodes(
     };
   });
 
-  const triggersByTable: Record<string, Trigger[]> = {};
-  (schema.triggers || []).forEach((trigger) => {
-    if (!triggersByTable[trigger.tableId]) {
-      triggersByTable[trigger.tableId] = [];
-    }
-    triggersByTable[trigger.tableId].push(trigger);
-  });
+  const bottomPositions = new Map<string, { x: number; y: number }>();
+  let nextY = layered.bounds.maxBottom + GAP_Y;
 
-  const triggerNodes: Node[] = [];
-  Object.entries(triggersByTable).forEach(([tableId, tableTriggers]) => {
-    const tablePos = tablePositions[tableId];
-    if (!tablePos) return;
-
-    tableTriggers.forEach((trigger, idx) => {
-      triggerNodes.push({
-        id: trigger.id,
-        type: "triggerNode",
-        position: {
-          x: tablePos.x + TRIGGER_OFFSET_X,
-          y: tablePos.y + idx * TRIGGER_GAP_Y,
-        },
-        data: {
-          trigger,
-          isDimmed: false,
-          onClick: (e: React.MouseEvent) =>
-            options?.onTriggerClick?.(trigger, e),
-        },
-      });
-    });
-  });
-
-  const maxTableX = Math.max(
-    ...Object.values(tablePositions).map((p) => p.x),
-    0
+  const triggerIds = (schema.triggers || []).map((trigger) => trigger.id);
+  nextY = placeAuxLane(
+    bottomPositions,
+    triggerIds,
+    layered.bounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    TRIGGER_MIN_WIDTH
   );
-  const procedureStartX = maxTableX + PROCEDURE_OFFSET_X;
+
+  const procedureIds = (schema.storedProcedures || []).map((proc) => proc.id);
+  nextY = placeAuxLane(
+    bottomPositions,
+    procedureIds,
+    layered.bounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    ROUTINE_MIN_WIDTH
+  );
+  const functionIds = (schema.scalarFunctions || []).map((fn) => fn.id);
+  placeAuxLane(
+    bottomPositions,
+    functionIds,
+    layered.bounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    ROUTINE_MIN_WIDTH
+  );
+
+  const triggerNodes: Node[] = (schema.triggers || []).map((trigger) => ({
+    id: trigger.id,
+    type: "triggerNode",
+    position: bottomPositions.get(trigger.id) ?? { x: 0, y: 0 },
+    data: {
+      trigger,
+      isDimmed: false,
+      nodeWidth: getNodeWidth(nodeWidths, trigger.id, TRIGGER_MIN_WIDTH),
+      onClick: (e: React.MouseEvent) => options?.onTriggerClick?.(trigger, e),
+    },
+  }));
 
   const procedureNodes: Node[] = (schema.storedProcedures || []).map(
-    (procedure, index) => ({
+    (procedure) => ({
       id: procedure.id,
       type: "storedProcedureNode",
-      position: {
-        x: procedureStartX,
-        y: index * PROCEDURE_GAP_Y,
-      },
+      position: bottomPositions.get(procedure.id) ?? { x: 0, y: 0 },
       data: {
         procedure,
         isDimmed: false,
+        nodeWidth: getNodeWidth(nodeWidths, procedure.id, ROUTINE_MIN_WIDTH),
         onClick: (e: React.MouseEvent) =>
           options?.onProcedureClick?.(procedure, e),
       },
     })
   );
 
-  const functionStartX = procedureStartX + FUNCTION_OFFSET_X;
-
-  const functionNodes: Node[] = (schema.scalarFunctions || []).map(
-    (fn, index) => ({
-      id: fn.id,
-      type: "scalarFunctionNode",
-      position: {
-        x: functionStartX,
-        y: index * PROCEDURE_GAP_Y,
-      },
-      data: {
-        function: fn,
-        isDimmed: false,
-        onClick: (e: React.MouseEvent) => options?.onFunctionClick?.(fn, e),
-      },
-    })
-  );
+  const functionNodes: Node[] = (schema.scalarFunctions || []).map((fn) => ({
+    id: fn.id,
+    type: "scalarFunctionNode",
+    position: bottomPositions.get(fn.id) ?? { x: 0, y: 0 },
+    data: {
+      function: fn,
+      isDimmed: false,
+      nodeWidth: getNodeWidth(nodeWidths, fn.id, ROUTINE_MIN_WIDTH),
+      onClick: (e: React.MouseEvent) => options?.onFunctionClick?.(fn, e),
+    },
+  }));
 
   return [
     ...tableNodes,
@@ -696,104 +679,6 @@ function buildBaseEdges(
   return edges;
 }
 
-function buildEdgeState(
-  edges: EdgeMeta[],
-  edgeTypeFilter: Set<EdgeType> | undefined,
-  visibleNodeIds: Set<string>,
-  focusedTableId: string | null | undefined,
-  selectedEdgeIds: Set<string>,
-  hoveredEdgeId: string | null,
-  showLabels: boolean
-): { edges: Edge[]; handleEdgeTypes: Map<string, Set<EdgeType>> } {
-  const handleEdgeTypes = new Map<string, Set<EdgeType>>();
-  const addHandle = (handleId: string | undefined, type: EdgeType) => {
-    if (!handleId) return;
-    if (!handleEdgeTypes.has(handleId)) {
-      handleEdgeTypes.set(handleId, new Set());
-    }
-    handleEdgeTypes.get(handleId)!.add(type);
-  };
-
-  const isFocusActive = Boolean(focusedTableId);
-
-  const nextEdges = edges.map((edge) => {
-    const nodesVisible =
-      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target);
-    const typeVisible = !edgeTypeFilter || edgeTypeFilter.has(edge.type);
-    const isVisible = nodesVisible && typeVisible;
-
-    if (isVisible) {
-      addHandle(edge.sourceHandle, edge.type);
-      addHandle(edge.targetHandle, edge.type);
-    }
-
-    const isDimmed =
-      isFocusActive &&
-      edge.source !== focusedTableId &&
-      edge.target !== focusedTableId;
-    const isFocused = isFocusActive && !isDimmed;
-    const isSelected = !isFocusActive && selectedEdgeIds.has(edge.id);
-
-    const colors = EDGE_STYLE[edge.type];
-    const stroke = isSelected
-      ? colors.selected
-      : isDimmed
-        ? colors.dimmed
-        : colors.base;
-    const strokeWidth = isSelected ? 4 : isFocused ? 3 : isDimmed ? 1 : 2;
-    const labelColor = isSelected
-      ? colors.labelSelected
-      : isDimmed
-        ? colors.labelDimmed
-        : colors.label;
-    const isHovered = hoveredEdgeId === edge.id;
-    const shouldShowLabel =
-      (showLabels || isSelected || isHovered) && !isDimmed;
-    const label = shouldShowLabel ? edge.label : undefined;
-
-    return {
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: "smoothstep",
-      interactionWidth: 16,
-      data: {
-        edgeType: edge.type,
-        sourceColumn: edge.sourceColumn,
-        targetColumn: edge.targetColumn,
-      },
-      hidden: !isVisible,
-      style: {
-        stroke,
-        strokeWidth,
-        opacity: isDimmed ? 0.4 : 1,
-        cursor: isFocusActive ? "default" : "pointer",
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: stroke,
-      },
-      label,
-      labelStyle: label
-        ? {
-            fontSize: 10,
-            fill: labelColor,
-          }
-        : undefined,
-      labelBgStyle: label
-        ? {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
-          }
-        : undefined,
-    };
-  });
-
-  return { edges: nextEdges, handleEdgeTypes };
-}
-
 function SchemaGraphInner({
   schema,
   focusedTableId,
@@ -807,6 +692,7 @@ function SchemaGraphInner({
 }: SchemaGraphProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [hoverCard, setHoverCard] = useState<EdgeHoverCardState | null>(null);
   const [editDialogState, setEditDialogState] = useState<{
     type: string;
     id: string;
@@ -844,8 +730,9 @@ function SchemaGraphInner({
     selectedEdgeIds,
     toggleEdgeSelection,
     clearEdgeSelection,
-    focusMode,
     focusExpandThreshold,
+    edgeLabelMode,
+    showMiniMap,
     nodePositions: storedNodePositions,
     updateNodePosition,
     removeTable,
@@ -863,8 +750,9 @@ function SchemaGraphInner({
       selectedEdgeIds: state.selectedEdgeIds,
       toggleEdgeSelection: state.toggleEdgeSelection,
       clearEdgeSelection: state.clearEdgeSelection,
-      focusMode: state.focusMode,
       focusExpandThreshold: state.focusExpandThreshold,
+      edgeLabelMode: state.edgeLabelMode,
+      showMiniMap: state.showMiniMap,
       nodePositions: state.nodePositions,
       updateNodePosition: state.updateNodePosition,
       removeTable: state.removeTable,
@@ -881,7 +769,8 @@ function SchemaGraphInner({
   );
 
   // React Flow hook for programmatic viewport control
-  const { fitView, setViewport, getViewport } = useReactFlow();
+  const { fitView, setViewport, getViewport, zoomIn, zoomOut } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Export hooks
   const { exportPng, exportPdf, exportJson } = useExport();
@@ -900,6 +789,14 @@ function SchemaGraphInner({
     setViewport({ x: viewport.x, y: viewport.y, zoom: 1 }, { duration: 300 });
   }, [getViewport, setViewport]);
 
+  const handleZoomIn = useCallback(() => {
+    zoomIn({ duration: 300 });
+  }, [zoomIn]);
+
+  const handleZoomOut = useCallback(() => {
+    zoomOut({ duration: 300 });
+  }, [zoomOut]);
+
   const handleExportPng = useCallback(() => {
     exportPng();
   }, [exportPng]);
@@ -916,6 +813,8 @@ function SchemaGraphInner({
   useTauriEvent(menuToggleSidebarHub.subscribe, handleToggleSidebar);
   useTauriEvent(menuFitViewHub.subscribe, handleFitView);
   useTauriEvent(menuActualSizeHub.subscribe, handleActualSize);
+  useTauriEvent(menuZoomInHub.subscribe, handleZoomIn);
+  useTauriEvent(menuZoomOutHub.subscribe, handleZoomOut);
   useTauriEvent(menuExportPngHub.subscribe, handleExportPng);
   useTauriEvent(menuExportPdfHub.subscribe, handleExportPdf);
   useTauriEvent(menuExportJsonHub.subscribe, handleExportJson);
@@ -927,18 +826,22 @@ function SchemaGraphInner({
   // Once the user drags a node in focus mode, stop reapplying the compact layout
   const focusLayoutLockedRef = useRef(false);
   // Track previous focus state to detect exit transitions
-  const prevFocusStateRef = useRef<{
-    focusedTableId: string | null;
-    focusMode: string;
-  }>({
+  const prevFocusStateRef = useRef<FocusSnapshot>({
     focusedTableId: null,
-    focusMode: "hide",
   });
   // Track if fitView has been called for current focus session
   const fitViewCalledRef = useRef(false);
+  const pendingEdgeFlushRef = useRef(false);
+  const lastFlushSignatureRef = useRef("");
 
   const [zoom, setZoom] = useState(0.8);
-  const showEdgeLabels = zoom >= EDGE_LABEL_ZOOM;
+  const [isEdgeFlushInProgress, setIsEdgeFlushInProgress] = useState(false);
+  const showEdgeLabels =
+    edgeLabelMode === "always"
+      ? true
+      : edgeLabelMode === "never"
+        ? false
+        : zoom >= EDGE_LABEL_ZOOM;
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
@@ -952,16 +855,35 @@ function SchemaGraphInner({
     if (selectedEdgeIds.size > 0) {
       clearEdgeSelection();
     }
+    setHoveredEdgeId(null);
+    setHoverCard(null);
     setContextMenuEdge(null);
     setContextMenuPos(null);
   }, [selectedEdgeIds.size, clearEdgeSelection]);
 
-  const onEdgeMouseEnter = useCallback((_event: unknown, edge: Edge) => {
+  const onEdgeMouseEnter: EdgeMouseHandler = useCallback((event, edge) => {
     setHoveredEdgeId(edge.id);
+    setHoverCard({
+      edgeId: edge.id,
+      ...buildEdgeHoverCardContent(edge),
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
+  const onEdgeMouseMove: EdgeMouseHandler = useCallback((event, edge) => {
+    setHoveredEdgeId((prev) => (prev === edge.id ? prev : edge.id));
+    setHoverCard({
+      edgeId: edge.id,
+      ...buildEdgeHoverCardContent(edge),
+      x: event.clientX,
+      y: event.clientY,
+    });
   }, []);
 
   const onEdgeMouseLeave = useCallback(() => {
     setHoveredEdgeId(null);
+    setHoverCard(null);
   }, []);
 
   const onEdgeContextMenu = useCallback(
@@ -1175,11 +1097,11 @@ function SchemaGraphInner({
         updateNodePosition(node.id, node.position);
         return;
       }
-      if (focusMode === "hide" && focusedTableId) {
+      if (focusedTableId) {
         focusLayoutLockedRef.current = true;
       }
     },
-    [canvasMode, updateNodePosition, focusMode, focusedTableId]
+    [canvasMode, updateNodePosition, focusedTableId]
   );
 
   // Canvas mode: double-click to edit node
@@ -1278,13 +1200,51 @@ function SchemaGraphInner({
   );
 
   const schemaIndex = useMemo(() => getSchemaIndex(schema), [schema]);
+  const objectTextColorById = useMemo(() => {
+    const colors = new Map<string, string>();
+    schema.tables.forEach((table) => {
+      colors.set(table.id, "#64748b");
+    });
+    (schema.views || []).forEach((view) => {
+      colors.set(view.id, "#10b981");
+    });
+    (schema.triggers || []).forEach((trigger) => {
+      colors.set(trigger.id, "#f59e0b");
+    });
+    (schema.storedProcedures || []).forEach((procedure) => {
+      colors.set(procedure.id, "#8b5cf6");
+    });
+    (schema.scalarFunctions || []).forEach((fn) => {
+      colors.set(fn.id, "#06b6d4");
+    });
+    return colors;
+  }, [schema]);
+  const mainDependencyEdges = useMemo(
+    () => buildMainDirectedEdges(schema, schemaIndex.viewColumnSources),
+    [schema, schemaIndex.viewColumnSources]
+  );
+  const columnsByNodeId = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    schema.tables.forEach((table) => {
+      map.set(table.id, new Set(table.columns.map((column) => column.name)));
+    });
+    (schema.views || []).forEach((view) => {
+      map.set(view.id, new Set(view.columns.map((column) => column.name)));
+    });
+    return map;
+  }, [schema]);
+  const nodeHeights = useMemo(() => buildNodeHeightMap(schema), [schema]);
+  const nodeWidths = useMemo(() => buildNodeWidthMap(schema), [schema]);
   const baseNodes = useMemo(() => {
     const nodes = buildBaseNodes(
       schema,
+      schemaIndex.viewColumnSources,
       options,
       schemaIndex.columnsWithHandles,
       schemaIndex.fkColumnUsage,
-      schemaIndex.fkColumnLinks
+      schemaIndex.fkColumnLinks,
+      nodeHeights,
+      nodeWidths
     );
     // In canvas mode, override positions from stored positions and pass canvasMode to node data
     if (canvasMode) {
@@ -1304,9 +1264,12 @@ function SchemaGraphInner({
   }, [
     schema,
     options,
+    schemaIndex.viewColumnSources,
     schemaIndex.columnsWithHandles,
     schemaIndex.fkColumnUsage,
     schemaIndex.fkColumnLinks,
+    nodeHeights,
+    nodeWidths,
     canvasMode,
     storedNodePositions,
   ]);
@@ -1353,6 +1316,26 @@ function SchemaGraphInner({
     clearEdgeSelection,
   ]);
 
+  const handleDeleteSelectionMenu = useCallback(() => {
+    if (!canvasMode) return;
+    if (selectedEdgeIds.size > 0) {
+      handleDeleteSelectedEdges();
+      return;
+    }
+    const selectedNodes = nodes.filter((node) => node.selected);
+    if (selectedNodes.length > 0) {
+      handleDeleteSelected(selectedNodes);
+    }
+  }, [
+    canvasMode,
+    selectedEdgeIds,
+    handleDeleteSelectedEdges,
+    nodes,
+    handleDeleteSelected,
+  ]);
+
+  useTauriEvent(menuDeleteSelectionHub.subscribe, handleDeleteSelectionMenu);
+
   // Canvas mode: keyboard handler for Delete/Backspace
   useEffect(() => {
     if (!canvasMode) return;
@@ -1392,13 +1375,17 @@ function SchemaGraphInner({
     if (baseNodes.length === 0) {
       return;
     }
+    // Preserve the user's zoom/pan while editing node positions in canvas mode.
+    if (canvasMode) {
+      return;
+    }
 
     const frameId = requestAnimationFrame(() => {
       fitView({ padding: 0.2, duration: 300 });
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [baseNodes, fitView]);
+  }, [baseNodes, canvasMode, fitView]);
 
   // Store original positions when baseNodes change
   useEffect(() => {
@@ -1566,38 +1553,73 @@ function SchemaGraphInner({
     ].filter((id) => !dimmedNodeIds.has(id)).length;
     const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
 
-    // For edge building, exclude dimmed nodes when focus mode is "hide"
-    const edgeVisibleNodeIds =
-      focusMode === "hide"
-        ? new Set([...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id)))
-        : visibleNodeIds;
+    // Hide-only focus mode: exclude dimmed nodes from rendered edges.
+    const renderableNodeIds = new Set(
+      [...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id))
+    );
 
-    const { edges: nextEdges, handleEdgeTypes } = buildEdgeState(
-      baseEdges,
+    const {
+      edges: nextEdges,
+      handleEdgeTypes,
+      visibleEdgeIds,
+    } = deriveEdgeState({
+      edges: baseEdges,
       edgeTypeFilter,
-      edgeVisibleNodeIds,
-      focusedTableId ?? null,
+      renderableNodeIds,
+      columnsByNodeId,
+      focusedTableId: focusedTableId ?? null,
       selectedEdgeIds,
       hoveredEdgeId,
-      showEdgeLabels
-    );
-    setEdges(nextEdges);
+      showLabels: showEdgeLabels,
+      showInlineLabelOnHover: false,
+    });
 
     const prevState = prevFocusStateRef.current;
-    const focusSessionActive = focusMode === "hide" && Boolean(focusedTableId);
-    const prevFocusSessionActive =
-      prevState.focusMode === "hide" && Boolean(prevState.focusedTableId);
-    const focusTargetChanged =
-      focusSessionActive &&
-      prevFocusSessionActive &&
-      prevState.focusedTableId !== focusedTableId;
+    const nextFocusState: FocusSnapshot = {
+      focusedTableId: focusedTableId ?? null,
+    };
+    const focusTransition = getFocusTransition(prevState, nextFocusState);
+    const focusSessionActive = isFocusSessionActive(nextFocusState.focusedTableId);
+    const prevFocusSessionActive = isFocusSessionActive(prevState.focusedTableId);
+    const focusTargetChanged = focusTransition === "target-change";
 
     if ((focusSessionActive && !prevFocusSessionActive) || focusTargetChanged) {
       focusLayoutLockedRef.current = false;
     }
 
+    const flushSignature = `${focusTransition}:${prevState.focusedTableId ?? ""}->${nextFocusState.focusedTableId ?? ""}`;
+    const transitionNeedsFlush = shouldForceEdgeFlush(focusTransition);
+    const shouldStartEdgeFlush =
+      transitionNeedsFlush &&
+      !pendingEdgeFlushRef.current &&
+      lastFlushSignatureRef.current !== flushSignature;
+
+    if (shouldStartEdgeFlush) {
+      pendingEdgeFlushRef.current = true;
+      lastFlushSignatureRef.current = flushSignature;
+      setIsEdgeFlushInProgress(true);
+      setEdges([]);
+    } else if (!pendingEdgeFlushRef.current) {
+      setEdges(nextEdges);
+      if (!transitionNeedsFlush) {
+        lastFlushSignatureRef.current = "";
+        setIsEdgeFlushInProgress(false);
+      }
+    }
+
+    if (hoveredEdgeId && !visibleEdgeIds.has(hoveredEdgeId)) {
+      setHoveredEdgeId(null);
+      setHoverCard(null);
+    }
+    if (
+      selectedEdgeIds.size > 0 &&
+      [...selectedEdgeIds].some((id) => !visibleEdgeIds.has(id))
+    ) {
+      clearEdgeSelection();
+    }
+
     // Detect if we JUST exited focus mode (restore positions once, not continuously)
-    const justExitedFocus = !focusSessionActive && prevFocusSessionActive;
+    const justExitedFocus = focusTransition === "exit";
 
     // Calculate compact positions when focus mode is "hide" and focused
     const shouldUseCompactLayout =
@@ -1606,12 +1628,16 @@ function SchemaGraphInner({
       shouldUseCompactLayout && focusedTableId
         ? calculateCompactLayout(
             focusedTableId,
-            edgeVisibleNodeIds,
+            renderableNodeIds,
             focusedNeighbors,
-            schema
+            schema,
+            nodeHeights,
+            nodeWidths,
+            mainDependencyEdges
           )
         : null;
 
+    const internalsRefreshIds = new Set<string>();
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
         const isVisible = visibleNodeIds.has(node.id);
@@ -1660,6 +1686,15 @@ function SchemaGraphInner({
           isDimmed,
         };
 
+        const widthFallback =
+          node.type === "triggerNode"
+            ? TRIGGER_MIN_WIDTH
+            : node.type === "storedProcedureNode" ||
+                node.type === "scalarFunctionNode"
+              ? ROUTINE_MIN_WIDTH
+              : TABLE_VIEW_MIN_WIDTH;
+        nextData.nodeWidth = getNodeWidth(nodeWidths, node.id, widthFallback);
+
         if (node.type === "tableNode" || node.type === "viewNode") {
           nextData.columnsWithHandles = schemaIndex.columnsWithHandles;
           nextData.handleEdgeTypes = handleEdgeTypes;
@@ -1685,8 +1720,8 @@ function SchemaGraphInner({
           nextData.isCompact = nodeIsCompact;
         }
 
-        // Hide node if not visible by filters, or if dimmed and focus mode is "hide"
-        const shouldHide = !isVisible || (focusMode === "hide" && isDimmed);
+        // Hide node if not visible by filters, or dimmed in hide-only focus mode.
+        const shouldHide = !isVisible || isDimmed;
 
         // Apply compact position when in focus mode, or restore original when exiting
         let position = node.position; // Keep current position by default (preserves user drag)
@@ -1701,6 +1736,23 @@ function SchemaGraphInner({
           position = originalPositionsRef.current.get(node.id)!;
         }
 
+        const previousData = node.data as { isCompact?: boolean } | undefined;
+        const compactChanged = previousData?.isCompact !== nextData.isCompact;
+        const widthChanged =
+          (node.data as { nodeWidth?: number } | undefined)?.nodeWidth !==
+          nextData.nodeWidth;
+        const positionChanged =
+          position.x !== node.position.x || position.y !== node.position.y;
+        const hiddenChanged = node.hidden !== shouldHide;
+        if (
+          compactChanged ||
+          widthChanged ||
+          positionChanged ||
+          hiddenChanged
+        ) {
+          internalsRefreshIds.add(node.id);
+        }
+
         return {
           ...node,
           position,
@@ -1709,22 +1761,38 @@ function SchemaGraphInner({
         };
       })
     );
+    if (shouldStartEdgeFlush) {
+      requestAnimationFrame(() => {
+        internalsRefreshIds.forEach((nodeId) => updateNodeInternals(nodeId));
+        requestAnimationFrame(() => {
+          setEdges(nextEdges);
+          pendingEdgeFlushRef.current = false;
+          lastFlushSignatureRef.current = "";
+          setIsEdgeFlushInProgress(false);
+        });
+      });
+    } else if (internalsRefreshIds.size > 0) {
+      requestAnimationFrame(() => {
+        internalsRefreshIds.forEach((nodeId) => updateNodeInternals(nodeId));
+        if (!pendingEdgeFlushRef.current) {
+          // Re-apply visible edges after handle geometry updates to avoid stale paths.
+          setEdges([...nextEdges]);
+        }
+      });
+    }
 
     // Call fitView when entering focus mode
     if (shouldUseCompactLayout && !fitViewCalledRef.current) {
       fitViewCalledRef.current = true;
       setTimeout(() => {
-        fitView({ padding: 0.2, maxZoom: 1.5, minZoom: 0.6, duration: 300 });
+        fitView({ padding: 0.2, maxZoom: 1.5, duration: 300 });
       }, 50);
     } else if (!focusedTableId) {
       fitViewCalledRef.current = false;
     }
 
     // Update ref for next comparison
-    prevFocusStateRef.current = {
-      focusedTableId: focusedTableId ?? null,
-      focusMode,
-    };
+    prevFocusStateRef.current = nextFocusState;
     if (justExitedFocus) {
       focusLayoutLockedRef.current = false;
     }
@@ -1732,8 +1800,9 @@ function SchemaGraphInner({
     baseEdges,
     edgeTypeFilter,
     focusedTableId,
-    focusMode,
     focusExpandThreshold,
+    edgeLabelMode,
+    showMiniMap,
     zoom,
     schema,
     schemaFilter,
@@ -1743,10 +1812,36 @@ function SchemaGraphInner({
     hoveredEdgeId,
     setEdges,
     setNodes,
+    clearEdgeSelection,
     showEdgeLabels,
     objectTypeFilter,
+    columnsByNodeId,
+    nodeHeights,
+    nodeWidths,
+    mainDependencyEdges,
     fitView,
+    updateNodeInternals,
   ]);
+
+  const renderHoverEndpoint = useCallback(
+    (endpoint: EdgeHoverEndpoint) => {
+      const objectColor =
+        objectTextColorById.get(endpoint.objectId) ?? DEFAULT_OBJECT_TEXT_COLOR;
+      return (
+        <>
+          <span className="font-mono" style={{ color: objectColor }}>
+            {endpoint.objectId}
+          </span>
+          {endpoint.column && (
+            <span className="font-mono text-muted-foreground">
+              .{endpoint.column}
+            </span>
+          )}
+        </>
+      );
+    },
+    [objectTextColorById]
+  );
 
   const reactFlowContent = (
     <ReactFlow
@@ -1757,6 +1852,7 @@ function SchemaGraphInner({
       onEdgeClick={onEdgeClick}
       onEdgeContextMenu={canvasMode ? onEdgeContextMenu : undefined}
       onEdgeMouseEnter={onEdgeMouseEnter}
+      onEdgeMouseMove={onEdgeMouseMove}
       onEdgeMouseLeave={onEdgeMouseLeave}
       onPaneClick={onPaneClick}
       onMove={onMove}
@@ -1767,11 +1863,11 @@ function SchemaGraphInner({
       nodeTypes={nodeTypes}
       fitView
       fitViewOptions={{ padding: 0.2 }}
-      minZoom={0.1}
+      minZoom={0.02}
       maxZoom={2}
       defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
       proOptions={{ hideAttribution: true }}
-      onlyRenderVisibleElements={true}
+      onlyRenderVisibleElements={!isEdgeFlushInProgress}
       nodesConnectable={canvasMode ?? false}
       nodesDraggable={true}
       selectionOnDrag={canvasMode}
@@ -1781,13 +1877,15 @@ function SchemaGraphInner({
         gap={20}
       />
       <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
-      <MiniMap
-        nodeColor={getMinimapNodeColor}
-        maskColor="var(--minimap-mask)"
-        className="!bg-background"
-        pannable
-        zoomable
-      />
+      {showMiniMap && (
+        <MiniMap
+          nodeColor={getMinimapNodeColor}
+          maskColor="var(--minimap-mask)"
+          className="!bg-background"
+          pannable
+          zoomable
+        />
+      )}
     </ReactFlow>
   );
 
@@ -1821,6 +1919,31 @@ function SchemaGraphInner({
             visible={!sidebarOpen}
           />
           {reactFlowContent}
+          {hoverCard && (
+            <div
+              style={{
+                position: "fixed",
+                left: hoverCard.x + EDGE_HOVER_CARD_OFFSET_X,
+                top: hoverCard.y + EDGE_HOVER_CARD_OFFSET_Y,
+                zIndex: 120,
+              }}
+              className="pointer-events-none max-w-[420px] break-words rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+            >
+              {hoverCard.title && (
+                <div className="mb-1 font-medium">{hoverCard.title}</div>
+              )}
+              <div className="space-y-0.5">
+                <div>
+                  <span className="font-medium">From:</span>{" "}
+                  {renderHoverEndpoint(hoverCard.from)}
+                </div>
+                <div>
+                  <span className="font-medium">To:</span>{" "}
+                  {renderHoverEndpoint(hoverCard.to)}
+                </div>
+              </div>
+            </div>
+          )}
           {canvasMode && contextMenuPos && !contextMenuEdge && (
             <CanvasContextMenu
               screenPosition={contextMenuPos.screen}

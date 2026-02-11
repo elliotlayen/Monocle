@@ -16,6 +16,10 @@ import {
   buildColumnHandleBase,
   buildNodeHandleBase,
 } from "@/features/schema-graph/utils/handle-ids";
+import {
+  TABLE_VIEW_ROW_HEIGHT,
+  getTableViewNodeHeight,
+} from "./node-geometry";
 
 function HandleIndicators({
   edgeTypes,
@@ -40,6 +44,7 @@ function HandleIndicators({
 
 interface TableNodeData {
   table: TableNodeType;
+  nodeWidth?: number;
   isFocused?: boolean;
   isDimmed?: boolean;
   isCompact?: boolean;
@@ -57,6 +62,7 @@ interface TableNodeData {
 function TableNodeComponent({ data }: NodeProps) {
   const {
     table,
+    nodeWidth,
     isFocused,
     isDimmed,
     isCompact,
@@ -72,8 +78,12 @@ function TableNodeComponent({ data }: NodeProps) {
   return (
     <div
       onClick={onClick}
+      style={{
+        width: nodeWidth,
+        minHeight: getTableViewNodeHeight(table.columns.length),
+      }}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[240px] max-w-[320px] overflow-hidden transition-all duration-200 cursor-pointer relative",
+        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-blue-500 ring-2 ring-blue-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -144,11 +154,6 @@ function TableNodeComponent({ data }: NodeProps) {
           />
         ))}
       </div>
-      {isCompact && (
-        <div className="px-3 pb-2 text-[10px] text-muted-foreground">
-          {table.columns.length} column{table.columns.length !== 1 && "s"}
-        </div>
-      )}
     </div>
   );
 }
@@ -208,7 +213,7 @@ function ColumnRow({
 
   if (isCompact) {
     return (
-      <div className="relative h-3">
+      <div className="relative" style={{ minHeight: TABLE_VIEW_ROW_HEIGHT }}>
         {showHandle && (
           <Handle
             type="target"
@@ -232,7 +237,10 @@ function ColumnRow({
   }
 
   return (
-    <div className="flex items-center px-3 py-1 hover:bg-muted relative min-h-[28px]">
+    <div
+      className="flex items-center px-3 py-1 hover:bg-muted relative"
+      style={{ minHeight: TABLE_VIEW_ROW_HEIGHT }}
+    >
       {/* Left handle for incoming FKs (target) */}
       {showHandle && (
         <Handle
@@ -250,10 +258,10 @@ function ColumnRow({
       </div>
 
       {/* Column info */}
-      <div className="flex items-center gap-2 flex-1 overflow-hidden">
+      <div className="flex items-center gap-2 flex-1">
         <span
           className={cn(
-            "text-xs text-foreground truncate",
+            "text-xs text-foreground whitespace-nowrap",
             column.isPrimaryKey && "font-semibold"
           )}
         >

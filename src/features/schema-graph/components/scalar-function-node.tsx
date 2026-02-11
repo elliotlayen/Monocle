@@ -6,6 +6,7 @@ import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 interface ScalarFunctionNodeData {
   function: ScalarFunction;
+  nodeWidth?: number;
   isFocused?: boolean;
   isDimmed?: boolean;
   canvasMode?: boolean;
@@ -15,6 +16,7 @@ interface ScalarFunctionNodeData {
 function ScalarFunctionNodeComponent({ data }: NodeProps) {
   const {
     function: fn,
+    nodeWidth,
     isFocused,
     isDimmed,
     canvasMode,
@@ -25,8 +27,9 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
   return (
     <div
       onClick={onClick}
+      style={{ width: nodeWidth }}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[200px] max-w-[280px] overflow-hidden transition-all duration-200 cursor-pointer relative",
+        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-cyan-500 ring-2 ring-cyan-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -53,7 +56,9 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
         <span className="text-[10px] text-cyan-200 uppercase tracking-wide block">
           Function
         </span>
-        <span className="text-sm font-semibold block truncate">{fn.name}</span>
+        <span className="text-sm font-semibold block whitespace-nowrap">
+          {fn.name}
+        </span>
       </div>
 
       {/* Return type */}
@@ -83,7 +88,9 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
                   key={param.name}
                   className="flex items-center gap-2 text-xs"
                 >
-                  <span className="text-foreground truncate">{param.name}</span>
+                  <span className="text-foreground whitespace-nowrap">
+                    {param.name}
+                  </span>
                   <span className="text-muted-foreground text-[10px] ml-auto">
                     {param.dataType}
                   </span>

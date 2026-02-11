@@ -6,6 +6,7 @@ import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 interface TriggerNodeData {
   trigger: Trigger;
+  nodeWidth?: number;
   isFocused?: boolean;
   isDimmed?: boolean;
   canvasMode?: boolean;
@@ -13,7 +14,7 @@ interface TriggerNodeData {
 }
 
 function TriggerNodeComponent({ data }: NodeProps) {
-  const { trigger, isFocused, isDimmed, canvasMode, onClick } =
+  const { trigger, nodeWidth, isFocused, isDimmed, canvasMode, onClick } =
     data as unknown as TriggerNodeData;
   const nodeHandleBase = buildNodeHandleBase(trigger.id);
 
@@ -26,8 +27,9 @@ function TriggerNodeComponent({ data }: NodeProps) {
   return (
     <div
       onClick={onClick}
+      style={{ width: nodeWidth }}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm min-w-[180px] max-w-[240px] overflow-hidden transition-all duration-200 cursor-pointer relative",
+        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-all duration-200 cursor-pointer relative",
         isFocused && "border-amber-500 ring-2 ring-amber-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
@@ -61,7 +63,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
             </span>
           )}
         </div>
-        <span className="text-sm font-semibold block truncate">
+        <span className="text-sm font-semibold block whitespace-nowrap">
           {trigger.name}
         </span>
       </div>

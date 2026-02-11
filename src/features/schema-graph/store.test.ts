@@ -89,3 +89,28 @@ describe("useSchemaStore.loadSchema", () => {
     expect(useSchemaStore.getState().error).toBeTruthy();
   });
 });
+
+describe("useSchemaStore.hydrateSettings", () => {
+  beforeEach(() => {
+    useSchemaStore.setState(createInitialSchemaState());
+    vi.clearAllMocks();
+  });
+
+  it("hydrates edgeLabelMode and showMiniMap when values are valid", () => {
+    useSchemaStore.getState().hydrateSettings({
+      edgeLabelMode: "always",
+      showMiniMap: false,
+    });
+
+    expect(useSchemaStore.getState().edgeLabelMode).toBe("always");
+    expect(useSchemaStore.getState().showMiniMap).toBe(false);
+  });
+
+  it("falls back to auto when edgeLabelMode is invalid", () => {
+    useSchemaStore.getState().hydrateSettings({
+      edgeLabelMode: "invalid" as never,
+    });
+
+    expect(useSchemaStore.getState().edgeLabelMode).toBe("auto");
+  });
+});
