@@ -35,11 +35,13 @@ import { ScalarFunctionNode } from "./scalar-function-node";
 import {
   DirectedEdge,
   buildNodeHeightMap,
-  getPositionedBounds,
+  getCombinedPositionedBounds,
   getNodeHeight,
+  layoutAuxGroupsSideBySide,
   layoutLayeredLeftToRight,
-  layoutSideBands,
   layoutItemsInGridRows,
+  layoutRightAnchoredChildrenByBands,
+  layoutSideBands,
 } from "./layout";
 import {
   buildNodeWidthMap,
@@ -48,6 +50,7 @@ import {
   TABLE_VIEW_MIN_WIDTH,
   TRIGGER_MIN_WIDTH,
 } from "./node-width";
+import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
 import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
 import { DetailPopover } from "./detail-popover";
 import { SidebarToggle } from "./sidebar-toggle";
@@ -81,21 +84,36 @@ import {
   buildNodeHandleBase,
   parseHandleBase,
 } from "@/features/schema-graph/utils/handle-ids";
-import { deriveEdgeState, type EdgeMeta } from "./edge-state";
+import {
+  areEdgesEquivalent,
+  deriveEdgeState,
+  type EdgeMeta,
+} from "./edge-state";
 import {
   buildEdgeHoverCardContent,
   type EdgeHoverEndpoint,
 } from "./edge-hover-card";
+import { applyNodeRenderPatch } from "./node-render-update";
 import {
   getFocusTransition,
   isFocusSessionActive,
   shouldForceEdgeFlush,
   type FocusSnapshot,
 } from "./focus-transition";
+import {
+  getZoomBand,
+  isCompactForZoomBand,
+  isFocusModerateCompactForZoomBand,
+  shouldShowEdgeLabelsAtZoom,
+  type ZoomBand,
+} from "./zoom-band";
 
 const GAP_Y = 100;
 const OVERVIEW_LAYER_GAP_X = 140;
 const OVERVIEW_LAYER_LANE_GAP_X = 72;
+const OVERVIEW_TARGET_ASPECT_RATIO = 2.1;
+const OVERVIEW_MIN_LANES = 5;
+const OVERVIEW_MAX_LANES = 20;
 const FOCUS_TIER_GAP_X = 60;
 const FOCUS_SIDE_BAND_GAP_X = 140;
 const FOCUS_SIDE_LANE_GAP_X = 72;
@@ -103,10 +121,11 @@ const FOCUS_MAX_ROWS_PER_LANE = 5;
 const AUX_LANE_GAP_Y = 80;
 const AUX_NODE_GAP_X = 90;
 const AUX_MAX_COLS = 8;
-const COMPACT_ZOOM = 0.6;
-const FOCUS_COMPACT_ZOOM = 0.4;
-const FORCE_COMPACT_ZOOM = 0.3;
-const EDGE_LABEL_ZOOM = 0.8;
+const OVERVIEW_AUX_MAX_COLS = 20;
+const TRIGGER_PARENT_GAP_X = 48;
+const TRIGGER_STACK_GAP_Y = 24;
+const TRIGGER_MIN_INTER_BAND_GAP_X_OVERVIEW = OVERVIEW_LAYER_GAP_X;
+const TRIGGER_MIN_INTER_BAND_GAP_X_FOCUS = FOCUS_TIER_GAP_X;
 const EDGE_HOVER_CARD_OFFSET_X = 12;
 const EDGE_HOVER_CARD_OFFSET_Y = 12;
 const DEFAULT_OBJECT_TEXT_COLOR = "var(--muted-foreground)";
@@ -130,6 +149,9 @@ function getMinimapNodeColor(node: Node): string {
   if (node.type === "scalarFunctionNode") return "#06b6d4";
   return "#64748b";
 }
+
+const clampValue = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
 
 interface SchemaGraphProps {
   schema: SchemaGraphType;
@@ -162,6 +184,11 @@ function buildMainDirectedEdges(
 ): DirectedEdge[] {
   const edges: DirectedEdge[] = [];
   const seen = new Set<string>();
+  const tableLikeIds = new Set<string>([
+    ...schema.tables.map((table) => table.id),
+    ...(schema.views || []).map((view) => view.id),
+  ]);
+
   const pushEdge = (from: string, to: string) => {
     if (!from || !to || from === to) return;
     const key = `${from}=>${to}`;
@@ -180,11 +207,54 @@ function buildMainDirectedEdges(
     }
   }
 
+  (schema.views || []).forEach((view) => {
+    (view.referencedTables || []).forEach((sourceId) => {
+      if (!tableLikeIds.has(sourceId)) return;
+      pushEdge(sourceId, view.id);
+    });
+  });
+
   return edges;
 }
 
-const getAuxCols = (count: number) =>
-  Math.max(1, Math.min(AUX_MAX_COLS, Math.ceil(Math.sqrt(count))));
+const getFallbackAuxCols = (count: number) =>
+  clampValue(Math.ceil(Math.sqrt(count)), 1, AUX_MAX_COLS);
+
+const getOverviewMainMaxLanes = (nodeCount: number) =>
+  clampValue(
+    Math.ceil(Math.sqrt(Math.max(1, nodeCount)) * 1.8),
+    OVERVIEW_MIN_LANES,
+    OVERVIEW_MAX_LANES
+  );
+
+function estimateOverviewAuxCols(
+  nodeIds: string[],
+  nodeHeights: Map<string, number>,
+  nodeWidths: Map<string, number>,
+  fallbackWidth: number
+): number {
+  if (nodeIds.length === 0) {
+    return 1;
+  }
+
+  const totalStackHeight =
+    nodeIds.reduce((sum, nodeId) => sum + getNodeHeight(nodeHeights, nodeId), 0) +
+    GAP_Y * Math.max(0, nodeIds.length - 1);
+  const avgNodeWidth =
+    nodeIds.reduce(
+      (sum, nodeId) => sum + getNodeWidth(nodeWidths, nodeId, fallbackWidth),
+      0
+    ) / nodeIds.length;
+  const safeAvgWidth = Math.max(1, avgNodeWidth);
+
+  return clampValue(
+    Math.ceil(
+      Math.sqrt((OVERVIEW_TARGET_ASPECT_RATIO * totalStackHeight) / safeAvgWidth)
+    ),
+    1,
+    OVERVIEW_AUX_MAX_COLS
+  );
+}
 
 function placeAuxLane(
   positions: Map<string, { x: number; y: number }>,
@@ -193,7 +263,8 @@ function placeAuxLane(
   startY: number,
   nodeHeights: Map<string, number>,
   nodeWidths: Map<string, number>,
-  fallbackWidth: number
+  fallbackWidth: number,
+  cols?: number
 ): number {
   if (nodeIds.length === 0) return startY;
 
@@ -202,7 +273,7 @@ function placeAuxLane(
     {
       startX,
       startY,
-      cols: getAuxCols(nodeIds.length),
+      cols: cols ?? getFallbackAuxCols(nodeIds.length),
       nodeWidth: fallbackWidth,
       gapX: AUX_NODE_GAP_X,
       gapY: GAP_Y,
@@ -216,6 +287,43 @@ function placeAuxLane(
   });
 
   return laneLayout.maxBottom + AUX_LANE_GAP_Y;
+}
+
+function placeAuxGroupsSideBySide(
+  positions: Map<string, { x: number; y: number }>,
+  leftNodeIds: string[],
+  rightNodeIds: string[],
+  startX: number,
+  startY: number,
+  nodeHeights: Map<string, number>,
+  nodeWidths: Map<string, number>,
+  leftNodeWidthFallback: number,
+  rightNodeWidthFallback: number,
+  leftCols?: number,
+  rightCols?: number
+): number {
+  const groupLayout = layoutAuxGroupsSideBySide({
+    leftNodeIds,
+    rightNodeIds,
+    startX,
+    startY,
+    leftNodeWidthFallback,
+    rightNodeWidthFallback,
+    gapX: AUX_NODE_GAP_X,
+    gapY: GAP_Y,
+    laneGapY: AUX_LANE_GAP_Y,
+    leftCols,
+    rightCols,
+    getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
+    getWidth: (nodeId, fallbackWidth) =>
+      getNodeWidth(nodeWidths, nodeId, fallbackWidth),
+  });
+
+  Object.entries(groupLayout.positions).forEach(([id, position]) => {
+    positions.set(id, position);
+  });
+
+  return groupLayout.nextY;
 }
 
 /**
@@ -309,14 +417,9 @@ function calculateCompactLayout(
   applyCenteredBand(leftLayout.positions, leftLayout.bounds);
   applyCenteredBand(rightLayout.positions, rightLayout.bounds);
 
-  const mainBounds = getPositionedBounds(positions, (nodeId) =>
-    getNodeHeight(nodeHeights, nodeId),
-    (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH)
+  const visibleTriggers = (schema.triggers || []).filter((trigger) =>
+    visibleNodeIds.has(trigger.id)
   );
-
-  const visibleTriggers = (schema.triggers || [])
-    .map((trigger) => trigger.id)
-    .filter((id) => visibleNodeIds.has(id));
   const visibleProcedures = (schema.storedProcedures || [])
     .map((proc) => proc.id)
     .filter((id) => visibleNodeIds.has(id));
@@ -324,32 +427,97 @@ function calculateCompactLayout(
     .map((fn) => fn.id)
     .filter((id) => visibleNodeIds.has(id));
 
-  let nextY = mainBounds.maxBottom + GAP_Y;
+  const mainTableViewPositions: Record<string, { x: number; y: number }> = {};
+  positions.forEach((position, nodeId) => {
+    if (tableOrViewIds.has(nodeId)) {
+      mainTableViewPositions[nodeId] = position;
+    }
+  });
+  const bandXs = [...new Set(Object.values(mainTableViewPositions).map((p) => p.x))]
+    .sort((a, b) => a - b);
+  const orderedBandIds = bandXs.map((_, index) => `focus-band-${index}`);
+  const bandIdByX = new Map<number, string>();
+  const parentIdsByBand = new Map<string, string[]>();
+  orderedBandIds.forEach((bandId, index) => {
+    bandIdByX.set(bandXs[index], bandId);
+    parentIdsByBand.set(bandId, []);
+  });
+
+  Object.entries(mainTableViewPositions).forEach(([nodeId, position]) => {
+    const bandId = bandIdByX.get(position.x);
+    if (!bandId) return;
+    parentIdsByBand.get(bandId)!.push(nodeId);
+  });
+
+  const childIdsByParent = new Map<string, string[]>();
+  visibleTriggers.forEach((trigger) => {
+    if (!childIdsByParent.has(trigger.tableId)) {
+      childIdsByParent.set(trigger.tableId, []);
+    }
+    childIdsByParent.get(trigger.tableId)!.push(trigger.id);
+  });
+
+  const triggerLayout = layoutRightAnchoredChildrenByBands({
+    orderedBandIds,
+    parentIdsByBand,
+    childIdsByParent,
+    parentPositions: mainTableViewPositions,
+    getParentWidth: (parentId) =>
+      getNodeWidth(nodeWidths, parentId, TABLE_VIEW_MIN_WIDTH),
+    getParentHeight: (parentId) => getNodeHeight(nodeHeights, parentId),
+    getChildWidth: (childId) =>
+      getNodeWidth(nodeWidths, childId, TRIGGER_MIN_WIDTH),
+    getChildHeight: (childId) => getNodeHeight(nodeHeights, childId),
+    baseGapX: TRIGGER_PARENT_GAP_X,
+    stackGapY: TRIGGER_STACK_GAP_Y,
+    minLaneGapX: FOCUS_SIDE_LANE_GAP_X,
+    minBandGapX: TRIGGER_MIN_INTER_BAND_GAP_X_FOCUS,
+    getChildStackStartY: ({ parentTopY }) =>
+      parentTopY + TABLE_VIEW_HEADER_HEIGHT,
+  });
+
+  const shiftedMainTableViewPositions: Record<string, { x: number; y: number }> = {};
+  Object.entries(mainTableViewPositions).forEach(([nodeId, position]) => {
+    const shiftX = triggerLayout.parentShiftById.get(nodeId) ?? 0;
+    const shifted = { x: position.x + shiftX, y: position.y };
+    shiftedMainTableViewPositions[nodeId] = shifted;
+    positions.set(nodeId, shifted);
+  });
+
+  Object.entries(triggerLayout.positions).forEach(([id, position]) => {
+    positions.set(id, position);
+  });
+
+  const mainAndTriggerBounds = getCombinedPositionedBounds(
+    [shiftedMainTableViewPositions, triggerLayout.positions],
+    (nodeId) => getNodeHeight(nodeHeights, nodeId),
+    (nodeId) => {
+      if (tableOrViewIds.has(nodeId)) {
+        return getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH);
+      }
+      return getNodeWidth(nodeWidths, nodeId, TRIGGER_MIN_WIDTH);
+    }
+  );
+
+  let nextY = mainAndTriggerBounds.maxBottom + GAP_Y;
   nextY = placeAuxLane(
     positions,
-    visibleTriggers,
-    mainBounds.minX,
+    triggerLayout.unplacedChildIds,
+    mainAndTriggerBounds.minX,
     nextY,
     nodeHeights,
     nodeWidths,
     TRIGGER_MIN_WIDTH
   );
-  nextY = placeAuxLane(
+  placeAuxGroupsSideBySide(
     positions,
     visibleProcedures,
-    mainBounds.minX,
-    nextY,
-    nodeHeights,
-    nodeWidths,
-    ROUTINE_MIN_WIDTH
-  );
-  placeAuxLane(
-    positions,
     visibleFunctions,
-    mainBounds.minX,
+    mainAndTriggerBounds.minX,
     nextY,
     nodeHeights,
     nodeWidths,
+    ROUTINE_MIN_WIDTH,
     ROUTINE_MIN_WIDTH
   );
 
@@ -405,19 +573,73 @@ function buildBaseNodes(
   const tables = schema.tables;
   const views = schema.views || [];
   const mainNodeIds = [...tables.map((table) => table.id), ...views.map((view) => view.id)];
+  const overviewMaxLanes = getOverviewMainMaxLanes(mainNodeIds.length);
   const layered = layoutLayeredLeftToRight({
     nodeIds: mainNodeIds,
     edges: buildMainDirectedEdges(schema, viewColumnSources),
     layerGapX: OVERVIEW_LAYER_GAP_X,
     laneGapX: OVERVIEW_LAYER_LANE_GAP_X,
     gapY: GAP_Y,
+    maxLanes: overviewMaxLanes,
+    targetAspectRatio: OVERVIEW_TARGET_ASPECT_RATIO,
     getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
     getWidth: (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH),
   });
   const mainPositions = layered.positions;
+  const orderedRanks = [
+    ...new Set(mainNodeIds.map((nodeId) => layered.layerByNode.get(nodeId) ?? 0)),
+  ].sort((a, b) => a - b);
+  const orderedBandIds = orderedRanks.map((rank) => `overview-rank-${rank}`);
+  const bandIdByRank = new Map<number, string>();
+  orderedRanks.forEach((rank, index) => {
+    bandIdByRank.set(rank, orderedBandIds[index]);
+  });
+  const parentIdsByBand = new Map<string, string[]>();
+  orderedBandIds.forEach((bandId) => parentIdsByBand.set(bandId, []));
+  mainNodeIds.forEach((nodeId) => {
+    const rank = layered.layerByNode.get(nodeId) ?? 0;
+    const bandId = bandIdByRank.get(rank);
+    if (!bandId) return;
+    parentIdsByBand.get(bandId)!.push(nodeId);
+  });
+
+  const triggerEntries = schema.triggers || [];
+  const childIdsByParent = new Map<string, string[]>();
+  triggerEntries.forEach((trigger) => {
+    if (!childIdsByParent.has(trigger.tableId)) {
+      childIdsByParent.set(trigger.tableId, []);
+    }
+    childIdsByParent.get(trigger.tableId)!.push(trigger.id);
+  });
+  const triggerLayout = layoutRightAnchoredChildrenByBands({
+    orderedBandIds,
+    parentIdsByBand,
+    childIdsByParent,
+    parentPositions: mainPositions,
+    getParentWidth: (parentId) =>
+      getNodeWidth(nodeWidths, parentId, TABLE_VIEW_MIN_WIDTH),
+    getParentHeight: (parentId) => getNodeHeight(nodeHeights, parentId),
+    getChildWidth: (childId) =>
+      getNodeWidth(nodeWidths, childId, TRIGGER_MIN_WIDTH),
+    getChildHeight: (childId) => getNodeHeight(nodeHeights, childId),
+    baseGapX: TRIGGER_PARENT_GAP_X,
+    stackGapY: TRIGGER_STACK_GAP_Y,
+    minLaneGapX: OVERVIEW_LAYER_LANE_GAP_X,
+    minBandGapX: TRIGGER_MIN_INTER_BAND_GAP_X_OVERVIEW,
+    getChildStackStartY: ({ parentTopY }) =>
+      parentTopY + TABLE_VIEW_HEADER_HEIGHT,
+  });
+
+  const shiftedMainPositions: Record<string, { x: number; y: number }> = {};
+  mainNodeIds.forEach((nodeId) => {
+    const position = mainPositions[nodeId];
+    if (!position) return;
+    const shiftX = triggerLayout.parentShiftById.get(nodeId) ?? 0;
+    shiftedMainPositions[nodeId] = { x: position.x + shiftX, y: position.y };
+  });
 
   const tableNodes: Node[] = tables.map((table) => {
-    const position = mainPositions[table.id];
+    const position = shiftedMainPositions[table.id];
 
     return {
       id: table.id,
@@ -439,7 +661,7 @@ function buildBaseNodes(
   });
 
   const viewNodes: Node[] = views.map((view) => {
-    const position = mainPositions[view.id];
+    const position = shiftedMainPositions[view.id];
 
     return {
       id: view.id,
@@ -461,38 +683,66 @@ function buildBaseNodes(
   });
 
   const bottomPositions = new Map<string, { x: number; y: number }>();
-  let nextY = layered.bounds.maxBottom + GAP_Y;
+  Object.entries(triggerLayout.positions).forEach(([id, position]) => {
+    bottomPositions.set(id, position);
+  });
 
-  const triggerIds = (schema.triggers || []).map((trigger) => trigger.id);
-  nextY = placeAuxLane(
-    bottomPositions,
-    triggerIds,
-    layered.bounds.minX,
-    nextY,
+  const mainAndTriggerBounds = getCombinedPositionedBounds(
+    [shiftedMainPositions, triggerLayout.positions],
+    (nodeId) => getNodeHeight(nodeHeights, nodeId),
+    (nodeId) => {
+      if (shiftedMainPositions[nodeId]) {
+        return getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH);
+      }
+      return getNodeWidth(nodeWidths, nodeId, TRIGGER_MIN_WIDTH);
+    }
+  );
+  let nextY = mainAndTriggerBounds.maxBottom + GAP_Y;
+
+  const orphanTriggerIds = triggerLayout.unplacedChildIds;
+  const orphanTriggerCols = estimateOverviewAuxCols(
+    orphanTriggerIds,
     nodeHeights,
     nodeWidths,
     TRIGGER_MIN_WIDTH
   );
-
-  const procedureIds = (schema.storedProcedures || []).map((proc) => proc.id);
   nextY = placeAuxLane(
     bottomPositions,
-    procedureIds,
-    layered.bounds.minX,
+    orphanTriggerIds,
+    mainAndTriggerBounds.minX,
     nextY,
+    nodeHeights,
+    nodeWidths,
+    TRIGGER_MIN_WIDTH,
+    orphanTriggerCols
+  );
+
+  const procedureIds = (schema.storedProcedures || []).map((proc) => proc.id);
+  const functionIds = (schema.scalarFunctions || []).map((fn) => fn.id);
+  const procedureCols = estimateOverviewAuxCols(
+    procedureIds,
     nodeHeights,
     nodeWidths,
     ROUTINE_MIN_WIDTH
   );
-  const functionIds = (schema.scalarFunctions || []).map((fn) => fn.id);
-  placeAuxLane(
-    bottomPositions,
+  const functionCols = estimateOverviewAuxCols(
     functionIds,
-    layered.bounds.minX,
-    nextY,
     nodeHeights,
     nodeWidths,
     ROUTINE_MIN_WIDTH
+  );
+  placeAuxGroupsSideBySide(
+    bottomPositions,
+    procedureIds,
+    functionIds,
+    mainAndTriggerBounds.minX,
+    nextY,
+    nodeHeights,
+    nodeWidths,
+    ROUTINE_MIN_WIDTH,
+    ROUTINE_MIN_WIDTH,
+    procedureCols,
+    functionCols
   );
 
   const triggerNodes: Node[] = (schema.triggers || []).map((trigger) => ({
@@ -551,6 +801,10 @@ function buildBaseEdges(
   >
 ): EdgeMeta[] {
   const edges: EdgeMeta[] = [];
+  const tableLikeIds = new Set<string>([
+    ...schema.tables.map((table) => table.id),
+    ...(schema.views || []).map((view) => view.id),
+  ]);
 
   schema.relationships.forEach((rel) => {
     const sourceHandle = rel.fromColumn
@@ -655,7 +909,10 @@ function buildBaseEdges(
 
   (schema.views || []).forEach((view) => {
     const sources = viewColumnSources.get(view.id) ?? [];
+    const representedSourceIds = new Set<string>();
+
     sources.forEach((source) => {
+      representedSourceIds.add(source.sourceTableId);
       edges.push({
         id: `view-col-edge-${view.id}-${source.columnName}-${source.sourceTableId}-${source.sourceColumn}`,
         type: "viewDependencies",
@@ -672,6 +929,23 @@ function buildBaseEdges(
         label: view.name,
         sourceColumn: source.sourceColumn,
         targetColumn: source.columnName,
+      });
+    });
+
+    (view.referencedTables || []).forEach((sourceId) => {
+      if (!sourceId || sourceId === view.id) return;
+      if (!tableLikeIds.has(sourceId)) return;
+      if (representedSourceIds.has(sourceId)) return;
+
+      representedSourceIds.add(sourceId);
+      edges.push({
+        id: `view-ref-edge-${view.id}-${sourceId}`,
+        type: "viewDependencies",
+        source: sourceId,
+        target: view.id,
+        sourceHandle: `${buildNodeHandleBase(sourceId)}-source`,
+        targetHandle: `${buildNodeHandleBase(view.id)}-target`,
+        label: view.name,
       });
     });
   });
@@ -833,15 +1107,28 @@ function SchemaGraphInner({
   const fitViewCalledRef = useRef(false);
   const pendingEdgeFlushRef = useRef(false);
   const lastFlushSignatureRef = useRef("");
+  const zoomRef = useRef(0.8);
+  const edgesRef = useRef<Edge[]>([]);
+  const handleEdgeTypesRef = useRef<Map<string, Set<EdgeType>>>(new Map());
 
-  const [zoom, setZoom] = useState(0.8);
+  const [zoomBand, setZoomBand] = useState<ZoomBand>(() => getZoomBand(0.8));
+  const [autoShowEdgeLabels, setAutoShowEdgeLabels] = useState(() =>
+    shouldShowEdgeLabelsAtZoom(0.8)
+  );
   const [isEdgeFlushInProgress, setIsEdgeFlushInProgress] = useState(false);
   const showEdgeLabels =
     edgeLabelMode === "always"
       ? true
       : edgeLabelMode === "never"
         ? false
-        : zoom >= EDGE_LABEL_ZOOM;
+        : autoShowEdgeLabels;
+
+  useEffect(() => {
+    if (edgeLabelMode !== "auto") {
+      return;
+    }
+    setAutoShowEdgeLabels(shouldShowEdgeLabelsAtZoom(zoomRef.current));
+  }, [edgeLabelMode]);
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_event, edge) => {
@@ -916,10 +1203,17 @@ function SchemaGraphInner({
   );
 
   const onMove = useCallback((_event: unknown, viewport: { zoom: number }) => {
-    setZoom((prev) =>
-      Math.abs(prev - viewport.zoom) > 0.01 ? viewport.zoom : prev
-    );
-  }, []);
+    zoomRef.current = viewport.zoom;
+    const nextZoomBand = getZoomBand(viewport.zoom);
+    setZoomBand((prev) => (prev === nextZoomBand ? prev : nextZoomBand));
+
+    if (edgeLabelMode === "auto") {
+      const nextShowLabels = shouldShowEdgeLabelsAtZoom(viewport.zoom);
+      setAutoShowEdgeLabels((prev) =>
+        prev === nextShowLabels ? prev : nextShowLabels
+      );
+    }
+  }, [edgeLabelMode]);
 
   const removeEdgeDescriptor = useCallback(
     (descriptor: EdgeEditState) => {
@@ -1281,6 +1575,10 @@ function SchemaGraphInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(baseNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
+
   // Canvas mode: delete selected edges
   const handleDeleteSelectedEdges = useCallback(() => {
     if (!canvasMode) return;
@@ -1572,7 +1870,9 @@ function SchemaGraphInner({
       hoveredEdgeId,
       showLabels: showEdgeLabels,
       showInlineLabelOnHover: false,
+      previousHandleEdgeTypes: handleEdgeTypesRef.current,
     });
+    handleEdgeTypesRef.current = handleEdgeTypes;
 
     const prevState = prevFocusStateRef.current;
     const nextFocusState: FocusSnapshot = {
@@ -1598,9 +1898,13 @@ function SchemaGraphInner({
       pendingEdgeFlushRef.current = true;
       lastFlushSignatureRef.current = flushSignature;
       setIsEdgeFlushInProgress(true);
+      edgesRef.current = [];
       setEdges([]);
     } else if (!pendingEdgeFlushRef.current) {
-      setEdges(nextEdges);
+      if (!areEdgesEquivalent(edgesRef.current, nextEdges)) {
+        edgesRef.current = nextEdges;
+        setEdges(nextEdges);
+      }
       if (!transitionNeedsFlush) {
         lastFlushSignatureRef.current = "";
         setIsEdgeFlushInProgress(false);
@@ -1638,14 +1942,16 @@ function SchemaGraphInner({
         : null;
 
     const internalsRefreshIds = new Set<string>();
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
+    setNodes((currentNodes) => {
+      let changed = false;
+      const nextNodes = currentNodes.map((node) => {
         const isVisible = visibleNodeIds.has(node.id);
         let isFocused = false;
         let isDimmed = false;
+        const isTableOrView = node.type === "tableNode" || node.type === "viewNode";
 
         if (focusedTableId) {
-          if (node.type === "tableNode" || node.type === "viewNode") {
+          if (isTableOrView) {
             isFocused = node.id === focusedTableId;
             isDimmed = !isFocused && !isNeighbor(node.id);
           } else if (node.type === "triggerNode") {
@@ -1680,12 +1986,6 @@ function SchemaGraphInner({
           }
         }
 
-        const nextData: Record<string, unknown> = {
-          ...(node.data as Record<string, unknown>),
-          isFocused,
-          isDimmed,
-        };
-
         const widthFallback =
           node.type === "triggerNode"
             ? TRIGGER_MIN_WIDTH
@@ -1693,31 +1993,29 @@ function SchemaGraphInner({
                 node.type === "scalarFunctionNode"
               ? ROUTINE_MIN_WIDTH
               : TABLE_VIEW_MIN_WIDTH;
-        nextData.nodeWidth = getNodeWidth(nodeWidths, node.id, widthFallback);
+        const nodeWidth = getNodeWidth(nodeWidths, node.id, widthFallback);
 
-        if (node.type === "tableNode" || node.type === "viewNode") {
-          nextData.columnsWithHandles = schemaIndex.columnsWithHandles;
-          nextData.handleEdgeTypes = handleEdgeTypes;
+        let nodeIsCompact: boolean | undefined;
+        if (isTableOrView) {
+          // Per-node compact calculation.
+          nodeIsCompact = isCompactForZoomBand(zoomBand);
 
-          // Per-node compact calculation
-          let nodeIsCompact = zoom < COMPACT_ZOOM;
-
-          if (zoom < FORCE_COMPACT_ZOOM) {
+          if (zoomBand === "forceCompact") {
             nodeIsCompact = true;
           } else if (focusedTableId) {
             if (node.id === focusedTableId) {
-              // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM)
+              // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM).
               nodeIsCompact = false;
             } else if (isNeighbor(node.id)) {
-              // Neighbors a neighbor: expand based on count thresholds
+              // Neighbors a neighbor: expand based on count thresholds.
               if (visibleNonDimmedCount <= focusExpandThreshold) {
                 nodeIsCompact = false;
               } else if (visibleNonDimmedCount <= moderateThreshold) {
-                nodeIsCompact = zoom < FOCUS_COMPACT_ZOOM;
+                nodeIsCompact =
+                  isFocusModerateCompactForZoomBand(zoomBand);
               }
             }
           }
-          nextData.isCompact = nodeIsCompact;
         }
 
         // Hide node if not visible by filters, or dimmed in hide-only focus mode.
@@ -1736,35 +2034,37 @@ function SchemaGraphInner({
           position = originalPositionsRef.current.get(node.id)!;
         }
 
-        const previousData = node.data as { isCompact?: boolean } | undefined;
-        const compactChanged = previousData?.isCompact !== nextData.isCompact;
-        const widthChanged =
-          (node.data as { nodeWidth?: number } | undefined)?.nodeWidth !==
-          nextData.nodeWidth;
-        const positionChanged =
-          position.x !== node.position.x || position.y !== node.position.y;
-        const hiddenChanged = node.hidden !== shouldHide;
-        if (
-          compactChanged ||
-          widthChanged ||
-          positionChanged ||
-          hiddenChanged
-        ) {
-          internalsRefreshIds.add(node.id);
-        }
-
-        return {
-          ...node,
+        const nodeUpdate = applyNodeRenderPatch(node, {
           position,
           hidden: shouldHide,
-          data: nextData,
-        };
-      })
-    );
+          isFocused,
+          isDimmed,
+          nodeWidth,
+          isCompact: nodeIsCompact,
+          columnsWithHandles: isTableOrView
+            ? schemaIndex.columnsWithHandles
+            : undefined,
+          handleEdgeTypes: isTableOrView ? handleEdgeTypes : undefined,
+          includeTableViewFields: isTableOrView,
+        });
+
+        if (!nodeUpdate.changed) {
+          return node;
+        }
+
+        changed = true;
+        if (nodeUpdate.geometryChanged) {
+          internalsRefreshIds.add(node.id);
+        }
+        return nodeUpdate.node;
+      });
+      return changed ? nextNodes : currentNodes;
+    });
     if (shouldStartEdgeFlush) {
       requestAnimationFrame(() => {
         internalsRefreshIds.forEach((nodeId) => updateNodeInternals(nodeId));
         requestAnimationFrame(() => {
+          edgesRef.current = nextEdges;
           setEdges(nextEdges);
           pendingEdgeFlushRef.current = false;
           lastFlushSignatureRef.current = "";
@@ -1776,6 +2076,7 @@ function SchemaGraphInner({
         internalsRefreshIds.forEach((nodeId) => updateNodeInternals(nodeId));
         if (!pendingEdgeFlushRef.current) {
           // Re-apply visible edges after handle geometry updates to avoid stale paths.
+          edgesRef.current = nextEdges;
           setEdges([...nextEdges]);
         }
       });
@@ -1801,9 +2102,7 @@ function SchemaGraphInner({
     edgeTypeFilter,
     focusedTableId,
     focusExpandThreshold,
-    edgeLabelMode,
-    showMiniMap,
-    zoom,
+    zoomBand,
     schema,
     schemaFilter,
     schemaIndex,

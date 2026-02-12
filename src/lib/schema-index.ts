@@ -79,6 +79,10 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
       buildSearchText([view.name, view.schema, view.id, ...columnNames])
     );
   }
+  const tableLikeIds = new Set<string>([
+    ...schema.tables.map((table) => table.id),
+    ...(schema.views || []).map((view) => view.id),
+  ]);
 
   for (const trigger of schema.triggers || []) {
     triggerSearch.set(
@@ -227,6 +231,24 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
     for (const tableId of sourceTableIds) {
       addNeighbor(viewId, tableId);
       addNeighbor(tableId, viewId);
+    }
+  }
+
+  for (const view of schema.views || []) {
+    for (const reference of view.referencedTables || []) {
+      const normalizedReference = reference.replace(/[[\]]/g, "");
+      const referenceKey = normalizedReference.toLowerCase();
+      const shortKey = referenceKey.split(".").pop();
+      const sourceId =
+        nameToId.get(reference.toLowerCase()) ??
+        nameToId.get(referenceKey) ??
+        (shortKey ? nameToId.get(shortKey) : undefined) ??
+        normalizedReference;
+
+      if (!tableLikeIds.has(sourceId) || sourceId === view.id) continue;
+
+      addNeighbor(view.id, sourceId);
+      addNeighbor(sourceId, view.id);
     }
   }
 

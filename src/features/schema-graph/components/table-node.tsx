@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { TbCircleDashedLetterN, TbLink } from "react-icons/tb";
 import { IoMdKey } from "react-icons/io";
@@ -59,6 +59,18 @@ interface TableNodeData {
   onClick?: (event: React.MouseEvent) => void;
 }
 
+interface TableColumnRenderData {
+  column: Column;
+  handleId: string;
+  hasHandle: boolean;
+  targetEdgeTypes?: Set<EdgeType>;
+  sourceEdgeTypes?: Set<EdgeType>;
+  hasFkOut: boolean;
+  hasFkIn: boolean;
+  fkOutgoingTargets: string[];
+  fkIncomingTargets: string[];
+}
+
 function TableNodeComponent({ data }: NodeProps) {
   const {
     table,
@@ -74,6 +86,43 @@ function TableNodeComponent({ data }: NodeProps) {
     onClick,
   } = data as unknown as TableNodeData;
   const nodeHandleBase = buildNodeHandleBase(table.id);
+  const columnRows = useMemo<TableColumnRenderData[]>(
+    () =>
+      table.columns.map((column) => {
+        const handleId = buildColumnHandleBase(table.id, column.name);
+        const fkUsage = fkColumnUsage?.get(handleId);
+        const fkLinks = fkColumnLinks?.get(handleId) ?? [];
+        const hasFkOut = (fkUsage?.outgoing ?? 0) > 0;
+        const hasFkIn = (fkUsage?.incoming ?? 0) > 0;
+        return {
+          column,
+          handleId,
+          hasHandle: columnsWithHandles?.has(handleId) ?? true,
+          targetEdgeTypes: handleEdgeTypes?.get(`${handleId}-target`),
+          sourceEdgeTypes: handleEdgeTypes?.get(`${handleId}-source`),
+          hasFkOut,
+          hasFkIn,
+          fkOutgoingTargets: fkLinks
+            .filter((link) => link.direction === "outgoing")
+            .map((link) =>
+              link.column ? `${link.tableId}.${link.column}` : link.tableId
+            ),
+          fkIncomingTargets: fkLinks
+            .filter((link) => link.direction === "incoming")
+            .map((link) =>
+              link.column ? `${link.tableId}.${link.column}` : link.tableId
+            ),
+        };
+      }),
+    [
+      table.columns,
+      table.id,
+      columnsWithHandles,
+      fkColumnUsage,
+      fkColumnLinks,
+      handleEdgeTypes,
+    ]
+  );
 
   return (
     <div
@@ -96,7 +145,11 @@ function TableNodeComponent({ data }: NodeProps) {
           type="target"
           position={Position.Left}
           id={`${nodeHandleBase}-target`}
-          className={canvasMode ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
+          className={
+            canvasMode
+              ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full"
+              : "!w-0 !h-0 !bg-transparent !border-0"
+          }
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
 
@@ -128,27 +181,21 @@ function TableNodeComponent({ data }: NodeProps) {
           type="source"
           position={Position.Right}
           id={`${nodeHandleBase}-source`}
-          className={canvasMode ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
+          className={
+            canvasMode
+              ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full"
+              : "!w-0 !h-0 !bg-transparent !border-0"
+          }
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
       </div>
 
       {/* Columns */}
       <div className="py-1">
-        {table.columns.map((column, index) => (
+        {columnRows.map((row) => (
           <ColumnRow
-            key={column.name}
-            column={column}
-            tableId={table.id}
-            index={index}
-            hasHandle={
-              columnsWithHandles?.has(
-                buildColumnHandleBase(table.id, column.name)
-              ) ?? true
-            }
-            fkColumnUsage={fkColumnUsage}
-            fkColumnLinks={fkColumnLinks}
-            handleEdgeTypes={handleEdgeTypes}
+            key={row.column.name}
+            row={row}
             isCompact={isCompact}
             canvasMode={canvasMode}
           />
@@ -159,52 +206,29 @@ function TableNodeComponent({ data }: NodeProps) {
 }
 
 interface ColumnRowProps {
-  column: Column;
-  tableId: string;
-  index: number;
-  hasHandle: boolean;
-  fkColumnUsage?: Map<string, { outgoing: number; incoming: number }>;
-  fkColumnLinks?: Map<
-    string,
-    { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
-  >;
-  handleEdgeTypes?: Map<string, Set<EdgeType>>;
+  row: TableColumnRenderData;
   isCompact?: boolean;
   canvasMode?: boolean;
 }
 
-function ColumnRow({
-  column,
-  tableId,
-  hasHandle,
-  fkColumnUsage,
-  fkColumnLinks,
-  handleEdgeTypes,
-  isCompact,
-  canvasMode,
-}: ColumnRowProps) {
-  const handleId = buildColumnHandleBase(tableId, column.name);
-  const targetEdgeTypes = handleEdgeTypes?.get(`${handleId}-target`);
-  const sourceEdgeTypes = handleEdgeTypes?.get(`${handleId}-source`);
-  const fkUsage = fkColumnUsage?.get(handleId);
-  const fkLinks = fkColumnLinks?.get(handleId) ?? [];
-  const hasFkOut = (fkUsage?.outgoing ?? 0) > 0;
-  const hasFkIn = (fkUsage?.incoming ?? 0) > 0;
+function ColumnRowComponent({ row, isCompact, canvasMode }: ColumnRowProps) {
+  const {
+    column,
+    handleId,
+    hasHandle,
+    targetEdgeTypes,
+    sourceEdgeTypes,
+    hasFkOut,
+    hasFkIn,
+    fkOutgoingTargets,
+    fkIncomingTargets,
+  } = row;
   const fkClass = hasFkOut && hasFkIn
     ? "text-violet-500"
     : hasFkOut
-    ? "text-blue-500"
-    : "text-emerald-500";
-  const fkOutgoingTargets = fkLinks
-    .filter((link) => link.direction === "outgoing")
-    .map((link) =>
-      link.column ? `${link.tableId}.${link.column}` : link.tableId
-    );
-  const fkIncomingTargets = fkLinks
-    .filter((link) => link.direction === "incoming")
-    .map((link) =>
-      link.column ? `${link.tableId}.${link.column}` : link.tableId
-    );
+      ? "text-blue-500"
+      : "text-emerald-500";
+
   // In canvas mode, all columns get handles and they're visible
   const showHandle = hasHandle || canvasMode;
   const handleClass = canvasMode
@@ -339,6 +363,14 @@ function ColumnRow({
     </div>
   );
 }
+
+const ColumnRow = memo(
+  ColumnRowComponent,
+  (prev, next) =>
+    prev.row === next.row &&
+    prev.isCompact === next.isCompact &&
+    prev.canvasMode === next.canvasMode
+);
 
 // Memoize for performance
 export const TableNode = memo(TableNodeComponent);

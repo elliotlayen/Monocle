@@ -3,6 +3,7 @@ import {
   SchemaGraph,
   ConnectionParams,
   ServerConnectionParams,
+  Column,
   TableNode as TableNodeType,
   ViewNode as ViewNodeType,
   Trigger,
@@ -90,6 +91,7 @@ interface SchemaStore {
   loadSchema: (params: ConnectionParams) => Promise<boolean>;
   connectToServer: (params: ServerConnectionParams) => Promise<boolean>;
   selectDatabase: (database: string) => Promise<boolean>;
+  refreshSelectedDatabase: () => Promise<boolean>;
   disconnectServer: () => void;
   setSearchFilter: (search: string) => void;
   setDebouncedSearchFilter: (search: string) => void;
@@ -474,6 +476,175 @@ const getAvailableSchemas = (schema: SchemaGraph) => {
   return [...schemas];
 };
 
+const normalizeLookupKey = (value: string) =>
+  value.replace(/[[\]]/g, "").toLowerCase();
+
+const buildObjectLookup = (schema: SchemaGraph) => {
+  const lookup = new Map<string, string>();
+  const add = (name: string, id: string) => {
+    lookup.set(name.toLowerCase(), id);
+  };
+
+  schema.tables.forEach((table) => {
+    add(table.name, table.id);
+    add(table.id, table.id);
+  });
+
+  (schema.views || []).forEach((view) => {
+    add(view.name, view.id);
+    add(view.id, view.id);
+  });
+
+  return lookup;
+};
+
+const resolveObjectId = (value: string, lookup: Map<string, string>) => {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+
+  const normalized = trimmed.replace(/[[\]]/g, "");
+  const normalizedKey = normalizeLookupKey(normalized);
+  const shortKey = normalizedKey.split(".").pop() ?? normalizedKey;
+
+  return (
+    lookup.get(trimmed.toLowerCase()) ??
+    lookup.get(normalizedKey) ??
+    lookup.get(shortKey) ??
+    normalized
+  );
+};
+
+const hasColumnLineage = (column: Column) =>
+  Boolean(
+    (column.sourceColumns && column.sourceColumns.length > 0) ||
+      (column.sourceTable && column.sourceColumn)
+  );
+
+const getColumnLineage = (column: Column) => {
+  if (column.sourceColumns && column.sourceColumns.length > 0) {
+    return column.sourceColumns.map((source) => ({
+      table: source.table,
+      column: source.column,
+    }));
+  }
+  if (column.sourceTable && column.sourceColumn) {
+    return [{ table: column.sourceTable, column: column.sourceColumn }];
+  }
+  return [];
+};
+
+const mergeReferences = (
+  existing: string[],
+  parsed: string[],
+  lookup: Map<string, string>
+) => {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+
+  const pushUnique = (value: string) => {
+    const resolved = resolveObjectId(value, lookup);
+    if (!resolved) return;
+    const key = resolved.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(resolved);
+  };
+
+  existing.forEach(pushUnique);
+  parsed.forEach(pushUnique);
+
+  return merged;
+};
+
+const sameStringArray = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
+
+const enrichLoadedSchemaViewDependencies = (schema: SchemaGraph): SchemaGraph => {
+  if (!schema.views || schema.views.length === 0) {
+    return schema;
+  }
+
+  const lookup = buildObjectLookup(schema);
+  let schemaChanged = false;
+
+  const views = schema.views.map((view) => {
+    if (!view.definition.trim()) {
+      return view;
+    }
+
+    const parsed = parseViewDefinition(view.definition, schema, {
+      fallbackColumns: view.columns,
+      defaultSchema: view.schema,
+    });
+    const parsedColumns = parsed.columns ?? [];
+    const parsedColumnsByName = new Map<string, Column[]>();
+    parsedColumns.forEach((column) => {
+      const key = column.name.toLowerCase();
+      const existing = parsedColumnsByName.get(key) ?? [];
+      existing.push(column);
+      parsedColumnsByName.set(key, existing);
+    });
+
+    let columnsChanged = false;
+    const columns = view.columns.map((column, index) => {
+      if (hasColumnLineage(column)) {
+        return column;
+      }
+
+      let parsedColumn: Column | undefined = parsedColumns[index];
+      if (
+        !parsedColumn ||
+        parsedColumn.name.toLowerCase() !== column.name.toLowerCase()
+      ) {
+        const fallback = parsedColumnsByName.get(column.name.toLowerCase());
+        parsedColumn = fallback?.[0];
+      }
+
+      if (!parsedColumn) {
+        return column;
+      }
+
+      const lineage = getColumnLineage(parsedColumn);
+      if (lineage.length === 0) {
+        return column;
+      }
+
+      columnsChanged = true;
+      return {
+        ...column,
+        sourceColumns: lineage,
+        sourceTable: lineage[0].table,
+        sourceColumn: lineage[0].column,
+      };
+    });
+
+    const existingRefs = view.referencedTables || [];
+    const parsedRefs = parsed.referencedTables || [];
+    const referencedTables = mergeReferences(existingRefs, parsedRefs, lookup);
+    const referencesChanged = !sameStringArray(existingRefs, referencedTables);
+
+    if (!columnsChanged && !referencesChanged) {
+      return view;
+    }
+
+    schemaChanged = true;
+    return {
+      ...view,
+      columns: columnsChanged ? columns : view.columns,
+      referencedTables,
+    };
+  });
+
+  if (!schemaChanged) {
+    return schema;
+  }
+
+  return {
+    ...schema,
+    views,
+  };
+};
+
 function cloneSchema(schema: SchemaGraph): SchemaGraph {
   return {
     tables: [...schema.tables],
@@ -520,7 +691,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   loadSchema: async (params: ConnectionParams) => {
     set({ isLoading: true, error: null });
     try {
-      const schema = await schemaService.loadSchema(params);
+      const loadedSchema = await schemaService.loadSchema(params);
+      const schema = enrichLoadedSchemaViewDependencies(loadedSchema);
       const schemas = getAvailableSchemas(schema);
       const preferredSchemaFilter = get().preferredSchemaFilter;
       const resolvedSchemaFilter =
@@ -598,7 +770,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         trustServerCertificate: serverConnection.trustServerCertificate,
       };
 
-      const schema = await schemaService.loadSchema(params);
+      const loadedSchema = await schemaService.loadSchema(params);
+      const schema = enrichLoadedSchemaViewDependencies(loadedSchema);
       const schemas = getAvailableSchemas(schema);
       const preferredSchemaFilter = get().preferredSchemaFilter;
       const resolvedSchemaFilter =
@@ -621,6 +794,63 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         objectTypeFilter: new Set(ALL_OBJECT_TYPES),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set<string>(),
+      });
+      return true;
+    } catch (err) {
+      set({ error: String(err), isLoading: false });
+      return false;
+    }
+  },
+
+  refreshSelectedDatabase: async () => {
+    const { serverConnection, selectedDatabase } = get();
+
+    if (!serverConnection) {
+      set({ error: "Not connected to server" });
+      return false;
+    }
+
+    if (!selectedDatabase) {
+      set({ error: "No database selected" });
+      return false;
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      const params: ConnectionParams = {
+        server: serverConnection.server,
+        database: selectedDatabase,
+        authType: serverConnection.authType,
+        username: serverConnection.username,
+        password: serverConnection.password,
+        trustServerCertificate: serverConnection.trustServerCertificate,
+      };
+
+      const loadedSchema = await schemaService.loadSchema(params);
+      const schema = enrichLoadedSchemaViewDependencies(loadedSchema);
+      const schemas = getAvailableSchemas(schema);
+      const currentSchemaFilter = get().schemaFilter;
+      const resolvedSchemaFilter =
+        currentSchemaFilter === "all" || schemas.includes(currentSchemaFilter)
+          ? currentSchemaFilter
+          : "all";
+      const focusedTableId = get().focusedTableId;
+      const resolvedFocusedTableId =
+        focusedTableId && getAllNodeIds(schema).has(focusedTableId)
+          ? focusedTableId
+          : null;
+
+      set({
+        schema,
+        isLoading: false,
+        availableSchemas: schemas,
+        schemaFilter: resolvedSchemaFilter,
+        focusedTableId: resolvedFocusedTableId,
+        selectedEdgeIds: new Set<string>(),
+        connectionInfo: {
+          server: serverConnection.server,
+          database: selectedDatabase,
+        },
       });
       return true;
     } catch (err) {

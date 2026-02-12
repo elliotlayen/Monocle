@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
-import { Check, ChevronsUpDown, Database, Loader2 } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Database,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useToastStore } from "@/features/notifications/store";
@@ -26,6 +32,8 @@ export function DatabaseSelector() {
     isDatabasesLoading,
     isLoading,
     selectDatabase,
+    refreshSelectedDatabase,
+    clearError,
   } = useSchemaStore(
     useShallow((state) => ({
       availableDatabases: state.availableDatabases,
@@ -33,6 +41,8 @@ export function DatabaseSelector() {
       isDatabasesLoading: state.isDatabasesLoading,
       isLoading: state.isLoading,
       selectDatabase: state.selectDatabase,
+      refreshSelectedDatabase: state.refreshSelectedDatabase,
+      clearError: state.clearError,
     }))
   );
 
@@ -55,75 +65,115 @@ export function DatabaseSelector() {
         duration: 3000,
       });
     } else {
-      const { error, clearError } = useSchemaStore.getState();
+      const { error, clearError: clearStoreError } = useSchemaStore.getState();
       addToast({
         type: "error",
         title: "Failed to load database",
         message: error ?? `Unable to load ${database}.`,
         duration: 4000,
       });
-      clearError();
+      clearStoreError();
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!selectedDatabase) return;
+
+    const success = await refreshSelectedDatabase();
+    if (success) {
+      addToast({
+        type: "success",
+        title: "Schema refreshed",
+        message: `Reloaded ${selectedDatabase}`,
+        duration: 3000,
+      });
+      return;
+    }
+
+    const { error } = useSchemaStore.getState();
+    addToast({
+      type: "error",
+      title: "Failed to refresh schema",
+      message: error ?? `Unable to refresh ${selectedDatabase}.`,
+      duration: 4000,
+    });
+    clearError();
   };
 
   const isSelecting = isDatabasesLoading || isLoading;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-[448px] justify-between"
-          size="sm"
-          disabled={isSelecting}
-        >
-          {/* Left: Database icon */}
-          {isSelecting ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          ) : (
-            <Database className="h-4 w-4 shrink-0" />
-          )}
+    <div className="flex items-center gap-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-[448px] justify-between"
+            size="sm"
+            disabled={isSelecting}
+          >
+            {/* Left: Database icon */}
+            {isSelecting ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <Database className="h-4 w-4 shrink-0" />
+            )}
 
-          {/* Center: Database name */}
-          <span className="truncate">
-            {isSelecting
-              ? "Loading..."
-              : (selectedDatabase ?? "Select database...")}
-          </span>
+            {/* Center: Database name */}
+            <span className="truncate">
+              {isSelecting
+                ? "Loading..."
+                : (selectedDatabase ?? "Select database...")}
+            </span>
 
-          {/* Right: Chevron icon */}
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[448px] p-0">
-        <Command>
-          <CommandInput placeholder="Search database..." />
-          <CommandList>
-            <CommandEmpty>No database found.</CommandEmpty>
-            <CommandGroup>
-              {availableDatabases.map((database) => (
-                <CommandItem
-                  key={database}
-                  value={database}
-                  onSelect={() => handleSelect(database)}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedDatabase === database
-                        ? "opacity-100"
-                        : "opacity-0"
-                    )}
-                  />
-                  {database}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+            {/* Right: Chevron icon */}
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[448px] p-0">
+          <Command>
+            <CommandInput placeholder="Search database..." />
+            <CommandList>
+              <CommandEmpty>No database found.</CommandEmpty>
+              <CommandGroup>
+                {availableDatabases.map((database) => (
+                  <CommandItem
+                    key={database}
+                    value={database}
+                    onSelect={() => handleSelect(database)}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedDatabase === database
+                          ? "opacity-100"
+                          : "opacity-0"
+                      )}
+                    />
+                    {database}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="px-2"
+        onClick={() => {
+          void handleRefresh();
+        }}
+        disabled={isSelecting || !selectedDatabase}
+        aria-label="Refresh schema"
+        title="Refresh schema"
+      >
+        <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+      </Button>
+    </div>
   );
 }

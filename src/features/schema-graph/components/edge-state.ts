@@ -93,12 +93,72 @@ export interface EdgeStateInput {
   hoveredEdgeId: string | null;
   showLabels: boolean;
   showInlineLabelOnHover: boolean;
+  previousHandleEdgeTypes?: Map<string, Set<EdgeType>>;
 }
 
 export interface EdgeStateResult {
   edges: Edge[];
   handleEdgeTypes: Map<string, Set<EdgeType>>;
   visibleEdgeIds: Set<string>;
+}
+
+function getStyleValue(
+  edge: Edge,
+  key: "stroke" | "strokeWidth" | "opacity"
+): string | number | undefined {
+  const style = edge.style as Record<string, unknown> | undefined;
+  const value = style?.[key];
+  return typeof value === "string" || typeof value === "number"
+    ? value
+    : undefined;
+}
+
+export function areEdgesEquivalent(current: Edge[], next: Edge[]): boolean {
+  if (current === next) return true;
+  if (current.length !== next.length) return false;
+
+  for (let i = 0; i < current.length; i += 1) {
+    const currentEdge = current[i];
+    const nextEdge = next[i];
+    if (
+      currentEdge.id !== nextEdge.id ||
+      currentEdge.source !== nextEdge.source ||
+      currentEdge.target !== nextEdge.target ||
+      currentEdge.sourceHandle !== nextEdge.sourceHandle ||
+      currentEdge.targetHandle !== nextEdge.targetHandle ||
+      currentEdge.label !== nextEdge.label ||
+      getStyleValue(currentEdge, "stroke") !== getStyleValue(nextEdge, "stroke") ||
+      getStyleValue(currentEdge, "strokeWidth") !==
+        getStyleValue(nextEdge, "strokeWidth") ||
+      getStyleValue(currentEdge, "opacity") !== getStyleValue(nextEdge, "opacity")
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areHandleEdgeTypesEquivalent(
+  current: Map<string, Set<EdgeType>>,
+  next: Map<string, Set<EdgeType>>
+): boolean {
+  if (current === next) return true;
+  if (current.size !== next.size) return false;
+
+  for (const [handleId, nextTypes] of next.entries()) {
+    const currentTypes = current.get(handleId);
+    if (!currentTypes || currentTypes.size !== nextTypes.size) {
+      return false;
+    }
+    for (const type of nextTypes.values()) {
+      if (!currentTypes.has(type)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 export function deriveEdgeState({
@@ -111,15 +171,16 @@ export function deriveEdgeState({
   hoveredEdgeId,
   showLabels,
   showInlineLabelOnHover,
+  previousHandleEdgeTypes,
 }: EdgeStateInput): EdgeStateResult {
-  const handleEdgeTypes = new Map<string, Set<EdgeType>>();
+  const nextHandleEdgeTypes = new Map<string, Set<EdgeType>>();
   const visibleEdgeIds = new Set<string>();
   const addHandle = (handleId: string | undefined, type: EdgeType) => {
     if (!handleId) return;
-    if (!handleEdgeTypes.has(handleId)) {
-      handleEdgeTypes.set(handleId, new Set());
+    if (!nextHandleEdgeTypes.has(handleId)) {
+      nextHandleEdgeTypes.set(handleId, new Set());
     }
-    handleEdgeTypes.get(handleId)!.add(type);
+    nextHandleEdgeTypes.get(handleId)!.add(type);
   };
 
   const isFocusActive = Boolean(focusedTableId);
@@ -199,6 +260,12 @@ export function deriveEdgeState({
         : undefined,
     });
   }
+
+  const handleEdgeTypes =
+    previousHandleEdgeTypes &&
+    areHandleEdgeTypesEquivalent(previousHandleEdgeTypes, nextHandleEdgeTypes)
+      ? previousHandleEdgeTypes
+      : nextHandleEdgeTypes;
 
   return { edges: nextEdges, handleEdgeTypes, visibleEdgeIds };
 }

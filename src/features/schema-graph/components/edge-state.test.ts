@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveEdgeState, type EdgeMeta } from "./edge-state";
+import { areEdgesEquivalent, deriveEdgeState, type EdgeMeta } from "./edge-state";
 import {
   buildColumnHandleBase,
   buildNodeHandleBase,
@@ -180,5 +180,37 @@ describe("deriveEdgeState", () => {
 
     const hovered = result.edges.find((edge) => edge.id === "edge-orders-customers");
     expect(hovered?.label).toBe("orders->customers");
+  });
+
+  it("detects equivalent edge arrays for render guards", () => {
+    const first = deriveFor(
+      new Set(["dbo.orders", "dbo.customers", "dbo.invoices"])
+    ).edges;
+    const second = first.map((edge) => ({
+      ...edge,
+      style: {
+        ...(edge.style ?? {}),
+      },
+    }));
+
+    expect(areEdgesEquivalent(first, second)).toBe(true);
+  });
+
+  it("detects edge differences that require updates", () => {
+    const first = deriveFor(
+      new Set(["dbo.orders", "dbo.customers", "dbo.invoices"])
+    ).edges;
+    const second = first.map((edge) => ({
+      ...edge,
+      style: {
+        ...(edge.style ?? {}),
+        strokeWidth:
+          typeof edge.style?.strokeWidth === "number"
+            ? edge.style.strokeWidth + 1
+            : 2,
+      },
+    }));
+
+    expect(areEdgesEquivalent(first, second)).toBe(false);
   });
 });
