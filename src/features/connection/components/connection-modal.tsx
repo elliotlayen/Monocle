@@ -24,42 +24,10 @@ import type {
   AuthType,
 } from "@/features/schema-graph/types";
 import { useToastStore } from "@/features/notifications/store";
-
-const STORAGE_KEY = "monocle-connection-settings";
-
-interface SavedSettings {
-  server: string;
-  authType: AuthType;
-  username?: string; // Only persisted when authType is "sqlServer"
-}
-
-function loadSavedSettings(): SavedSettings | null {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return null;
-}
-
-function saveSettings(settings: SavedSettings) {
-  try {
-    // Only include username when using SQL Server auth
-    const toSave: SavedSettings = {
-      server: settings.server,
-      authType: settings.authType,
-    };
-    if (settings.authType === "sqlServer" && settings.username) {
-      toSave.username = settings.username;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  } catch {
-    // Ignore storage errors
-  }
-}
+import {
+  loadConnectionSettings,
+  saveConnectionSettings,
+} from "@/features/connection/services/connection-settings";
 
 type FormData = ServerConnectionParams;
 
@@ -88,7 +56,7 @@ export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
   const { addToast } = useToastStore();
 
   const [formData, setFormData] = useState<FormData>(() => {
-    const saved = loadSavedSettings();
+    const saved = loadConnectionSettings();
     return {
       server: saved?.server ?? "",
       authType: saved?.authType ?? "sqlServer",
@@ -100,9 +68,22 @@ export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
 
   const [mockModalOpen, setMockModalOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    const saved = loadConnectionSettings();
+    if (!saved) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      server: saved.server,
+      authType: saved.authType,
+      username: saved.authType === "sqlServer" ? (saved.username ?? "") : "",
+    }));
+  }, [open]);
+
   // Save settings when they change
   useEffect(() => {
-    saveSettings({
+    saveConnectionSettings({
       server: formData.server,
       authType: formData.authType,
       username: formData.username,
@@ -169,9 +150,12 @@ export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
                 type="text"
                 value={formData.server}
                 onChange={(e) => handleChange("server", e.target.value)}
-                placeholder="localhost"
+                placeholder="HOST\\INSTANCE"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Examples: HOST\INSTANCE, HOST,1433, localhost
+              </p>
             </div>
 
             <div className="space-y-1">

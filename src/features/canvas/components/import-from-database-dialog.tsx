@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
@@ -23,6 +23,10 @@ import { useShallow } from "zustand/shallow";
 import { databaseService } from "@/features/connection/services/database-service";
 import { schemaService } from "@/features/schema-graph/services/schema-service";
 import { useToastStore } from "@/features/notifications/store";
+import {
+  loadConnectionSettings,
+  saveConnectionSettings,
+} from "@/features/connection/services/connection-settings";
 import type {
   SchemaGraph,
   AuthType,
@@ -66,9 +70,16 @@ export function ImportFromDatabaseDialog({
   const { addToast } = useToastStore();
 
   const [step, setStep] = useState<Step>("connect");
-  const [server, setServer] = useState("");
-  const [authType, setAuthType] = useState<AuthType>("sqlServer");
-  const [username, setUsername] = useState("");
+  const [initialSavedSettings] = useState(() => loadConnectionSettings());
+  const [server, setServer] = useState(() => initialSavedSettings?.server ?? "");
+  const [authType, setAuthType] = useState<AuthType>(
+    () => initialSavedSettings?.authType ?? "sqlServer"
+  );
+  const [username, setUsername] = useState(() =>
+    initialSavedSettings?.authType === "sqlServer"
+      ? (initialSavedSettings.username ?? "")
+      : ""
+  );
   const [password, setPassword] = useState("");
   const [trustCert, setTrustCert] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -84,6 +95,24 @@ export function ImportFromDatabaseDialog({
   const [expandedSections, setExpandedSections] = useState<
     Record<SectionKey, boolean>
   >(createDefaultExpandedSections);
+
+  useEffect(() => {
+    if (!open) return;
+    const saved = loadConnectionSettings();
+    if (!saved) return;
+
+    setServer(saved.server);
+    setAuthType(saved.authType);
+    setUsername(saved.authType === "sqlServer" ? (saved.username ?? "") : "");
+  }, [open]);
+
+  useEffect(() => {
+    saveConnectionSettings({
+      server,
+      authType,
+      username,
+    });
+  }, [server, authType, username]);
 
   const reset = useCallback(() => {
     setStep("connect");
@@ -254,9 +283,12 @@ export function ImportFromDatabaseDialog({
                 id="import-server"
                 value={server}
                 onChange={(e) => setServer(e.target.value)}
-                placeholder="localhost"
+                placeholder="HOST\\INSTANCE"
                 autoFocus
               />
+              <p className="text-xs text-muted-foreground">
+                Examples: HOST\INSTANCE, HOST,1433, localhost
+              </p>
             </div>
             <div className="space-y-1">
               <Label>Authentication</Label>
