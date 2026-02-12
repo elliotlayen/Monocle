@@ -13,13 +13,21 @@ pub enum ConnectionError {
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Auth(String),
+    #[error(
+        "Could not resolve SQL Server instance `{server}\\{instance}` via SQL Server Browser (UDP 1434): {reason}. Verify SQL Server Browser is running and firewall allows UDP 1434, or connect using `server,port`."
+    )]
+    InstanceResolution {
+        server: String,
+        instance: String,
+        reason: String,
+    },
 }
 
 pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
     let mut config = Config::new();
 
     // Parse server and port (format: "server", "server,port", "server:port", or "server\instance")
-    let (host, port) = parse_server_async(&params.server).await;
+    let (host, port) = parse_server_async(&params.server).await?;
     config.host(&host);
     config.port(port);
     config.database(&params.database);
@@ -66,7 +74,7 @@ pub async fn create_server_client(params: &ServerConnectionParams) -> Result<Cli
     let mut config = Config::new();
 
     // Parse server and port (format: "server", "server,port", "server:port", or "server\instance")
-    let (host, port) = parse_server_async(&params.server).await;
+    let (host, port) = parse_server_async(&params.server).await?;
     config.host(&host);
     config.port(port);
     config.database("master"); // Connect to master database for listing databases
@@ -110,34 +118,40 @@ pub async fn create_server_client(params: &ServerConnectionParams) -> Result<Cli
 
 /// Parse server string into host and port, resolving named instances via SSRP.
 /// Supports formats: "server", "server,port", "server:port", "server\instance"
-async fn parse_server_async(server: &str) -> (String, u16) {
+async fn parse_server_async(server: &str) -> Result<(String, u16), ConnectionError> {
     const DEFAULT_PORT: u16 = 1433;
 
     // Check for explicit port (comma separator - SQL Server style)
     if let Some((host, port_str)) = server.split_once(',') {
         if let Ok(port) = port_str.trim().parse::<u16>() {
-            return (host.trim().to_string(), port);
+            return Ok((host.trim().to_string(), port));
         }
     }
 
     // Check for explicit port (colon separator)
     if let Some((host, port_str)) = server.rsplit_once(':') {
         if let Ok(port) = port_str.trim().parse::<u16>() {
-            return (host.trim().to_string(), port);
+            return Ok((host.trim().to_string(), port));
         }
     }
 
     // Check for named instance (backslash separator)
     if let Some((host, instance)) = server.split_once('\\') {
-        if let Some(port) = resolve_instance_port(host, instance).await {
-            return (host.to_string(), port);
+        let host = host.trim();
+        let instance = instance.trim();
+        match resolve_instance_port(host, instance).await {
+            Ok(port) => return Ok((host.to_string(), port)),
+            Err(err) => {
+                return Err(ConnectionError::InstanceResolution {
+                    server: host.to_string(),
+                    instance: instance.to_string(),
+                    reason: err.to_string(),
+                });
+            }
         }
-        // SSRP failed - return host with default port (will likely fail to connect,
-        // but provides a more informative error than a port resolution error)
-        return (host.to_string(), DEFAULT_PORT);
     }
 
-    (server.to_string(), DEFAULT_PORT)
+    Ok((server.to_string(), DEFAULT_PORT))
 }
 
 /// Synchronous version for testing - does not support named instances
@@ -162,7 +176,7 @@ fn parse_server(server: &str) -> (String, u16) {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_server;
+    use super::{parse_server, parse_server_async, ConnectionError};
 
     #[test]
     fn parse_server_with_comma() {
@@ -183,5 +197,14 @@ mod tests {
         let (host, port) = parse_server("localhost");
         assert_eq!(host, "localhost");
         assert_eq!(port, 1433);
+    }
+
+    #[tokio::test]
+    async fn parse_server_instance_resolution_failure_returns_explicit_error() {
+        let result = parse_server_async("%%\\INSTANCE").await;
+        assert!(matches!(
+            result,
+            Err(ConnectionError::InstanceResolution { .. })
+        ));
     }
 }

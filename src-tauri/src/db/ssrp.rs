@@ -6,52 +6,121 @@ use tokio::time::timeout;
 const SSRP_PORT: u16 = 1434;
 const SSRP_TIMEOUT: Duration = Duration::from_secs(2);
 
+#[derive(Debug, thiserror::Error)]
+pub enum SsrpError {
+    #[error("Could not resolve host `{host}` for SQL Server Browser lookup")]
+    HostResolution { host: String },
+    #[error("Timed out waiting for SQL Server Browser response on UDP 1434")]
+    Timeout,
+    #[error("SQL Server Browser returned an invalid response")]
+    InvalidResponse,
+    #[error("SQL Server Browser did not return a TCP port for instance `{instance}`")]
+    PortNotFound { instance: String },
+    #[error("Network error during SQL Server Browser lookup: {0}")]
+    Io(#[from] std::io::Error),
+}
+
 /// Resolve a named instance to its TCP port using SQL Server Browser (SSRP protocol).
-/// Returns None if the browser service is unavailable or the instance is not found.
-pub async fn resolve_instance_port(host: &str, instance: &str) -> Option<u16> {
-    // Resolve hostname to IP
-    let ip = resolve_host(host)?;
-    let browser_addr = SocketAddr::new(ip, SSRP_PORT);
+pub async fn resolve_instance_port(host: &str, instance: &str) -> Result<u16, SsrpError> {
+    let browser_addrs = resolve_browser_addrs(host)?;
 
-    // Create UDP socket bound to any available port
-    let socket = UdpSocket::bind("0.0.0.0:0").await.ok()?;
-
-    // Build CLNT_UCAST_INST request: 0x04 + instance_name + 0x00
+    // Build CLNT_UCAST_INST request: 0x04 + instance_name
     let mut request = vec![0x04];
     request.extend_from_slice(instance.as_bytes());
-    request.push(0x00);
 
-    // Send request to SQL Server Browser
-    socket.send_to(&request, browser_addr).await.ok()?;
+    let mut timed_out = false;
+    let mut invalid_response = false;
+    let mut missing_port = false;
+    let mut last_io_error: Option<std::io::Error> = None;
 
-    // Receive response with timeout
-    let mut buffer = [0u8; 1024];
-    let (n, _) = timeout(SSRP_TIMEOUT, socket.recv_from(&mut buffer))
-        .await
-        .ok()?
-        .ok()?;
+    for browser_addr in browser_addrs {
+        let bind_addr = if browser_addr.is_ipv4() {
+            "0.0.0.0:0"
+        } else {
+            "[::]:0"
+        };
 
-    // Parse response for TCP port
-    parse_ssrp_response(&buffer[..n])
+        let socket = match UdpSocket::bind(bind_addr).await {
+            Ok(socket) => socket,
+            Err(err) => {
+                last_io_error = Some(err);
+                continue;
+            }
+        };
+
+        if let Err(err) = socket.send_to(&request, browser_addr).await {
+            last_io_error = Some(err);
+            continue;
+        }
+
+        // Receive response with timeout
+        let mut buffer = [0u8; 1024];
+        let (n, _) = match timeout(SSRP_TIMEOUT, socket.recv_from(&mut buffer)).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(err)) => {
+                last_io_error = Some(err);
+                continue;
+            }
+            Err(_) => {
+                timed_out = true;
+                continue;
+            }
+        };
+
+        match parse_ssrp_response(&buffer[..n], instance) {
+            Ok(port) => return Ok(port),
+            Err(SsrpError::InvalidResponse) => invalid_response = true,
+            Err(SsrpError::PortNotFound { .. }) => missing_port = true,
+            Err(err) => return Err(err),
+        }
+    }
+
+    if missing_port {
+        return Err(SsrpError::PortNotFound {
+            instance: instance.to_string(),
+        });
+    }
+    if invalid_response {
+        return Err(SsrpError::InvalidResponse);
+    }
+    if timed_out {
+        return Err(SsrpError::Timeout);
+    }
+    if let Some(err) = last_io_error {
+        return Err(SsrpError::Io(err));
+    }
+
+    Err(SsrpError::HostResolution {
+        host: host.to_string(),
+    })
 }
 
-fn resolve_host(host: &str) -> Option<IpAddr> {
+fn resolve_browser_addrs(host: &str) -> Result<Vec<SocketAddr>, SsrpError> {
     // Try parsing as IP address first
     if let Ok(ip) = host.parse::<IpAddr>() {
-        return Some(ip);
+        return Ok(vec![SocketAddr::new(ip, SSRP_PORT)]);
     }
-    // Fall back to DNS resolution
-    format!("{}:0", host)
+
+    let addrs: Vec<SocketAddr> = format!("{}:{}", host, SSRP_PORT)
         .to_socket_addrs()
-        .ok()?
-        .next()
-        .map(|addr| addr.ip())
+        .map_err(|_| SsrpError::HostResolution {
+            host: host.to_string(),
+        })?
+        .collect();
+
+    if addrs.is_empty() {
+        return Err(SsrpError::HostResolution {
+            host: host.to_string(),
+        });
+    }
+
+    Ok(addrs)
 }
 
-fn parse_ssrp_response(data: &[u8]) -> Option<u16> {
+fn parse_ssrp_response(data: &[u8], instance: &str) -> Result<u16, SsrpError> {
     // Response format: 0x05 + 2-byte length (little-endian) + data string
     if data.len() < 3 || data[0] != 0x05 {
-        return None;
+        return Err(SsrpError::InvalidResponse);
     }
 
     // Skip header (3 bytes) and parse the response string
@@ -62,10 +131,13 @@ fn parse_ssrp_response(data: &[u8]) -> Option<u16> {
     let parts: Vec<&str> = response_str.split(';').collect();
     for window in parts.windows(2) {
         if window[0].eq_ignore_ascii_case("tcp") {
-            return window[1].parse().ok();
+            return window[1].parse().map_err(|_| SsrpError::InvalidResponse);
         }
     }
-    None
+
+    Err(SsrpError::PortNotFound {
+        instance: instance.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -77,38 +149,55 @@ mod tests {
         // Simulated SSRP response
         let mut response = vec![0x05, 0x50, 0x00]; // Header: 0x05 + length
         response.extend_from_slice(
-            b"ServerName;TESTSERVER;InstanceName;SQLEXPRESS;IsClustered;No;Version;16.0.1000.6;tcp;1444;np;\\\\TESTSERVER\\pipe\\MSSQL$SQLEXPRESS\\sql\\query;;"
+            b"ServerName;TESTSERVER;InstanceName;TESTINSTANCE;IsClustered;No;Version;16.0.1000.6;tcp;1444;np;\\\\TESTSERVER\\pipe\\MSSQL$TESTINSTANCE\\sql\\query;;"
         );
 
-        let port = parse_ssrp_response(&response);
-        assert_eq!(port, Some(1444));
+        let port = parse_ssrp_response(&response, "TESTINSTANCE")
+            .expect("expected SSRP parser to extract TCP port");
+        assert_eq!(port, 1444);
     }
 
     #[test]
     fn parse_ssrp_response_handles_invalid() {
         // Invalid response (wrong header)
         let response = vec![0x04, 0x00, 0x00];
-        assert_eq!(parse_ssrp_response(&response), None);
+        assert!(matches!(
+            parse_ssrp_response(&response, "TESTINSTANCE"),
+            Err(SsrpError::InvalidResponse)
+        ));
 
         // Too short
         let response = vec![0x05, 0x00];
-        assert_eq!(parse_ssrp_response(&response), None);
+        assert!(matches!(
+            parse_ssrp_response(&response, "TESTINSTANCE"),
+            Err(SsrpError::InvalidResponse)
+        ));
 
         // No tcp entry
         let mut response = vec![0x05, 0x10, 0x00];
         response.extend_from_slice(b"ServerName;TEST;;");
-        assert_eq!(parse_ssrp_response(&response), None);
+        assert!(matches!(
+            parse_ssrp_response(&response, "TESTINSTANCE"),
+            Err(SsrpError::PortNotFound { .. })
+        ));
     }
 
     #[test]
-    fn resolve_host_parses_ip() {
-        assert_eq!(
-            resolve_host("192.168.1.1"),
-            Some("192.168.1.1".parse().unwrap())
-        );
-        assert_eq!(
-            resolve_host("127.0.0.1"),
-            Some("127.0.0.1".parse().unwrap())
-        );
+    fn resolve_browser_addrs_parses_ip() {
+        let ipv4 =
+            resolve_browser_addrs("192.168.1.1").expect("expected IPv4 address to resolve");
+        assert_eq!(ipv4, vec!["192.168.1.1:1434".parse().unwrap()]);
+
+        let loopback =
+            resolve_browser_addrs("127.0.0.1").expect("expected loopback address to resolve");
+        assert_eq!(loopback, vec!["127.0.0.1:1434".parse().unwrap()]);
+    }
+
+    #[test]
+    fn resolve_browser_addrs_invalid_host() {
+        assert!(matches!(
+            resolve_browser_addrs("%%"),
+            Err(SsrpError::HostResolution { .. })
+        ));
     }
 }
