@@ -49,6 +49,7 @@ src/
         monocle-logo.tsx            - Logo component
       services/
         connection-service.ts       - Tauri IPC for connection history
+        connection-settings.ts      - Connection settings localStorage persistence
         database-service.ts         - Tauri IPC for database operations
     schema-graph/
       components/
@@ -60,6 +61,8 @@ src/
         trigger-node.tsx            - Custom node for triggers
         stored-procedure-node.tsx   - Custom node for procedures
         scalar-function-node.tsx    - Custom node for functions
+        node-render-update.ts       - Efficient node render diffing
+        zoom-band.ts                - Discrete zoom band thresholds
         detail-popover.tsx          - Popover for object details
         detail-content.tsx          - Content for detail popover
         sql-code-block.tsx          - SQL syntax highlighting
@@ -98,6 +101,8 @@ src/
   services/
     tauri.ts                        - Centralized Tauri IPC wrapper
     events.ts                       - Event hub for Tauri events
+  lib/
+    schema-index.ts                 - Schema search index and relationship lookups
   utils/
     index.ts                        - Utility exports
     formatting.ts                   - String/number formatting helpers
@@ -145,6 +150,7 @@ src-tauri/src/
 - `AppState` in Rust manages settings via `Mutex<AppSettings>`
 - Settings persist to `{app_data_dir}/settings.json`
 - Connection history (last 10) saved automatically on successful connect
+- Connection settings (server, auth type, username) persist to localStorage
 - Schema filter preference restored on app launch
 
 ## Architecture Guidelines

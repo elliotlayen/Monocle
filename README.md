@@ -10,6 +10,7 @@ A desktop application for visualizing SQL Server database schemas. Connect to an
 - Interactive graph with pan, zoom, and minimap navigation
 - Automatic dagre layout for optimal positioning
 - Custom nodes for tables, views, triggers, stored procedures, and scalar functions
+- Performance-optimized rendering for large schemas
 - Foreign key relationships displayed as colored edges
 - Edge color customization in settings
 
@@ -38,6 +39,7 @@ A desktop application for visualizing SQL Server database schemas. Connect to an
 ### Connectivity
 - Windows Authentication support
 - SQL Server Authentication support
+- Saved connection settings (server, auth type) across sessions
 - Multiple database selection per server
 - Auto-update notifications for new versions
 
