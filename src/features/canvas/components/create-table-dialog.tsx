@@ -98,14 +98,14 @@ export function CreateTableDialog({
           nameInputRef.current?.focus();
         }}
       >
-        <div
-          className="max-h-[85vh] overflow-y-auto p-6 space-y-4"
-          data-combobox-scroll
-        >
-          <DialogHeader>
-            <DialogTitle>{isEdit ? "Edit Table" : "Add Table"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col">
+          <div
+            className="flex-1 overflow-y-auto p-6 space-y-4"
+            data-combobox-scroll
+          >
+            <DialogHeader>
+              <DialogTitle>{isEdit ? "Edit Table" : "Add Table"}</DialogTitle>
+            </DialogHeader>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="table-schema">Schema</Label>
@@ -130,21 +130,21 @@ export function CreateTableDialog({
             </div>
 
             <ColumnEditor columns={columns} onChange={setColumns} />
+          </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!name.trim()}>
-                {isEdit ? "Save" : "Add Table"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </div>
+          <DialogFooter className="border-t bg-background px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!name.trim()}>
+              {isEdit ? "Save" : "Add Table"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

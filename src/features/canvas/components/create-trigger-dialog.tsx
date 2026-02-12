@@ -126,16 +126,16 @@ export function CreateTriggerDialog({
           nameInputRef.current?.focus();
         }}
       >
-        <div
-          className="max-h-[85vh] overflow-y-auto p-6 space-y-4"
-          data-combobox-scroll
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {isEdit ? "Edit Trigger" : "Add Trigger"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col">
+          <div
+            className="flex-1 overflow-y-auto p-6 space-y-4"
+            data-combobox-scroll
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {isEdit ? "Edit Trigger" : "Add Trigger"}
+              </DialogTitle>
+            </DialogHeader>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -240,21 +240,21 @@ export function CreateTriggerDialog({
                 />
               </div>
             </div>
+          </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!name.trim() || !tableId}>
-                {isEdit ? "Save" : "Add Trigger"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </div>
+          <DialogFooter className="border-t bg-background px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!name.trim() || !tableId}>
+              {isEdit ? "Save" : "Add Trigger"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
