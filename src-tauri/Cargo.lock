@@ -2084,7 +2084,7 @@ dependencies = [
 
 [[package]]
 name = "monocle"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "chrono",
  "futures-util",
