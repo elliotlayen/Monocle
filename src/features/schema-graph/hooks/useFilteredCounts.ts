@@ -2,8 +2,9 @@ import { useMemo } from "react";
 import { SchemaGraph } from "../types";
 import { ObjectType, EdgeType } from "../store";
 import { getSchemaIndex } from "@/lib/schema-index";
+import { getFilteredObjectBuckets } from "@/features/schema-graph/utils/object-filtering";
 
-interface FilteredCounts {
+export interface FilteredCounts {
   filteredObjects: number;
   totalObjects: number;
   filteredEdges: number;
@@ -31,6 +32,7 @@ export function useFilteredCounts(
   searchFilter: string,
   schemaFilter: string,
   objectTypeFilter: Set<ObjectType>,
+  excludedObjectIds: Set<string>,
   edgeTypeFilter: Set<EdgeType>,
   focusedTableId: string | null
 ): FilteredCounts {
@@ -61,120 +63,23 @@ export function useFilteredCounts(
     }
 
     const schemaIndex = getSchemaIndex(schema);
-    const lowerSearch = searchFilter.trim().toLowerCase();
-    const hasSearch = lowerSearch.length > 0;
-    const matchesSearch = (map: Map<string, string>, id: string) => {
-      if (!hasSearch) return true;
-      const text = map.get(id);
-      return text ? text.includes(lowerSearch) : false;
-    };
-
-    // Calculate focused neighbors (tables/views connected to focused table)
-    const focusedNeighbors = focusedTableId
-      ? (schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>())
-      : new Set<string>();
-
-    const showTables = objectTypeFilter.has("tables");
-    const showViews = objectTypeFilter.has("views");
-    const showTriggers = objectTypeFilter.has("triggers");
-    const showProcedures = objectTypeFilter.has("storedProcedures");
-    const showFunctions = objectTypeFilter.has("scalarFunctions");
-
-    // Filter tables
-    let filteredTables = showTables ? schema.tables : [];
-    if (hasSearch) {
-      filteredTables = filteredTables.filter((t) =>
-        matchesSearch(schemaIndex.tableSearch, t.id)
-      );
-    }
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
-    }
-    // Apply focus filter - only count focused table and its neighbors
-    if (focusedTableId) {
-      filteredTables = filteredTables.filter(
-        (t) => t.id === focusedTableId || focusedNeighbors.has(t.id)
-      );
-    }
-
-    // Filter views
-    let filteredViews = showViews ? schema.views || [] : [];
-    if (hasSearch) {
-      filteredViews = filteredViews.filter((v) =>
-        matchesSearch(schemaIndex.viewSearch, v.id)
-      );
-    }
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredViews = filteredViews.filter((v) => v.schema === schemaFilter);
-    }
-    // Apply focus filter to views
-    if (focusedTableId) {
-      filteredViews = filteredViews.filter(
-        (v) => v.id === focusedTableId || focusedNeighbors.has(v.id)
-      );
-    }
-
-    const tableIds = new Set(filteredTables.map((t) => t.id));
-    const viewIds = new Set(filteredViews.map((v) => v.id));
-
-    // Filter triggers
-    const triggers = schema.triggers || [];
-    let filteredTriggers = showTriggers
-      ? triggers.filter((tr) => tableIds.has(tr.tableId))
-      : [];
-    if (hasSearch) {
-      filteredTriggers = filteredTriggers.filter((tr) =>
-        matchesSearch(schemaIndex.triggerSearch, tr.id)
-      );
-    }
-    // Focus filter already applied via tableIds
-
-    // Filter stored procedures
-    const storedProcedures = schema.storedProcedures || [];
-    let filteredProcedures = showProcedures ? storedProcedures : [];
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredProcedures = filteredProcedures.filter(
-        (p) => p.schema === schemaFilter
-      );
-    }
-    if (hasSearch) {
-      filteredProcedures = filteredProcedures.filter((p) =>
-        matchesSearch(schemaIndex.procedureSearch, p.id)
-      );
-    }
-    // For procedures during focus, only count those connected to focused tables
-    if (focusedTableId) {
-      filteredProcedures = filteredProcedures.filter((p) => {
-        const referencedTables = p.referencedTables || [];
-        const affectedTables = p.affectedTables || [];
-        return [...referencedTables, ...affectedTables].some(
-          (tableId) => tableIds.has(tableId) || viewIds.has(tableId)
-        );
-      });
-    }
-
-    // Filter scalar functions
-    const scalarFunctions = schema.scalarFunctions || [];
-    let filteredFunctions = showFunctions ? scalarFunctions : [];
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredFunctions = filteredFunctions.filter(
-        (f) => f.schema === schemaFilter
-      );
-    }
-    if (hasSearch) {
-      filteredFunctions = filteredFunctions.filter((f) =>
-        matchesSearch(schemaIndex.functionSearch, f.id)
-      );
-    }
-    // For functions during focus, only count those connected to focused tables
-    if (focusedTableId) {
-      filteredFunctions = filteredFunctions.filter((f) => {
-        const referencedTables = f.referencedTables || [];
-        return referencedTables.some(
-          (tableId) => tableIds.has(tableId) || viewIds.has(tableId)
-        );
-      });
-    }
+    const {
+      tables: filteredTables,
+      views: filteredViews,
+      triggers: filteredTriggers,
+      storedProcedures: filteredProcedures,
+      scalarFunctions: filteredFunctions,
+      tableIds,
+      viewIds,
+    } = getFilteredObjectBuckets({
+      schema,
+      searchFilter,
+      schemaFilter,
+      objectTypeFilter,
+      excludedObjectIds,
+      focusedTableId,
+      schemaIndex,
+    });
 
     // Calculate edge counts
     let relationshipCount = 0;
@@ -444,6 +349,7 @@ export function useFilteredCounts(
     searchFilter,
     schemaFilter,
     objectTypeFilter,
+    excludedObjectIds,
     edgeTypeFilter,
     focusedTableId,
   ]);

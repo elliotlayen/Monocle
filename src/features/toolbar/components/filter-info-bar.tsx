@@ -55,18 +55,20 @@ export function FilterInfoBar() {
     schema,
     focusedTableId,
     objectTypeFilter,
+    excludedObjectIds,
     edgeTypeFilter,
     clearFocus,
-    selectAllObjectTypes,
+    resetObjectFilters,
     selectAllEdgeTypes,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
+      excludedObjectIds: state.excludedObjectIds,
       edgeTypeFilter: state.edgeTypeFilter,
       clearFocus: state.clearFocus,
-      selectAllObjectTypes: state.selectAllObjectTypes,
+      resetObjectFilters: state.resetObjectFilters,
       selectAllEdgeTypes: state.selectAllEdgeTypes,
     }))
   );
@@ -88,10 +90,24 @@ export function FilterInfoBar() {
   };
 
   const getObjectsLabel = () => {
-    if (allObjectsSelected) return null;
-    if (objectTypeFilter.size > 1) return `${objectTypeFilter.size} types`;
-    const type = Array.from(objectTypeFilter)[0];
-    return OBJECT_TYPE_LABELS[type];
+    const hiddenCount = excludedObjectIds.size;
+    const hasTypeFilter = !allObjectsSelected;
+    if (!hasTypeFilter && hiddenCount === 0) return null;
+
+    const typeLabel = (() => {
+      if (!hasTypeFilter) return "";
+      if (objectTypeFilter.size > 1 || objectTypeFilter.size === 0) {
+        return `${objectTypeFilter.size} types`;
+      }
+      const type = Array.from(objectTypeFilter)[0];
+      return OBJECT_TYPE_LABELS[type];
+    })();
+
+    const hiddenLabel = hiddenCount > 0 ? `${hiddenCount} hidden` : "";
+    if (typeLabel && hiddenLabel) {
+      return `${typeLabel}, ${hiddenLabel}`;
+    }
+    return typeLabel || hiddenLabel;
   };
 
   const getEdgesLabel = () => {
@@ -139,7 +155,7 @@ export function FilterInfoBar() {
           label="Objects"
           value={objectsLabel}
           colors={getObjectColors()}
-          onClear={selectAllObjectTypes}
+          onClear={resetObjectFilters}
         />
       )}
       {edgesLabel && (

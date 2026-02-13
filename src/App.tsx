@@ -38,6 +38,7 @@ function App() {
     schemaFilter,
     focusedTableId,
     objectTypeFilter,
+    excludedObjectIds,
     edgeTypeFilter,
     hydrateSettings,
     disconnect,
@@ -48,7 +49,7 @@ function App() {
     setSearchFilter,
     setDebouncedSearchFilter,
     clearFocus,
-    selectAllObjectTypes,
+    resetObjectFilters,
     selectAllEdgeTypes,
   } = useSchemaStore(
     useShallow((state) => ({
@@ -64,6 +65,7 @@ function App() {
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
+      excludedObjectIds: state.excludedObjectIds,
       edgeTypeFilter: state.edgeTypeFilter,
       hydrateSettings: state.hydrateSettings,
       disconnect: state.disconnect,
@@ -74,7 +76,7 @@ function App() {
       setSearchFilter: state.setSearchFilter,
       setDebouncedSearchFilter: state.setDebouncedSearchFilter,
       clearFocus: state.clearFocus,
-      selectAllObjectTypes: state.selectAllObjectTypes,
+      resetObjectFilters: state.resetObjectFilters,
       selectAllEdgeTypes: state.selectAllEdgeTypes,
     }))
   );
@@ -216,13 +218,13 @@ function App() {
 
   const handleResetFilters = useCallback(() => {
     clearFocus();
-    selectAllObjectTypes();
+    resetObjectFilters();
     selectAllEdgeTypes();
     setSearchFilter("");
     setDebouncedSearchFilter("");
   }, [
     clearFocus,
-    selectAllObjectTypes,
+    resetObjectFilters,
     selectAllEdgeTypes,
     setSearchFilter,
     setDebouncedSearchFilter,
@@ -321,6 +323,7 @@ function App() {
     hasFocus ||
     searchFilter.trim() !== "" ||
     objectTypeFilter.size !== 5 ||
+    excludedObjectIds.size > 0 ||
     edgeTypeFilter.size !== 7;
 
   useEffect(() => {
@@ -407,6 +410,7 @@ function App() {
                     schemaFilter={schemaFilter}
                     focusedTableId={focusedTableId}
                     objectTypeFilter={objectTypeFilter}
+                    excludedObjectIds={excludedObjectIds}
                     edgeTypeFilter={edgeTypeFilter}
                     canvasMode={isCanvasMode}
                     importDialogOpen={importDialogOpen}
@@ -415,7 +419,7 @@ function App() {
                 </>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p>Select a database from the toolbar to view its schema</p>
+                  <p>Select a database from the toolbar.</p>
                 </div>
               )}
             </main>

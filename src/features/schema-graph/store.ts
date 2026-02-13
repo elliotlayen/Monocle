@@ -78,6 +78,7 @@ interface SchemaStore {
   schemaFilter: string;
   focusedTableId: string | null;
   objectTypeFilter: Set<ObjectType>;
+  excludedObjectIds: Set<string>;
   edgeTypeFilter: Set<EdgeType>;
 
   // Selection
@@ -106,6 +107,9 @@ interface SchemaStore {
   toggleObjectType: (type: ObjectType) => void;
   setObjectTypeFilter: (types: Set<ObjectType>) => void;
   selectAllObjectTypes: () => void;
+  toggleObjectExclusion: (id: string) => void;
+  clearObjectExclusions: () => void;
+  resetObjectFilters: () => void;
   toggleEdgeType: (type: EdgeType) => void;
   selectAllEdgeTypes: () => void;
   toggleEdgeSelection: (edgeId: string) => void;
@@ -215,6 +219,11 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
   "viewDependencies",
   "functionReads",
 ]);
+
+const createDefaultObjectFilterState = () => ({
+  objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+  excludedObjectIds: new Set<string>(),
+});
 
 const EMPTY_SCHEMA: SchemaGraph = {
   tables: [],
@@ -448,7 +457,7 @@ export const createInitialSchemaState = () => ({
   edgeLabelMode: "auto" as EdgeLabelMode,
   showMiniMap: true,
   focusedTableId: null,
-  objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+  ...createDefaultObjectFilterState(),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
   selectedEdgeIds: new Set<string>(),
   availableSchemas: [],
@@ -475,6 +484,14 @@ const getAvailableSchemas = (schema: SchemaGraph) => {
   (schema.scalarFunctions || []).forEach((fn) => schemas.add(fn.schema));
   return [...schemas];
 };
+
+const pruneExcludedObjectIds = (
+  schema: SchemaGraph,
+  excludedObjectIds: Set<string>
+) =>
+  new Set(
+    [...excludedObjectIds].filter((id) => getAllNodeIds(schema).has(id))
+  );
 
 const normalizeLookupKey = (value: string) =>
   value.replace(/[[\]]/g, "").toLowerCase();
@@ -678,7 +695,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         connectionInfo: { server: "localhost", database: "MockDB" },
         availableSchemas: schemas,
         schemaFilter: resolvedSchemaFilter,
-        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       });
       return true;
@@ -712,7 +729,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         debouncedSearchFilter: "",
         schemaFilter: resolvedSchemaFilter,
         focusedTableId: null,
-        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set<string>(),
       });
@@ -741,7 +758,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         debouncedSearchFilter: "",
         schemaFilter: "all",
         focusedTableId: null,
-        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set<string>(),
       });
@@ -791,7 +808,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         debouncedSearchFilter: "",
         schemaFilter: resolvedSchemaFilter,
         focusedTableId: null,
-        objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+        ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set<string>(),
       });
@@ -839,6 +856,11 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         focusedTableId && getAllNodeIds(schema).has(focusedTableId)
           ? focusedTableId
           : null;
+      const focusChanged = focusedTableId !== resolvedFocusedTableId;
+      const resolvedExcludedObjectIds = pruneExcludedObjectIds(
+        schema,
+        get().excludedObjectIds
+      );
 
       set({
         schema,
@@ -846,6 +868,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         availableSchemas: schemas,
         schemaFilter: resolvedSchemaFilter,
         focusedTableId: resolvedFocusedTableId,
+        ...(focusChanged
+          ? createDefaultObjectFilterState()
+          : { excludedObjectIds: resolvedExcludedObjectIds }),
         selectedEdgeIds: new Set<string>(),
         connectionInfo: {
           server: serverConnection.server,
@@ -871,7 +896,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       debouncedSearchFilter: "",
       schemaFilter: "all",
       focusedTableId: null,
-      objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+      ...createDefaultObjectFilterState(),
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set<string>(),
       availableSchemas: [],
@@ -953,9 +978,20 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     });
   },
 
-  setFocusedTable: (tableId: string | null) => set({ focusedTableId: tableId }),
+  setFocusedTable: (tableId: string | null) =>
+    set((state) => {
+      if (state.focusedTableId === tableId) {
+        return state;
+      }
+      return {
+        focusedTableId: tableId,
+        ...createDefaultObjectFilterState(),
+      };
+    }),
 
-  clearFocus: () => set({ focusedTableId: null }),
+  clearFocus: () => {
+    get().setFocusedTable(null);
+  },
 
   toggleObjectType: (type: ObjectType) =>
     set((state) => {
@@ -973,6 +1009,24 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
   selectAllObjectTypes: () =>
     set({ objectTypeFilter: new Set(ALL_OBJECT_TYPES) }),
+
+  toggleObjectExclusion: (id: string) =>
+    set((state) => {
+      const nextExcludedObjectIds = new Set(state.excludedObjectIds);
+      if (nextExcludedObjectIds.has(id)) {
+        nextExcludedObjectIds.delete(id);
+      } else {
+        nextExcludedObjectIds.add(id);
+      }
+      return { excludedObjectIds: nextExcludedObjectIds };
+    }),
+
+  clearObjectExclusions: () => set({ excludedObjectIds: new Set<string>() }),
+
+  resetObjectFilters: () =>
+    set({
+      ...createDefaultObjectFilterState(),
+    }),
 
   toggleEdgeType: (type: EdgeType) =>
     set((state) => {
@@ -1012,7 +1066,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       debouncedSearchFilter: "",
       schemaFilter: "all",
       focusedTableId: null,
-      objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+      ...createDefaultObjectFilterState(),
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set<string>(),
       availableSchemas: [],
@@ -1039,7 +1093,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       debouncedSearchFilter: "",
       schemaFilter: "all",
       focusedTableId: null,
-      objectTypeFilter: new Set(ALL_OBJECT_TYPES),
+      ...createDefaultObjectFilterState(),
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set<string>(),
       error: null,

@@ -17,6 +17,7 @@ export function StatusBar() {
     schemaFilter,
     focusedTableId,
     objectTypeFilter,
+    excludedObjectIds,
     edgeTypeFilter,
     selectedEdgeIds,
     connectionInfo,
@@ -29,6 +30,7 @@ export function StatusBar() {
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
       objectTypeFilter: state.objectTypeFilter,
+      excludedObjectIds: state.excludedObjectIds,
       edgeTypeFilter: state.edgeTypeFilter,
       selectedEdgeIds: state.selectedEdgeIds,
       connectionInfo: state.connectionInfo,
@@ -42,6 +44,7 @@ export function StatusBar() {
     debouncedSearchFilter,
     schemaFilter,
     objectTypeFilter,
+    excludedObjectIds,
     edgeTypeFilter,
     focusedTableId
   );
@@ -56,6 +59,7 @@ export function StatusBar() {
     schemaFilter !== "all" ||
     focusedTableId !== null ||
     !allObjectsSelected ||
+    excludedObjectIds.size > 0 ||
     !allEdgesSelected;
 
   const [objectsOpen, setObjectsOpen] = useState(false);

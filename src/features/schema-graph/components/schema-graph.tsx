@@ -159,6 +159,7 @@ interface SchemaGraphProps {
   searchFilter?: string;
   schemaFilter?: string;
   objectTypeFilter?: Set<ObjectType>;
+  excludedObjectIds?: Set<string>;
   edgeTypeFilter?: Set<EdgeType>;
   canvasMode?: boolean;
   importDialogOpen?: boolean;
@@ -959,6 +960,7 @@ function SchemaGraphInner({
   searchFilter,
   schemaFilter,
   objectTypeFilter,
+  excludedObjectIds,
   edgeTypeFilter,
   canvasMode,
   importDialogOpen,
@@ -1708,8 +1710,11 @@ function SchemaGraphInner({
       !objectTypeFilter || objectTypeFilter.has("storedProcedures");
     const showFunctions =
       !objectTypeFilter || objectTypeFilter.has("scalarFunctions");
+    const isIncludedObject = (id: string) => !excludedObjectIds?.has(id);
 
-    let filteredTables = showTables ? schema.tables : [];
+    let filteredTables = showTables
+      ? schema.tables.filter((t) => isIncludedObject(t.id))
+      : [];
     if (hasSearch) {
       filteredTables = filteredTables.filter((t) =>
         matchesSearch(schemaIndex.tableSearch, t.id)
@@ -1719,7 +1724,9 @@ function SchemaGraphInner({
       filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
     }
 
-    let filteredViews = showViews ? schema.views || [] : [];
+    let filteredViews = showViews
+      ? (schema.views || []).filter((v) => isIncludedObject(v.id))
+      : [];
     if (hasSearch) {
       filteredViews = filteredViews.filter((v) =>
         matchesSearch(schemaIndex.viewSearch, v.id)
@@ -1733,7 +1740,9 @@ function SchemaGraphInner({
     const visibleViewIds = new Set(filteredViews.map((v) => v.id));
 
     let filteredTriggers = showTriggers
-      ? (schema.triggers || []).filter((tr) => visibleTableIds.has(tr.tableId))
+      ? (schema.triggers || []).filter(
+          (tr) => visibleTableIds.has(tr.tableId) && isIncludedObject(tr.id)
+        )
       : [];
     if (hasSearch) {
       filteredTriggers = filteredTriggers.filter((tr) =>
@@ -1742,9 +1751,11 @@ function SchemaGraphInner({
     }
 
     let filteredProcedures = showProcedures
-      ? schema.storedProcedures || []
+      ? (schema.storedProcedures || []).filter((p) => isIncludedObject(p.id))
       : [];
-    let filteredFunctions = showFunctions ? schema.scalarFunctions || [] : [];
+    let filteredFunctions = showFunctions
+      ? (schema.scalarFunctions || []).filter((f) => isIncludedObject(f.id))
+      : [];
 
     if (schemaFilter && schemaFilter !== "all") {
       filteredProcedures = filteredProcedures.filter(
@@ -2114,6 +2125,7 @@ function SchemaGraphInner({
     clearEdgeSelection,
     showEdgeLabels,
     objectTypeFilter,
+    excludedObjectIds,
     columnsByNodeId,
     nodeHeights,
     nodeWidths,

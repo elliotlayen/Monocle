@@ -16,6 +16,13 @@ vi.mock("@/features/settings/services/settings-service", () => ({
 }));
 
 const mockedSchemaService = vi.mocked(schemaService);
+const ALL_OBJECT_TYPES = [
+  "scalarFunctions",
+  "storedProcedures",
+  "tables",
+  "triggers",
+  "views",
+];
 
 const baseSchema = {
   tables: [
@@ -224,6 +231,7 @@ describe("useSchemaStore.refreshSelectedDatabase", () => {
       debouncedSearchFilter: "orders",
       schemaFilter: "sales",
       objectTypeFilter: new Set(["tables"]),
+      excludedObjectIds: new Set(["sales.orders"]),
       edgeTypeFilter: new Set(["relationships"]),
       focusedTableId: "sales.orders",
       selectedEdgeIds: new Set(["FK_sales.orders__sales.orders"]),
@@ -237,6 +245,7 @@ describe("useSchemaStore.refreshSelectedDatabase", () => {
     expect(state.debouncedSearchFilter).toBe("orders");
     expect(state.schemaFilter).toBe("sales");
     expect(Array.from(state.objectTypeFilter)).toEqual(["tables"]);
+    expect(Array.from(state.excludedObjectIds)).toEqual(["sales.orders"]);
     expect(Array.from(state.edgeTypeFilter)).toEqual(["relationships"]);
     expect(state.focusedTableId).toBe("sales.orders");
     expect(state.selectedEdgeIds.size).toBe(0);
@@ -270,12 +279,17 @@ describe("useSchemaStore.refreshSelectedDatabase", () => {
       },
       selectedDatabase: "Monocle",
       focusedTableId: "sales.orders",
+      objectTypeFilter: new Set(["views"]),
+      excludedObjectIds: new Set(["dbo.customers"]),
     });
 
     const ok = await useSchemaStore.getState().refreshSelectedDatabase();
 
     expect(ok).toBe(true);
-    expect(useSchemaStore.getState().focusedTableId).toBeNull();
+    const state = useSchemaStore.getState();
+    expect(state.focusedTableId).toBeNull();
+    expect(Array.from(state.objectTypeFilter).sort()).toEqual(ALL_OBJECT_TYPES);
+    expect(state.excludedObjectIds.size).toBe(0);
   });
 
   it("returns false with clear errors when missing connection or selected database", async () => {
@@ -323,6 +337,137 @@ describe("useSchemaStore.refreshSelectedDatabase", () => {
     expect(ok).toBe(false);
     expect(state.schema).toBe(baseSchema);
     expect(state.error).toContain("boom");
+  });
+
+  it("prunes excluded object IDs that no longer exist after refresh", async () => {
+    mockedSchemaService.loadSchema.mockResolvedValue({
+      ...baseSchema,
+      tables: [
+        {
+          id: "dbo.customers",
+          name: "customers",
+          schema: "dbo",
+          columns: [],
+        },
+      ],
+    });
+
+    useSchemaStore.setState({
+      isConnected: true,
+      serverConnection: {
+        server: "localhost",
+        authType: "sqlServer",
+        username: "sa",
+        password: "secret",
+        trustServerCertificate: true,
+      },
+      selectedDatabase: "Monocle",
+      excludedObjectIds: new Set(["sales.orders", "dbo.customers"]),
+    });
+
+    const ok = await useSchemaStore.getState().refreshSelectedDatabase();
+    const state = useSchemaStore.getState();
+
+    expect(ok).toBe(true);
+    expect(Array.from(state.excludedObjectIds)).toEqual(["dbo.customers"]);
+  });
+});
+
+describe("useSchemaStore object filters", () => {
+  beforeEach(() => {
+    useSchemaStore.setState(createInitialSchemaState());
+    vi.clearAllMocks();
+  });
+
+  it("toggles object exclusions by ID", () => {
+    const store = useSchemaStore.getState();
+
+    store.toggleObjectExclusion("dbo.orders");
+    expect(Array.from(useSchemaStore.getState().excludedObjectIds)).toEqual([
+      "dbo.orders",
+    ]);
+
+    store.toggleObjectExclusion("dbo.orders");
+    expect(useSchemaStore.getState().excludedObjectIds.size).toBe(0);
+  });
+
+  it("resetObjectFilters restores all types and clears exclusions", () => {
+    useSchemaStore.setState({
+      objectTypeFilter: new Set(["tables"]),
+      excludedObjectIds: new Set(["dbo.orders"]),
+    });
+
+    useSchemaStore.getState().resetObjectFilters();
+    const state = useSchemaStore.getState();
+
+    expect(Array.from(state.objectTypeFilter).sort()).toEqual(ALL_OBJECT_TYPES);
+    expect(state.excludedObjectIds.size).toBe(0);
+  });
+});
+
+describe("useSchemaStore focus transitions", () => {
+  beforeEach(() => {
+    useSchemaStore.setState(createInitialSchemaState());
+    vi.clearAllMocks();
+  });
+
+  it("resets object filters when starting focus", () => {
+    useSchemaStore.setState({
+      objectTypeFilter: new Set(["views"]),
+      excludedObjectIds: new Set(["dbo.orders_view"]),
+    });
+
+    useSchemaStore.getState().setFocusedTable("dbo.orders");
+    const state = useSchemaStore.getState();
+
+    expect(state.focusedTableId).toBe("dbo.orders");
+    expect(Array.from(state.objectTypeFilter).sort()).toEqual(ALL_OBJECT_TYPES);
+    expect(state.excludedObjectIds.size).toBe(0);
+  });
+
+  it("resets object filters when changing focus target", () => {
+    useSchemaStore.setState({
+      focusedTableId: "dbo.orders",
+      objectTypeFilter: new Set(["views"]),
+      excludedObjectIds: new Set(["dbo.orders_view"]),
+    });
+
+    useSchemaStore.getState().setFocusedTable("dbo.customers");
+    const state = useSchemaStore.getState();
+
+    expect(state.focusedTableId).toBe("dbo.customers");
+    expect(Array.from(state.objectTypeFilter).sort()).toEqual(ALL_OBJECT_TYPES);
+    expect(state.excludedObjectIds.size).toBe(0);
+  });
+
+  it("resets object filters when clearing focus", () => {
+    useSchemaStore.setState({
+      focusedTableId: "dbo.orders",
+      objectTypeFilter: new Set(["views"]),
+      excludedObjectIds: new Set(["dbo.orders_view"]),
+    });
+
+    useSchemaStore.getState().clearFocus();
+    const state = useSchemaStore.getState();
+
+    expect(state.focusedTableId).toBeNull();
+    expect(Array.from(state.objectTypeFilter).sort()).toEqual(ALL_OBJECT_TYPES);
+    expect(state.excludedObjectIds.size).toBe(0);
+  });
+
+  it("does not reset object filters when focus target is unchanged", () => {
+    useSchemaStore.setState({
+      focusedTableId: "dbo.orders",
+      objectTypeFilter: new Set(["views"]),
+      excludedObjectIds: new Set(["dbo.orders_view"]),
+    });
+
+    useSchemaStore.getState().setFocusedTable("dbo.orders");
+    const state = useSchemaStore.getState();
+
+    expect(state.focusedTableId).toBe("dbo.orders");
+    expect(Array.from(state.objectTypeFilter)).toEqual(["views"]);
+    expect(Array.from(state.excludedObjectIds)).toEqual(["dbo.orders_view"]);
   });
 });
 
