@@ -11,6 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ParameterEditor } from "./parameter-editor";
 import { SqlEditor } from "./sql-editor";
+import {
+  CANVAS_OBJECT_DIALOG_CONTENT_CLASS,
+  CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_FORM_CLASS,
+  CANVAS_OBJECT_DIALOG_LEFT_COLUMN_CLASS,
+  CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_SQL_EDITOR_FILL_HEIGHT,
+  CANVAS_OBJECT_DIALOG_SQL_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_TWO_COLUMN_BODY_CLASS,
+} from "./object-dialog-layout";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import type { ProcedureParameter } from "@/features/schema-graph/types";
@@ -136,24 +146,21 @@ export function CreateProcedureDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-5xl overflow-visible p-0"
+        className={CANVAS_OBJECT_DIALOG_CONTENT_CLASS}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           nameInputRef.current?.focus();
         }}
       >
-        <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col">
-          <div
-            className="flex-1 overflow-y-auto p-6 space-y-4"
-            data-combobox-scroll
-          >
-            <DialogHeader>
-              <DialogTitle>
-                {isEdit ? "Edit Stored Procedure" : "Add Stored Procedure"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-              <div className="space-y-4">
+        <form onSubmit={handleSubmit} className={CANVAS_OBJECT_DIALOG_FORM_CLASS}>
+          <div className={CANVAS_OBJECT_DIALOG_TWO_COLUMN_BODY_CLASS}>
+            <div className={CANVAS_OBJECT_DIALOG_LEFT_COLUMN_CLASS}>
+              <div className={CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS}>
+                <DialogHeader>
+                  <DialogTitle>
+                    {isEdit ? "Edit Stored Procedure" : "Add Stored Procedure"}
+                  </DialogTitle>
+                </DialogHeader>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="proc-schema">Schema</Label>
@@ -176,17 +183,22 @@ export function CreateProcedureDialog({
                     />
                   </div>
                 </div>
+              </div>
 
+              <div
+                className={CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS}
+                data-combobox-scroll
+              >
                 <ParameterEditor
                   parameters={parameters}
                   onChange={handleParametersChange}
                 />
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="proc-definition">
-                  SQL Definition (optional)
-                </Label>
+            <div className={CANVAS_OBJECT_DIALOG_SQL_SECTION_CLASS}>
+              <Label htmlFor="proc-definition">SQL Definition (optional)</Label>
+              <div className="min-h-0 flex-1">
                 <SqlEditor
                   id="proc-definition"
                   value={definitionMode === "auto" ? autoDefinition : definition}
@@ -195,7 +207,7 @@ export function CreateProcedureDialog({
                     setDefinitionMode("manual");
                   }}
                   placeholder="BEGIN\n  -- SQL\nEND"
-                  height="360px"
+                  height={CANVAS_OBJECT_DIALOG_SQL_EDITOR_FILL_HEIGHT}
                 />
               </div>
             </div>

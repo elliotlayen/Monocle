@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,6 +30,22 @@ export function ParameterEditor({
   parameters,
   onChange,
 }: ParameterEditorProps) {
+  const prevCountRef = useRef(parameters.length);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const prevCount = prevCountRef.current;
+    prevCountRef.current = parameters.length;
+
+    if (parameters.length <= prevCount) return;
+
+    const rafId = requestAnimationFrame(() => {
+      endRef.current?.scrollIntoView({ block: "end" });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [parameters.length]);
+
   const addParameter = () => {
     onChange([
       ...parameters,
@@ -51,7 +68,7 @@ export function ParameterEditor({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 px-1">
       <div className="text-sm font-medium">Parameters</div>
       {parameters.length > 0 && (
         <div className="grid grid-cols-[1fr_140px_50px_32px] gap-1 text-xs text-muted-foreground mb-1">
@@ -109,6 +126,7 @@ export function ParameterEditor({
         <Plus className="w-3.5 h-3.5 mr-1" />
         Add Parameter
       </Button>
+      <div ref={endRef} />
     </div>
   );
 }

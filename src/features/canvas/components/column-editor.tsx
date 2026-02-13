@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +38,22 @@ interface ColumnEditorProps {
 }
 
 export function ColumnEditor({ columns, onChange }: ColumnEditorProps) {
+  const prevCountRef = useRef(columns.length);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const prevCount = prevCountRef.current;
+    prevCountRef.current = columns.length;
+
+    if (columns.length <= prevCount) return;
+
+    const rafId = requestAnimationFrame(() => {
+      endRef.current?.scrollIntoView({ block: "end" });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [columns.length]);
+
   const addColumn = () => {
     onChange([
       ...columns,
@@ -56,7 +73,7 @@ export function ColumnEditor({ columns, onChange }: ColumnEditorProps) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 px-1">
       <div className="text-sm font-medium">Columns</div>
       {columns.length > 0 && (
         <div className="grid grid-cols-[1fr_140px_40px_40px_32px] gap-1 text-xs text-muted-foreground mb-1">
@@ -121,6 +138,7 @@ export function ColumnEditor({ columns, onChange }: ColumnEditorProps) {
         <Plus className="w-3.5 h-3.5 mr-1" />
         Add Column
       </Button>
+      <div ref={endRef} />
     </div>
   );
 }

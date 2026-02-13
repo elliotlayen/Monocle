@@ -18,6 +18,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SqlEditor } from "./sql-editor";
+import {
+  CANVAS_OBJECT_DIALOG_CONTENT_CLASS,
+  CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_FORM_CLASS,
+  CANVAS_OBJECT_DIALOG_LEFT_COLUMN_CLASS,
+  CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_SQL_EDITOR_FILL_HEIGHT,
+  CANVAS_OBJECT_DIALOG_SQL_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_TWO_COLUMN_BODY_CLASS,
+} from "./object-dialog-layout";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import type { CreateTriggerInput } from "../types";
@@ -120,24 +130,19 @@ export function CreateTriggerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-5xl overflow-visible p-0"
+        className={CANVAS_OBJECT_DIALOG_CONTENT_CLASS}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           nameInputRef.current?.focus();
         }}
       >
-        <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col">
-          <div
-            className="flex-1 overflow-y-auto p-6 space-y-4"
-            data-combobox-scroll
-          >
-            <DialogHeader>
-              <DialogTitle>
-                {isEdit ? "Edit Trigger" : "Add Trigger"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-              <div className="space-y-4">
+        <form onSubmit={handleSubmit} className={CANVAS_OBJECT_DIALOG_FORM_CLASS}>
+          <div className={CANVAS_OBJECT_DIALOG_TWO_COLUMN_BODY_CLASS}>
+            <div className={CANVAS_OBJECT_DIALOG_LEFT_COLUMN_CLASS}>
+              <div className={CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS}>
+                <DialogHeader>
+                  <DialogTitle>{isEdit ? "Edit Trigger" : "Add Trigger"}</DialogTitle>
+                </DialogHeader>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="trigger-schema">Schema</Label>
@@ -160,83 +165,90 @@ export function CreateTriggerDialog({
                     />
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <Label>Parent Table</Label>
-                  <Select value={tableId} onValueChange={setTableId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a table" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tables.map((table) => (
-                        <SelectItem key={table.id} value={table.id}>
-                          {table.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div
+                className={CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS}
+                data-combobox-scroll
+              >
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <Label>Parent Table</Label>
+                    <Select value={tableId} onValueChange={setTableId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a table" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tables.map((table) => (
+                          <SelectItem key={table.id} value={table.id}>
+                            {table.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Trigger Type</Label>
-                  <Select value={triggerType} onValueChange={setTriggerType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AFTER">AFTER</SelectItem>
-                      <SelectItem value="INSTEAD OF">INSTEAD OF</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <Label>Trigger Type</Label>
+                    <Select value={triggerType} onValueChange={setTriggerType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AFTER">AFTER</SelectItem>
+                        <SelectItem value="INSTEAD OF">INSTEAD OF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Fires On</Label>
-                  <div className="flex gap-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="fires-insert"
-                        checked={firesOnInsert}
-                        onCheckedChange={(c) => setFiresOnInsert(c === true)}
-                      />
-                      <Label htmlFor="fires-insert" className="text-sm font-normal">
-                        Insert
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="fires-update"
-                        checked={firesOnUpdate}
-                        onCheckedChange={(c) => setFiresOnUpdate(c === true)}
-                      />
-                      <Label htmlFor="fires-update" className="text-sm font-normal">
-                        Update
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="fires-delete"
-                        checked={firesOnDelete}
-                        onCheckedChange={(c) => setFiresOnDelete(c === true)}
-                      />
-                      <Label htmlFor="fires-delete" className="text-sm font-normal">
-                        Delete
-                      </Label>
+                  <div className="space-y-2">
+                    <Label>Fires On</Label>
+                    <div className="flex gap-4">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="fires-insert"
+                          checked={firesOnInsert}
+                          onCheckedChange={(c) => setFiresOnInsert(c === true)}
+                        />
+                        <Label htmlFor="fires-insert" className="text-sm font-normal">
+                          Insert
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="fires-update"
+                          checked={firesOnUpdate}
+                          onCheckedChange={(c) => setFiresOnUpdate(c === true)}
+                        />
+                        <Label htmlFor="fires-update" className="text-sm font-normal">
+                          Update
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="fires-delete"
+                          checked={firesOnDelete}
+                          onCheckedChange={(c) => setFiresOnDelete(c === true)}
+                        />
+                        <Label htmlFor="fires-delete" className="text-sm font-normal">
+                          Delete
+                        </Label>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="trigger-definition">
-                  SQL Definition (optional)
-                </Label>
+            <div className={CANVAS_OBJECT_DIALOG_SQL_SECTION_CLASS}>
+              <Label htmlFor="trigger-definition">SQL Definition (optional)</Label>
+              <div className="min-h-0 flex-1">
                 <SqlEditor
                   id="trigger-definition"
                   value={definition}
                   onChange={setDefinition}
                   placeholder="BEGIN\n  -- SQL\nEND"
-                  height="360px"
+                  height={CANVAS_OBJECT_DIALOG_SQL_EDITOR_FILL_HEIGHT}
                 />
               </div>
             </div>

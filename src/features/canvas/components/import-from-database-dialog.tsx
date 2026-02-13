@@ -1,5 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronsUpDown,
+  Search,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,29 +18,47 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox as CheckboxUI } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { databaseService } from "@/features/connection/services/database-service";
 import { schemaService } from "@/features/schema-graph/services/schema-service";
 import { useToastStore } from "@/features/notifications/store";
+import { cn } from "@/lib/utils";
 import {
   loadConnectionSettings,
   saveConnectionSettings,
 } from "@/features/connection/services/connection-settings";
+import {
+  ServerConnectionForm,
+  type ServerConnectionFormValues,
+} from "@/features/connection/components/server-connection-form";
+import { OBJECT_COLORS } from "@/constants/edge-colors";
 import type {
   SchemaGraph,
-  AuthType,
   ServerConnectionParams,
   ConnectionParams,
 } from "@/features/schema-graph/types";
+import {
+  buildImportConnectionIdentity,
+  getImportSessionStep,
+  resolveSelectedDatabaseAfterConnect,
+  shouldInvalidateImportSession,
+  type ImportConnectionIdentity,
+  type ImportDialogStep,
+} from "./import-from-database-dialog-state";
 
-type Step = "connect" | "database" | "pick";
 type SectionKey =
   | "tables"
   | "views"
@@ -53,6 +77,39 @@ const createDefaultExpandedSections = (): Record<SectionKey, boolean> => ({
 const sortById = (a: { id: string }, b: { id: string }) =>
   a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
 
+const stopEventPropagation = (event: { stopPropagation: () => void }) => {
+  event.stopPropagation();
+};
+
+export const getImportSectionCounts = (
+  items: { id: string }[],
+  selectedIds: Set<string>
+) => ({
+  totalCount: items.length,
+  selectedCount: items.filter((item) => selectedIds.has(item.id)).length,
+});
+
+export const isImportSectionFullySelected = (
+  visibleItems: { id: string }[],
+  selectedIds: Set<string>
+) => visibleItems.every((item) => selectedIds.has(item.id));
+
+const getPickSectionData = (schema: SchemaGraph) => [
+  { key: "tables" as const, label: "Tables", items: schema.tables },
+  { key: "views" as const, label: "Views", items: schema.views || [] },
+  { key: "triggers" as const, label: "Triggers", items: schema.triggers || [] },
+  {
+    key: "storedProcedures" as const,
+    label: "Stored Procedures",
+    items: schema.storedProcedures || [],
+  },
+  {
+    key: "scalarFunctions" as const,
+    label: "Scalar Functions",
+    items: schema.scalarFunctions || [],
+  },
+];
+
 interface ImportFromDatabaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -69,25 +126,28 @@ export function ImportFromDatabaseDialog({
   );
   const { addToast } = useToastStore();
 
-  const [step, setStep] = useState<Step>("connect");
+  const [step, setStep] = useState<ImportDialogStep>("connect");
   const [initialSavedSettings] = useState(() => loadConnectionSettings());
-  const [server, setServer] = useState(() => initialSavedSettings?.server ?? "");
-  const [authType, setAuthType] = useState<AuthType>(
-    () => initialSavedSettings?.authType ?? "sqlServer"
-  );
-  const [username, setUsername] = useState(() =>
-    initialSavedSettings?.authType === "sqlServer"
-      ? (initialSavedSettings.username ?? "")
-      : ""
-  );
-  const [password, setPassword] = useState("");
-  const [trustCert, setTrustCert] = useState(true);
+  const [connectionValues, setConnectionValues] =
+    useState<ServerConnectionFormValues>(() => ({
+      server: initialSavedSettings?.server ?? "",
+      authType: initialSavedSettings?.authType ?? "sqlServer",
+      username:
+        initialSavedSettings?.authType === "sqlServer"
+          ? (initialSavedSettings.username ?? "")
+          : "",
+      password: "",
+      trustServerCertificate: true,
+    }));
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [databases, setDatabases] = useState<string[]>([]);
   const [selectedDb, setSelectedDb] = useState<string>("");
+  const [databasePickerOpen, setDatabasePickerOpen] = useState(false);
   const [isLoadingSchema, setIsLoadingSchema] = useState(false);
+  const [cachedConnectionIdentity, setCachedConnectionIdentity] =
+    useState<ImportConnectionIdentity | null>(null);
 
   const [loadedSchema, setLoadedSchema] = useState<SchemaGraph | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -95,42 +155,98 @@ export function ImportFromDatabaseDialog({
   const [expandedSections, setExpandedSections] = useState<
     Record<SectionKey, boolean>
   >(createDefaultExpandedSections);
+  const wasOpenRef = useRef(open);
 
-  useEffect(() => {
-    if (!open) return;
-    const saved = loadConnectionSettings();
-    if (!saved) return;
-
-    setServer(saved.server);
-    setAuthType(saved.authType);
-    setUsername(saved.authType === "sqlServer" ? (saved.username ?? "") : "");
-  }, [open]);
-
-  useEffect(() => {
-    saveConnectionSettings({
-      server,
-      authType,
-      username,
-    });
-  }, [server, authType, username]);
-
-  const reset = useCallback(() => {
-    setStep("connect");
+  const resetPickState = useCallback(() => {
     setError(null);
-    setDatabases([]);
-    setSelectedDb("");
     setLoadedSchema(null);
     setSelectedIds(new Set());
     setFilterText("");
     setExpandedSections(createDefaultExpandedSections());
   }, []);
 
+  useEffect(() => {
+    if (!open || wasOpenRef.current) return;
+
+    const hasCachedDatabases = databases.length > 0;
+    setStep(getImportSessionStep(hasCachedDatabases));
+    resetPickState();
+
+    if (!hasCachedDatabases) {
+      const saved = loadConnectionSettings();
+      if (!saved) return;
+
+      setConnectionValues((prev) => ({
+        ...prev,
+        server: saved.server,
+        authType: saved.authType,
+        username: saved.authType === "sqlServer" ? (saved.username ?? "") : "",
+      }));
+    }
+  }, [open, databases.length, resetPickState]);
+
+  useEffect(() => {
+    wasOpenRef.current = open;
+  }, [open]);
+
+  useEffect(() => {
+    saveConnectionSettings({
+      server: connectionValues.server,
+      authType: connectionValues.authType,
+      username: connectionValues.username,
+    });
+  }, [
+    connectionValues.server,
+    connectionValues.authType,
+    connectionValues.username,
+  ]);
+
+  useEffect(() => {
+    if (!cachedConnectionIdentity) return;
+
+    const nextIdentity = buildImportConnectionIdentity({
+      server: connectionValues.server,
+      authType: connectionValues.authType,
+      username: connectionValues.username,
+      trustServerCertificate: connectionValues.trustServerCertificate,
+    });
+
+    if (!shouldInvalidateImportSession(cachedConnectionIdentity, nextIdentity)) {
+      return;
+    }
+
+    setCachedConnectionIdentity(null);
+    setDatabases([]);
+    setSelectedDb("");
+    setStep("connect");
+    resetPickState();
+  }, [
+    cachedConnectionIdentity,
+    connectionValues.server,
+    connectionValues.authType,
+    connectionValues.username,
+    connectionValues.trustServerCertificate,
+    resetPickState,
+  ]);
+
+  useEffect(() => {
+    if (step !== "database") {
+      setDatabasePickerOpen(false);
+    }
+  }, [step]);
+
+  const resetForClose = useCallback(() => {
+    setStep(getImportSessionStep(databases.length > 0));
+    setDatabasePickerOpen(false);
+    resetPickState();
+  }, [databases.length, resetPickState]);
+
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (!open) reset();
+      if (!open) resetForClose();
       onOpenChange(open);
     },
-    [onOpenChange, reset]
+    [onOpenChange, resetForClose]
   );
 
   const handleConnect = async () => {
@@ -138,16 +254,25 @@ export function ImportFromDatabaseDialog({
     setError(null);
     try {
       const params: ServerConnectionParams = {
-        server,
-        authType,
-        trustServerCertificate: trustCert,
+        server: connectionValues.server,
+        authType: connectionValues.authType,
+        trustServerCertificate: connectionValues.trustServerCertificate,
       };
-      if (authType === "sqlServer") {
-        params.username = username;
-        params.password = password;
+      if (connectionValues.authType === "sqlServer") {
+        params.username = connectionValues.username;
+        params.password = connectionValues.password;
       }
       const dbs = await databaseService.listDatabases(params);
       setDatabases(dbs);
+      setSelectedDb((prev) => resolveSelectedDatabaseAfterConnect(dbs, prev));
+      setCachedConnectionIdentity(
+        buildImportConnectionIdentity({
+          server: connectionValues.server,
+          authType: connectionValues.authType,
+          username: connectionValues.username,
+          trustServerCertificate: connectionValues.trustServerCertificate,
+        })
+      );
       setStep("database");
     } catch (err) {
       setError(String(err));
@@ -162,12 +287,18 @@ export function ImportFromDatabaseDialog({
     setError(null);
     try {
       const params: ConnectionParams = {
-        server,
+        server: connectionValues.server,
         database: selectedDb,
-        authType,
-        username: authType === "sqlServer" ? username : undefined,
-        password: authType === "sqlServer" ? password : undefined,
-        trustServerCertificate: trustCert,
+        authType: connectionValues.authType,
+        username:
+          connectionValues.authType === "sqlServer"
+            ? connectionValues.username
+            : undefined,
+        password:
+          connectionValues.authType === "sqlServer"
+            ? connectionValues.password
+            : undefined,
+        trustServerCertificate: connectionValues.trustServerCertificate,
       };
       const schema = await schemaService.loadSchema(params);
       setLoadedSchema(schema);
@@ -266,7 +397,10 @@ export function ImportFromDatabaseDialog({
   const filterMatch = (id: string) =>
     !filterText || id.toLowerCase().includes(filterText.toLowerCase());
 
-  const isWindowsAuth = authType === "windows";
+  const pickSections = loadedSchema ? getPickSectionData(loadedSchema) : [];
+  const hasPickSearchMatches = pickSections.some(({ items }) =>
+    items.some((item) => filterMatch(item.id))
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -276,77 +410,18 @@ export function ImportFromDatabaseDialog({
         </DialogHeader>
 
         {step === "connect" && (
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="import-server">Server</Label>
-              <Input
-                id="import-server"
-                value={server}
-                onChange={(e) => setServer(e.target.value)}
-                placeholder="HOST\\INSTANCE"
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">
-                Examples: HOST\INSTANCE, HOST,1433, localhost
-              </p>
-            </div>
-            <div className="space-y-1">
-              <Label>Authentication</Label>
-              <Select
-                value={authType}
-                onValueChange={(v: AuthType) => setAuthType(v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sqlServer">
-                    SQL Server Authentication
-                  </SelectItem>
-                  <SelectItem value="windows">
-                    Windows Authentication
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {!isWindowsAuth && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="import-user">Username</Label>
-                  <Input
-                    id="import-user"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="sa"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="import-pass">Password</Label>
-                  <Input
-                    id="import-pass"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex items-center space-x-2">
-              <CheckboxUI
-                id="import-trust"
-                checked={trustCert}
-                onCheckedChange={(c) => setTrustCert(c === true)}
-              />
-              <Label htmlFor="import-trust" className="text-sm font-normal">
-                Trust Server Certificate
-              </Label>
-            </div>
-            {error && (
-              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <DialogFooter>
+          <ServerConnectionForm
+            values={connectionValues}
+            onValuesChange={(patch) =>
+              setConnectionValues((prev) => ({ ...prev, ...patch }))
+            }
+            onSubmit={handleConnect}
+            isSubmitting={isConnecting}
+            submitLabel="Connect"
+            submitDisabled={!connectionValues.server}
+            error={error}
+            fieldIdPrefix="import"
+            cancelAction={
               <Button
                 type="button"
                 variant="outline"
@@ -354,32 +429,61 @@ export function ImportFromDatabaseDialog({
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleConnect}
-                disabled={isConnecting || !server}
-              >
-                {isConnecting ? "Connecting..." : "Connect"}
-              </Button>
-            </DialogFooter>
-          </div>
+            }
+          />
         )}
 
         {step === "database" && (
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Database</Label>
-              <Select value={selectedDb} onValueChange={setSelectedDb}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a database" />
-                </SelectTrigger>
-                <SelectContent side="bottom" avoidCollisions={false}>
-                  {databases.map((db) => (
-                    <SelectItem key={db} value={db}>
-                      {db}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover
+                open={databasePickerOpen}
+                onOpenChange={setDatabasePickerOpen}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={databasePickerOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {selectedDb || "Select a database"}
+                    </span>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search database..." />
+                    <CommandList>
+                      <CommandEmpty>No database found.</CommandEmpty>
+                      <CommandGroup>
+                        {databases.map((db) => (
+                          <CommandItem
+                            key={db}
+                            value={db}
+                            onSelect={() => {
+                              setSelectedDb(db);
+                              setDatabasePickerOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedDb === db ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {db}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md text-sm text-destructive">
@@ -406,100 +510,124 @@ export function ImportFromDatabaseDialog({
 
         {step === "pick" && loadedSchema && (
           <div className="space-y-3">
-            <Input
-              placeholder="Filter objects..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-            />
-            <div className="max-h-[400px] overflow-y-auto space-y-2">
-              {[
-                {
-                  key: "tables" as const,
-                  label: "Tables",
-                  items: loadedSchema.tables,
-                },
-                {
-                  key: "views" as const,
-                  label: "Views",
-                  items: loadedSchema.views || [],
-                },
-                {
-                  key: "triggers" as const,
-                  label: "Triggers",
-                  items: loadedSchema.triggers || [],
-                },
-                {
-                  key: "storedProcedures" as const,
-                  label: "Stored Procedures",
-                  items: loadedSchema.storedProcedures || [],
-                },
-                {
-                  key: "scalarFunctions" as const,
-                  label: "Scalar Functions",
-                  items: loadedSchema.scalarFunctions || [],
-                },
-              ].map(({ key, label, items }) => {
-                const totalCount = items.length;
-                const filtered = [...items]
-                  .sort(sortById)
-                  .filter((i) => filterMatch(i.id));
-                if (filtered.length === 0) return null;
+            <div className="border rounded-md overflow-hidden">
+              <div className="p-2 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Filter objects..."
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    className="pl-8 h-8"
+                  />
+                </div>
+              </div>
+              <div className="h-80 overflow-auto">
+                <div className="w-max min-w-full">
+                  {pickSections.map(({ key, label, items }) => {
+                    const { totalCount, selectedCount } = getImportSectionCounts(
+                      items,
+                      selectedIds
+                    );
+                    const filtered = [...items]
+                      .sort(sortById)
+                      .filter((i) => filterMatch(i.id));
+                    if (filtered.length === 0) return null;
 
-                const isExpanded =
-                  filterText.trim().length > 0 || expandedSections[key];
-                const allSelected = filtered.every((i) =>
-                  selectedIds.has(i.id)
-                );
+                    const isExpanded =
+                      filterText.trim().length > 0 || expandedSections[key];
+                    const allSelected = isImportSectionFullySelected(
+                      filtered,
+                      selectedIds
+                    );
 
-                return (
-                  <div key={label}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckboxUI
-                        checked={allSelected}
-                        onCheckedChange={(c) =>
-                          toggleAll(
-                            filtered.map((i) => i.id),
-                            c === true
-                          )
-                        }
-                      />
-                      <span className="text-sm font-medium">
-                        {label} ({filtered.length}/{totalCount})
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="ml-auto h-7 w-7"
-                        onClick={() => toggleSection(key)}
-                        aria-label={`Toggle ${label}`}
+                    return (
+                      <div
+                        key={label}
+                        className="w-max min-w-full border-b last:border-b-0"
                       >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    {isExpanded && (
-                      <div className="pl-6 space-y-0.5">
-                        {filtered.map((item) => (
-                          <label
-                            key={item.id}
-                            className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted px-1 py-0.5 rounded"
+                        <div
+                          className="w-max min-w-full px-3 py-2 bg-muted/50 flex items-center gap-2 cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleSection(key)}
+                          onKeyDown={(event) => {
+                            if (event.currentTarget !== event.target) return;
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              toggleSection(key);
+                            }
+                          }}
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleSection(key);
+                            }}
+                            onKeyDown={stopEventPropagation}
+                            aria-label={`Toggle ${label}`}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                          <div
+                            className="inline-flex items-center"
+                            onClick={stopEventPropagation}
+                            onKeyDown={stopEventPropagation}
                           >
                             <CheckboxUI
-                              checked={selectedIds.has(item.id)}
-                              onCheckedChange={() => toggleId(item.id)}
+                              checked={allSelected}
+                              onCheckedChange={(c) =>
+                                toggleAll(
+                                  filtered.map((i) => i.id),
+                                  c === true
+                                )
+                              }
                             />
-                            <span>{item.id}</span>
-                          </label>
-                        ))}
+                          </div>
+                          <span
+                            className="text-xs font-medium"
+                            style={{ color: OBJECT_COLORS[key] }}
+                          >
+                            {label} ({selectedCount}/{totalCount})
+                          </span>
+                        </div>
+                        {isExpanded && (
+                          <div className="w-max min-w-full py-1">
+                            {filtered.map((item) => (
+                              <label
+                                key={item.id}
+                                className="w-max min-w-full flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-accent"
+                              >
+                                <CheckboxUI
+                                  checked={selectedIds.has(item.id)}
+                                  onCheckedChange={() => toggleId(item.id)}
+                                />
+                                <span style={{ color: OBJECT_COLORS[key] }}>
+                                  {item.id}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+
+                  {filterText.trim().length > 0 && !hasPickSearchMatches && (
+                    <div className="w-max min-w-full px-3 py-4 text-sm text-center text-muted-foreground">
+                      No matches found
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button

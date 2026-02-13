@@ -11,6 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ColumnEditor } from "./column-editor";
 import { SqlEditor } from "./sql-editor";
+import {
+  CANVAS_OBJECT_DIALOG_CONTENT_CLASS,
+  CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_FORM_CLASS,
+  CANVAS_OBJECT_DIALOG_LEFT_COLUMN_CLASS,
+  CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_SQL_EDITOR_FILL_HEIGHT,
+  CANVAS_OBJECT_DIALOG_SQL_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_TWO_COLUMN_BODY_CLASS,
+} from "./object-dialog-layout";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import type { Column } from "@/features/schema-graph/types";
@@ -136,22 +146,19 @@ export function CreateViewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-5xl overflow-visible p-0"
+        className={CANVAS_OBJECT_DIALOG_CONTENT_CLASS}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           nameInputRef.current?.focus();
         }}
       >
-        <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col">
-          <div
-            className="flex-1 overflow-y-auto p-6 space-y-4"
-            data-combobox-scroll
-          >
-            <DialogHeader>
-              <DialogTitle>{isEdit ? "Edit View" : "Add View"}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-              <div className="space-y-4">
+        <form onSubmit={handleSubmit} className={CANVAS_OBJECT_DIALOG_FORM_CLASS}>
+          <div className={CANVAS_OBJECT_DIALOG_TWO_COLUMN_BODY_CLASS}>
+            <div className={CANVAS_OBJECT_DIALOG_LEFT_COLUMN_CLASS}>
+              <div className={CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS}>
+                <DialogHeader>
+                  <DialogTitle>{isEdit ? "Edit View" : "Add View"}</DialogTitle>
+                </DialogHeader>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="view-schema">Schema</Label>
@@ -174,17 +181,19 @@ export function CreateViewDialog({
                     />
                   </div>
                 </div>
-
-                <ColumnEditor
-                  columns={columns}
-                  onChange={handleColumnsChange}
-                />
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="view-definition">
-                  SQL Definition (optional)
-                </Label>
+              <div
+                className={CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS}
+                data-combobox-scroll
+              >
+                <ColumnEditor columns={columns} onChange={handleColumnsChange} />
+              </div>
+            </div>
+
+            <div className={CANVAS_OBJECT_DIALOG_SQL_SECTION_CLASS}>
+              <Label htmlFor="view-definition">SQL Definition (optional)</Label>
+              <div className="min-h-0 flex-1">
                 <SqlEditor
                   id="view-definition"
                   value={definitionMode === "auto" ? autoDefinition : definition}
@@ -193,7 +202,7 @@ export function CreateViewDialog({
                     setDefinitionMode("manual");
                   }}
                   placeholder="SELECT ..."
-                  height="360px"
+                  height={CANVAS_OBJECT_DIALOG_SQL_EDITOR_FILL_HEIGHT}
                 />
               </div>
             </div>

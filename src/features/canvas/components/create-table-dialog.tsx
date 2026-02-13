@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ColumnEditor } from "./column-editor";
+import {
+  CANVAS_OBJECT_DIALOG_BODY_CLASS,
+  CANVAS_OBJECT_DIALOG_CONTENT_CLASS,
+  CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS,
+  CANVAS_OBJECT_DIALOG_FORM_CLASS,
+  CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS,
+} from "./object-dialog-layout";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import type { Column } from "@/features/schema-graph/types";
@@ -92,44 +99,48 @@ export function CreateTableDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-5xl overflow-visible p-0"
+        className={CANVAS_OBJECT_DIALOG_CONTENT_CLASS}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           nameInputRef.current?.focus();
         }}
       >
-        <form onSubmit={handleSubmit} className="flex max-h-[85vh] flex-col">
-          <div
-            className="flex-1 overflow-y-auto p-6 space-y-4"
-            data-combobox-scroll
-          >
-            <DialogHeader>
-              <DialogTitle>{isEdit ? "Edit Table" : "Add Table"}</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="table-schema">Schema</Label>
-                <Input
-                  id="table-schema"
-                  value={schemaName}
-                  onChange={(e) => setSchemaName(e.target.value)}
-                  placeholder="dbo"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="table-name">Name</Label>
-                <Input
-                  id="table-name"
-                  ref={nameInputRef}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="TableName"
-                  required
-                />
+        <form onSubmit={handleSubmit} className={CANVAS_OBJECT_DIALOG_FORM_CLASS}>
+          <div className={CANVAS_OBJECT_DIALOG_BODY_CLASS}>
+            <div className={CANVAS_OBJECT_DIALOG_FIXED_SECTION_CLASS}>
+              <DialogHeader>
+                <DialogTitle>{isEdit ? "Edit Table" : "Add Table"}</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="table-schema">Schema</Label>
+                  <Input
+                    id="table-schema"
+                    value={schemaName}
+                    onChange={(e) => setSchemaName(e.target.value)}
+                    placeholder="dbo"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="table-name">Name</Label>
+                  <Input
+                    id="table-name"
+                    ref={nameInputRef}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="TableName"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            <ColumnEditor columns={columns} onChange={setColumns} />
+            <div
+              className={CANVAS_OBJECT_DIALOG_SCROLL_SECTION_CLASS}
+              data-combobox-scroll
+            >
+              <ColumnEditor columns={columns} onChange={setColumns} />
+            </div>
           </div>
 
           <DialogFooter className="border-t bg-background px-6 py-4">
