@@ -46,6 +46,7 @@ src/
       components/
         home-screen.tsx             - Landing page with recent connections
         connection-modal.tsx        - Database connection dialog
+        server-connection-form.tsx  - Shared server connection form
         monocle-logo.tsx            - Logo component
       services/
         connection-service.ts       - Tauri IPC for connection history
@@ -65,12 +66,14 @@ src/
         zoom-band.ts                - Discrete zoom band thresholds
         detail-popover.tsx          - Popover for object details
         detail-content.tsx          - Content for detail popover
-        sql-code-block.tsx          - SQL syntax highlighting
+        sql-code-block.tsx          - Monaco SQL syntax highlighting (readonly)
       hooks/
         useFilteredCounts.ts        - Filter statistics hook
         use-detail-popover.ts       - Detail popover state hook
       services/
         schema-service.ts           - Tauri IPC for schema loading
+      utils/
+        object-filtering.ts         - Shared object filtering logic
       store.ts                      - Zustand store for schema state
       types.ts                      - TypeScript types (SchemaGraph, TableNode, etc.)
     settings/
@@ -96,6 +99,19 @@ src/
         png-export.ts               - PNG export logic
         pdf-export.ts               - PDF export logic
         json-export.ts              - JSON export logic
+    canvas/
+      components/
+        sql-editor.tsx              - Monaco SQL editor (editable)
+        create-table-dialog.tsx     - Create table dialog
+        create-view-dialog.tsx      - Create view dialog
+        create-function-dialog.tsx  - Create function dialog
+        create-procedure-dialog.tsx - Create procedure dialog
+        create-trigger-dialog.tsx   - Create trigger dialog
+        import-from-database-dialog.tsx       - Import from database dialog
+        import-from-database-dialog-state.ts  - Import dialog session state
+        object-dialog-layout.ts     - Dialog layout CSS class constants
+        column-editor.tsx           - Column editor for table dialogs
+        parameter-editor.tsx        - Parameter editor for procedure/function dialogs
     notifications/
       store.ts                      - Notification state
   services/
@@ -103,9 +119,14 @@ src/
     events.ts                       - Event hub for Tauri events
   lib/
     schema-index.ts                 - Schema search index and relationship lookups
+    monaco-sql-loader.ts            - Lazy Monaco Editor + SQL language loader
+    sql-intellisense.ts             - SQL autocomplete provider for schema objects
   utils/
     index.ts                        - Utility exports
     formatting.ts                   - String/number formatting helpers
+  hooks/
+    use-resolved-theme.ts           - Theme resolution hook (system/dark/light)
+  types/                            - TypeScript type declarations
   components/
     ui/                             - shadcn/ui components
   constants/
@@ -222,6 +243,7 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - Schema filter state persists across sessions via settings
 - Connection passwords are not stored - only connection metadata
 - The app uses React Flow's dagre layout for automatic positioning
+- Monaco Editor provides SQL syntax highlighting and intellisense (replaces prism-react-renderer)
 
 ## Release Workflow
 
