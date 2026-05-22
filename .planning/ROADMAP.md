@@ -35,10 +35,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. A top navigation bar appears consistent with schema/canvas modes, allowing switching between all modes
   3. The explorer layout shows a sidebar area (empty) and a content area (empty placeholder)
   4. User can return to the home screen or switch to other modes without losing app state
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 01-01: TBD
+- [ ] 01-01-PLAN.md -- Explorer mode state, shell components, home screen button, keyboard shortcut, and visual verification
 **UI hint**: yes
 
 ### Phase 2: Folder Sources & Tree Sidebar
@@ -192,7 +192,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Explorer Shell & Navigation | 0/? | Not started | - |
+| 1. Explorer Shell & Navigation | 0/1 | Planning complete | - |
 | 2. Folder Sources & Tree Sidebar | 0/? | Not started | - |
 | 3. XML File Viewing | 0/? | Not started | - |
 | 4. Single-File Validation | 0/? | Not started | - |
