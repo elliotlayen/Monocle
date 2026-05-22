@@ -61,11 +61,13 @@ Plans:
   4. User can type in a filter field to narrow the client list and pin favorite clients to always appear at the top
   5. Expanding folders over a slow network connection shows a loading indicator rather than freezing the UI
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md -- Rust backend (FolderSource model, directory listing with timeout/cancel, favorites), frontend types, Zustand store, IPC services, utility functions, and tests
+- [ ] 02-02-PLAN.md -- Settings Folder Sources section (CRUD, drag-to-reorder, browse, path validation), updated empty state messaging
+- [ ] 02-03-PLAN.md -- Tree sidebar (lazy-loading tree, date formatting, filter bar, favorites with star/context-menu, sort toggle, resize/collapse), visual verification
 
 **UI hint**: yes
 
@@ -242,7 +244,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
-| 2. Folder Sources & Tree Sidebar | 0/? | Not started | - |
+| 2. Folder Sources & Tree Sidebar | 0/3 | Not started | - |
 | 3. XML File Viewing | 0/? | Not started | - |
 | 4. Single-File Validation | 0/? | Not started | - |
 | 5. Bulk Validation & Reporting | 0/? | Not started | - |
