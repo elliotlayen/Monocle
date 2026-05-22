@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
 import { HomeScreen } from "@/features/connection/components/home-screen";
+import { ExplorerShell } from "@/features/explorer/components/explorer-shell";
 import { Toolbar } from "@/features/toolbar/components/toolbar";
 import { FilterInfoBar } from "@/features/toolbar/components/filter-info-bar";
 import { StatusBar } from "@/components/status-bar";
@@ -44,6 +45,8 @@ function App() {
     disconnect,
     enterCanvasMode,
     exitCanvasMode,
+    enterExplorerMode,
+    exitExplorerMode,
     setCanvasFilePath,
     setCanvasDirty,
     setSearchFilter,
@@ -71,6 +74,8 @@ function App() {
       disconnect: state.disconnect,
       enterCanvasMode: state.enterCanvasMode,
       exitCanvasMode: state.exitCanvasMode,
+      enterExplorerMode: state.enterExplorerMode,
+      exitExplorerMode: state.exitExplorerMode,
       setCanvasFilePath: state.setCanvasFilePath,
       setCanvasDirty: state.setCanvasDirty,
       setSearchFilter: state.setSearchFilter,
@@ -94,6 +99,7 @@ function App() {
   const [isCanvasDirtySaving, setIsCanvasDirtySaving] = useState(false);
 
   const isCanvasMode = mode === "canvas";
+  const isExplorerMode = mode === "explorer";
   const canvasFileName = useMemo(() => {
     return canvasFilePath
       ? canvasFilePath.split("/").pop()?.split("\\").pop() ?? "Untitled"
@@ -168,6 +174,14 @@ function App() {
   const handleExitCanvasMode = useCallback(() => {
     requestCanvasAction("exit");
   }, [requestCanvasAction]);
+
+  const handleEnterExplorer = useCallback(() => {
+    enterExplorerMode();
+  }, [enterExplorerMode]);
+
+  const handleExitExplorer = useCallback(() => {
+    exitExplorerMode();
+  }, [exitExplorerMode]);
 
   const handleCanvasSave = useCallback(async () => {
     if (!schema) return false;
@@ -272,6 +286,12 @@ function App() {
           handleEnterCanvasMode();
         }
       }
+      if (mod && e.key === "e") {
+        e.preventDefault();
+        if (!isExplorerMode) {
+          handleEnterExplorer();
+        }
+      }
       if (mod && e.key === "s" && isCanvasMode) {
         e.preventDefault();
         void handleCanvasSave();
@@ -279,7 +299,7 @@ function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isCanvasMode, handleEnterCanvasMode, handleCanvasSave]);
+  }, [isCanvasMode, isExplorerMode, handleEnterCanvasMode, handleEnterExplorer, handleCanvasSave]);
 
   const menuHandlers = useMemo(
     () => ({
@@ -355,7 +375,7 @@ function App() {
   }, [hydrateSettings]);
 
   const showHome =
-    !schema && mode !== "canvas" && (!isConnected || !serverConnection);
+    !schema && mode !== "canvas" && mode !== "explorer" && (!isConnected || !serverConnection);
 
   return (
     <>
@@ -387,6 +407,12 @@ function App() {
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenAbout={() => setAboutOpen(true)}
           onEnterCanvasMode={handleEnterCanvasMode}
+          onEnterExplorer={handleEnterExplorer}
+        />
+      ) : isExplorerMode ? (
+        <ExplorerShell
+          onHome={handleExitExplorer}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : (
         <ReactFlowProvider>
