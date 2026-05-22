@@ -6,10 +6,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Info, Network, Palette } from "lucide-react";
+import { FolderSync, Info, Network, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GraphSettingsSection } from "@/features/settings/components/sections/graph-settings-section";
 import { AppearanceSettingsSection } from "@/features/settings/components/sections/appearance-settings-section";
+import { FolderSourcesSection } from "@/features/settings/components/sections/folder-sources-section";
 import { AboutSettingsSection } from "@/features/settings/components/sections/about-settings-section";
 
 interface AppSettingsSheetProps {
@@ -17,7 +18,7 @@ interface AppSettingsSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type SettingsSectionId = "graph" | "appearance" | "about";
+type SettingsSectionId = "graph" | "appearance" | "sources" | "about";
 
 const SETTINGS_SECTIONS: Array<{
   id: SettingsSectionId;
@@ -26,6 +27,7 @@ const SETTINGS_SECTIONS: Array<{
 }> = [
   { id: "graph", label: "Graph", icon: Network },
   { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "sources", label: "Sources", icon: FolderSync },
   { id: "about", label: "About", icon: Info },
 ];
 
@@ -44,6 +46,8 @@ export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) 
         return <GraphSettingsSection />;
       case "appearance":
         return <AppearanceSettingsSection />;
+      case "sources":
+        return <FolderSourcesSection />;
       case "about":
         return <AboutSettingsSection />;
       default:
@@ -59,7 +63,7 @@ export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) 
         </DialogHeader>
         <div className="min-h-0 flex-1 border-t">
           <div className="border-b px-3 pb-3 sm:hidden">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {SETTINGS_SECTIONS.map((section) => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
