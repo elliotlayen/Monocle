@@ -47,10 +47,14 @@ Exceptions: none
 
 | Role | Size | Weight | Line Height | Usage in Phase 1 |
 |------|------|--------|-------------|-------------------|
-| Body | 14px (`text-sm`) | 400 (regular) | 1.43 (20px) | Button labels, nav bar text, empty state body copy |
-| Label | 12px (`text-xs`) | 400 (regular) | 1.33 (16px) | Keyboard shortcut badges, status bar text |
 | Heading | 20px (`text-xl`) | 600 (semibold) | 1.2 (24px) | Empty state feature name heading |
-| Display | 14px (`text-sm`) | 500 (medium) | 1.43 (20px) | Empty state description paragraph |
+| Body | 14px (`text-sm`) | 400 (regular) | 1.43 (20px) | Button labels, nav bar text, empty state body copy, empty state description paragraph |
+| Label | 12px (`text-xs`) | 400 (regular) | 1.33 (16px) | Keyboard shortcut badges, status bar text |
+
+Two-weight contract: **400 regular** and **600 semibold**. No other weights permitted.
+
+- 400 regular -- Label (12px), Body (14px), description paragraph (14px with `text-muted-foreground` for visual distinction)
+- 600 semibold -- Heading (20px), branding override (16px)
 
 Branding override: "Monocle" text in nav bar uses JetBrains Mono at 16px (`text-base`) weight 600 (`font-semibold`). This matches the existing toolbar pattern exactly.
 
@@ -140,6 +144,8 @@ No new shadcn components need to be installed. All required components (`button`
 
 ### Explorer Empty State (`ExplorerEmptyState`)
 
+**Primary visual anchor:** The heading "Integration Explorer" at 20px semibold is the focal point of the empty state. It is the largest and heaviest text element, drawing the eye first. The icon above serves as a visual lead-in; the description and CTA below provide supporting context.
+
 ```
 +------------------------------------------------------+
 |                                                      |
@@ -167,7 +173,7 @@ No new shadcn components need to be installed. All required components (`button`
 - Inner wrapper: `flex flex-col items-center gap-3 text-center`
 - Icon: `FolderSync` from lucide-react, `w-10 h-10 text-muted-foreground`, `mb-1`
 - Heading: `text-xl font-semibold` (20px, weight 600)
-- Description: `text-sm text-muted-foreground max-w-sm` (14px, weight 400)
+- Description: `text-sm text-muted-foreground max-w-sm` (14px, weight 400) -- visual distinction from Body role achieved via `text-muted-foreground` color, not a separate weight
 - CTA button: `variant="default"` (filled primary), `className="mt-6"`, icon `Settings` at `w-4 h-4` + text
 - Pattern matches existing empty state in `App.tsx` line 421-423 but with richer content
 
@@ -272,8 +278,8 @@ No third-party registries declared. No new shadcn components need installation.
 
 - [ ] Dimension 1 Copywriting: PASS
 - [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
+- [ ] Dimension 3 Typography: PASS
+- [ ] Dimension 4 Color: PASS
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
