@@ -1,4 +1,4 @@
-import { Server, Settings, Info, PenTool } from "lucide-react";
+import { Server, Settings, Info, PenTool, FolderSync } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MonocleLogo } from "./monocle-logo";
 
@@ -8,6 +8,7 @@ interface HomeScreenProps {
   onOpenSettings?: () => void;
   onOpenAbout?: () => void;
   onEnterCanvasMode?: () => void;
+  onEnterExplorer?: () => void;
 }
 
 export function HomeScreen({
@@ -15,6 +16,7 @@ export function HomeScreen({
   onOpenSettings,
   onOpenAbout,
   onEnterCanvasMode,
+  onEnterExplorer,
 }: HomeScreenProps) {
 
   const isMac =
@@ -62,6 +64,20 @@ export function HomeScreen({
           </span>
           <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             {modKey}+K
+          </kbd>
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full h-12 justify-between px-4"
+          onClick={onEnterExplorer}
+        >
+          <span className="flex items-center gap-3">
+            <FolderSync className="w-5 h-5" />
+            Integration Explorer
+          </span>
+          <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+            {modKey}+E
           </kbd>
         </Button>
 

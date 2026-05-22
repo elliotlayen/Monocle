@@ -61,7 +61,7 @@ interface SchemaStore {
   showMiniMap: boolean;
 
   // Canvas mode state
-  mode: "connected" | "canvas";
+  mode: "connected" | "canvas" | "explorer";
   canvasFilePath: string | null;
   canvasIsDirty: boolean;
   nodePositions: Record<string, { x: number; y: number }>;
@@ -115,6 +115,10 @@ interface SchemaStore {
   toggleEdgeSelection: (edgeId: string) => void;
   clearEdgeSelection: () => void;
   disconnect: () => void;
+
+  // Explorer mode actions
+  enterExplorerMode: () => void;
+  exitExplorerMode: () => void;
 
   // Canvas mode actions
   enterCanvasMode: (
@@ -1072,6 +1076,10 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       availableSchemas: [],
       error: null,
     }),
+
+  // Explorer mode actions
+  enterExplorerMode: () => set({ mode: "explorer" }),
+  exitExplorerMode: () => set({ mode: "connected" }),
 
   // Canvas mode actions
   enterCanvasMode: (schema?, positions?, filePath?) => {
