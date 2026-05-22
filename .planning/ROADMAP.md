@@ -35,8 +35,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Success Criteria** (what must be TRUE):
 
   1. User can click "Integration Explorer" on the home screen and enter a new full-screen mode
-  2. A top navigation bar appears consistent with schema/canvas modes, allowing switching between all modes
-  3. The explorer layout shows a sidebar area (empty) and a content area (empty placeholder)
+  2. A top navigation bar appears with Monocle branding, Home button, and Settings button (per D-01: users switch modes from the home screen, not from the nav bar)
+  3. The explorer layout shows a full-width content area with getting-started empty state (per D-06: sidebar deferred to Phase 2)
   4. User can return to the home screen or switch to other modes without losing app state
 
 **Plans**: 1 plan
