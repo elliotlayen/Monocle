@@ -241,7 +241,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Explorer Shell & Navigation | 1/1 | Complete   | 2026-05-22 |
+| 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
 | 2. Folder Sources & Tree Sidebar | 0/? | Not started | - |
 | 3. XML File Viewing | 0/? | Not started | - |
 | 4. Single-File Validation | 0/? | Not started | - |

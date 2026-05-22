@@ -17,7 +17,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **BRWS-06**: User can open multiple XML files in tabs, each maintaining its own view state
 - [ ] **BRWS-07**: User can copy a file's full path, open it in an external editor, copy raw content, or export/save a copy
 - [ ] **BRWS-08**: User can filter the client list by typing and pin favorite clients to the top of the tree
-- [ ] **BRWS-09**: Integration Explorer is accessible from the home screen as a new button and has a top navigation bar consistent with other modes
+- [x] **BRWS-09**: Integration Explorer is accessible from the home screen as a new button and has a top navigation bar consistent with other modes
 
 ### Validation
 
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BRWS-06 | Phase 3 | Pending |
 | BRWS-07 | Phase 3 | Pending |
 | BRWS-08 | Phase 2 | Pending |
-| BRWS-09 | Phase 1 | Pending |
+| BRWS-09 | Phase 1 | Complete |
 | VALD-01 | Phase 4 | Pending |
 | VALD-02 | Phase 4 | Pending |
 | VALD-03 | Phase 4 | Pending |
@@ -101,6 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MNTR-03 | Phase 10 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 26 total
 - Mapped to phases: 26
 - Unmapped: 0
