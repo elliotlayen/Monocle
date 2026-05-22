@@ -1,4 +1,5 @@
 import { tauri } from "@/services/tauri";
+import type { FolderSource } from "@/features/explorer/types";
 
 export type ThemeSetting = "dark" | "light" | "system";
 export type EdgeLabelMode = "auto" | "never" | "always";
@@ -9,6 +10,8 @@ export interface AppSettings {
   focusExpandThreshold?: number;
   edgeLabelMode?: EdgeLabelMode;
   showMiniMap?: boolean;
+  folderSources?: FolderSource[];
+  explorerSidebarWidth?: number;
 }
 
 export interface SettingsUpdate {
@@ -17,6 +20,8 @@ export interface SettingsUpdate {
   focusExpandThreshold?: number;
   edgeLabelMode?: EdgeLabelMode;
   showMiniMap?: boolean;
+  folderSources?: FolderSource[];
+  explorerSidebarWidth?: number;
 }
 
 export const settingsService = {
