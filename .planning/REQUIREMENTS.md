@@ -73,38 +73,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BRWS-01 | -- | Pending |
-| BRWS-02 | -- | Pending |
-| BRWS-03 | -- | Pending |
-| BRWS-04 | -- | Pending |
-| BRWS-05 | -- | Pending |
-| BRWS-06 | -- | Pending |
-| BRWS-07 | -- | Pending |
-| BRWS-08 | -- | Pending |
-| BRWS-09 | -- | Pending |
-| VALD-01 | -- | Pending |
-| VALD-02 | -- | Pending |
-| VALD-03 | -- | Pending |
-| VALD-04 | -- | Pending |
-| VALD-05 | -- | Pending |
-| VALD-06 | -- | Pending |
-| SRCH-01 | -- | Pending |
-| SRCH-02 | -- | Pending |
-| SRCH-03 | -- | Pending |
-| ANLS-01 | -- | Pending |
-| ANLS-02 | -- | Pending |
-| ANLS-03 | -- | Pending |
-| ANLS-04 | -- | Pending |
-| ANLS-05 | -- | Pending |
-| MNTR-01 | -- | Pending |
-| MNTR-02 | -- | Pending |
-| MNTR-03 | -- | Pending |
+| BRWS-01 | Phase 2 | Pending |
+| BRWS-02 | Phase 2 | Pending |
+| BRWS-03 | Phase 2 | Pending |
+| BRWS-04 | Phase 3 | Pending |
+| BRWS-05 | Phase 3 | Pending |
+| BRWS-06 | Phase 3 | Pending |
+| BRWS-07 | Phase 3 | Pending |
+| BRWS-08 | Phase 2 | Pending |
+| BRWS-09 | Phase 1 | Pending |
+| VALD-01 | Phase 4 | Pending |
+| VALD-02 | Phase 4 | Pending |
+| VALD-03 | Phase 4 | Pending |
+| VALD-04 | Phase 4 | Pending |
+| VALD-05 | Phase 5 | Pending |
+| VALD-06 | Phase 5 | Pending |
+| SRCH-01 | Phase 6 | Pending |
+| SRCH-02 | Phase 6 | Pending |
+| SRCH-03 | Phase 6 | Pending |
+| ANLS-01 | Phase 7 | Pending |
+| ANLS-02 | Phase 8 | Pending |
+| ANLS-03 | Phase 8 | Pending |
+| ANLS-04 | Phase 8 | Pending |
+| ANLS-05 | Phase 8 | Pending |
+| MNTR-01 | Phase 9 | Pending |
+| MNTR-02 | Phase 10 | Pending |
+| MNTR-03 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after initial definition*
+*Last updated: 2026-05-22 after roadmap creation*
