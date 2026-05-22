@@ -5,10 +5,13 @@ mod state;
 mod types;
 
 use commands::{
-    get_settings, list_databases_cmd, load_schema_cmd, load_schema_mock, save_settings,
-    set_menu_ui_state_cmd,
+    cancel_directory_cmd, check_path_reachable, get_settings, list_databases_cmd, list_directory_cmd,
+    load_schema_cmd, load_schema_mock, save_settings, set_menu_ui_state_cmd, toggle_favorite_cmd,
+    ExplorerState,
 };
 use state::AppState;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -27,6 +30,11 @@ pub fn run() {
             let state = AppState::new(app_data_dir);
             app.manage(state);
 
+            let explorer_state = ExplorerState {
+                active_listings: Mutex::new(HashMap::new()),
+            };
+            app.manage(explorer_state);
+
             // Setup native menu bar
             let menu = menu::setup_menu(app)?;
             app.set_menu(menu)?;
@@ -41,6 +49,10 @@ pub fn run() {
             get_settings,
             save_settings,
             set_menu_ui_state_cmd,
+            list_directory_cmd,
+            cancel_directory_cmd,
+            check_path_reachable,
+            toggle_favorite_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
