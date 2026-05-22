@@ -8,6 +8,7 @@ import type {
   AppSettings,
   SettingsUpdate,
 } from "@/features/settings/services/settings-service";
+import type { DirEntry } from "@/features/explorer/types";
 
 // Centralized error handling wrapper
 async function invokeCommand<T>(
@@ -46,4 +47,14 @@ export const tauri = {
     hasFocus: boolean;
     hasActiveFilters: boolean;
   }) => invokeCommand<void>("set_menu_ui_state_cmd", { state }),
+
+  // Explorer commands
+  listDirectory: (path: string, operationId: string) =>
+    invokeCommand<DirEntry[]>("list_directory_cmd", { path, operationId }),
+  cancelDirectory: (operationId: string) =>
+    invokeCommand<void>("cancel_directory_cmd", { operationId }),
+  checkPathReachable: (path: string) =>
+    invokeCommand<boolean>("check_path_reachable", { path }),
+  toggleFavorite: (sourceId: string, clientName: string) =>
+    invokeCommand<AppSettings>("toggle_favorite_cmd", { sourceId, clientName }),
 };
