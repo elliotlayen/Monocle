@@ -276,6 +276,9 @@ function App() {
     void performCanvasAction(action);
   }, [pendingCanvasAction, performCanvasAction]);
 
+  const showHome =
+    !schema && mode !== "canvas" && mode !== "explorer" && (!isConnected || !serverConnection);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -288,7 +291,7 @@ function App() {
       }
       if (mod && e.key === "e") {
         e.preventDefault();
-        if (!isExplorerMode) {
+        if (showHome) {
           handleEnterExplorer();
         }
       }
@@ -299,7 +302,7 @@ function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isCanvasMode, isExplorerMode, handleEnterCanvasMode, handleEnterExplorer, handleCanvasSave]);
+  }, [isCanvasMode, showHome, handleEnterCanvasMode, handleEnterExplorer, handleCanvasSave]);
 
   const menuHandlers = useMemo(
     () => ({
@@ -373,9 +376,6 @@ function App() {
       isMounted = false;
     };
   }, [hydrateSettings]);
-
-  const showHome =
-    !schema && mode !== "canvas" && mode !== "explorer" && (!isConnected || !serverConnection);
 
   return (
     <>
