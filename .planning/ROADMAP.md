@@ -14,7 +14,7 @@ The Integration Explorer transforms Monocle from a schema visualizer into a dual
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Explorer Shell & Navigation** - Mode entry point, layout shell, top nav integration with existing modes (completed 2026-05-22)
-- [ ] **Phase 2: Folder Sources & Tree Sidebar** - Configurable root folders, lazy-loading folder tree, date formatting, client filtering and favorites
+- [x] **Phase 2: Folder Sources & Tree Sidebar** - Configurable root folders, lazy-loading folder tree, date formatting, client filtering and favorites (completed 2026-05-26)
 - [ ] **Phase 3: XML File Viewing** - Tree view, syntax-highlighted source view, tabbed multi-file interface, file actions
 - [ ] **Phase 4: Single-File Validation** - Illegal character detection, problem badges in tree, problems panel, inline source highlighting
 - [ ] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export
@@ -66,8 +66,8 @@ Plans:
 Plans:
 
 - [x] 02-01-PLAN.md -- Rust backend (FolderSource model, directory listing with timeout/cancel, favorites), frontend types, Zustand store, IPC services, utility functions, and tests
-- [ ] 02-02-PLAN.md -- Settings Folder Sources section (CRUD, drag-to-reorder, browse, path validation), updated empty state messaging
-- [ ] 02-03-PLAN.md -- Tree sidebar (lazy-loading tree, date formatting, filter bar, favorites with star/context-menu, sort toggle, resize/collapse), visual verification
+- [x] 02-02-PLAN.md -- Settings Folder Sources section (CRUD, drag-to-reorder, browse, path validation), updated empty state messaging
+- [x] 02-03-PLAN.md -- Tree sidebar (lazy-loading tree, date formatting, filter bar, favorites with star/context-menu, sort toggle, resize/collapse), visual verification
 
 **UI hint**: yes
 
@@ -244,7 +244,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
-| 2. Folder Sources & Tree Sidebar | 1/3 | In Progress|  |
+| 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
 | 3. XML File Viewing | 0/? | Not started | - |
 | 4. Single-File Validation | 0/? | Not started | - |
 | 5. Bulk Validation & Reporting | 0/? | Not started | - |
