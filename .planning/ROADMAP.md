@@ -126,6 +126,17 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 04.1: Generic folder tree refactor - remove hardcoded hierarchy and fix stale node references (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 4
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 04.1 to break down)
+
 ### Phase 5: Bulk Validation & Reporting
 
 **Goal**: Users can scan an entire folder or client's files for problems in one action and export the results for sharing or tracking

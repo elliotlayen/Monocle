@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-05-26T18:53:56.603Z"
+last_updated: "2026-05-26T20:30:16.786Z"
 last_activity: 2026-05-26 -- Phase 04 execution started
 progress:
-  total_phases: 10
-  completed_phases: 3
+  total_phases: 11
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 7
-  percent: 30
+  completed_plans: 9
+  percent: 36
 ---
 
 # Project State
@@ -62,6 +62,10 @@ Recent decisions affecting current work:
 
 - [Roadmap]: 10 phases derived from 26 requirements at fine granularity; browsing foundation first, validation second, search third, analytics/comparison fourth, monitoring last
 - [Roadmap]: Research recommends quick-xml, encoding_rs, react-arborist, recharts; all I/O patterns (async + timeout + streaming) established in Phase 1-2
+
+### Roadmap Evolution
+
+- Phase 04.1 inserted after Phase 04 (URGENT): Generic folder tree refactor - remove hardcoded hierarchy and fix stale node references. Work already completed in commits c139b20, 7b273d6.
 
 ### Pending Todos
 
