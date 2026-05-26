@@ -291,7 +291,7 @@ function App() {
       }
       if (mod && e.key === "e") {
         e.preventDefault();
-        if (showHome) {
+        if (!isExplorerMode) {
           handleEnterExplorer();
         }
       }
@@ -302,7 +302,7 @@ function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isCanvasMode, showHome, handleEnterCanvasMode, handleEnterExplorer, handleCanvasSave]);
+  }, [isCanvasMode, isExplorerMode, handleEnterCanvasMode, handleEnterExplorer, handleCanvasSave]);
 
   const menuHandlers = useMemo(
     () => ({
@@ -376,6 +376,7 @@ function App() {
       isMounted = false;
     };
   }, [hydrateSettings]);
+
 
   return (
     <>
