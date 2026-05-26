@@ -602,7 +602,7 @@ return (
 | A2 | DOMParser handles all XML node types (CDATA, PI, comments) correctly in the Tauri webview (WebKit on macOS, WebView2 on Windows) | Architecture Patterns | LOW -- DOMParser is a well-established web standard; unlikely to have issues in modern webviews |
 | A3 | `std::fs::read_to_string` with 30s timeout is sufficient for VPN-accessed network share files | Pitfalls | MEDIUM -- very large files may take longer; but 30s aligns with the directory listing pattern |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Maximum file size handling**
    - What we know: D-04 says read entirely into memory, no streaming. DOMParser is synchronous.
