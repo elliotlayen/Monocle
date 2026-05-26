@@ -8,7 +8,7 @@ import type {
   AppSettings,
   SettingsUpdate,
 } from "@/features/settings/services/settings-service";
-import type { DirEntry } from "@/features/explorer/types";
+import type { DirEntry, FileContent } from "@/features/explorer/types";
 
 // Centralized error handling wrapper
 async function invokeCommand<T>(
@@ -57,4 +57,6 @@ export const tauri = {
     invokeCommand<boolean>("check_path_reachable", { path }),
   toggleFavorite: (sourceId: string, clientName: string) =>
     invokeCommand<AppSettings>("toggle_favorite_cmd", { sourceId, clientName }),
+  readFile: (path: string) =>
+    invokeCommand<FileContent>("read_file_cmd", { path }),
 };

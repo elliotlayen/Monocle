@@ -1,5 +1,5 @@
 import { tauri } from "@/services/tauri";
-import type { DirEntry } from "../types";
+import type { DirEntry, FileContent } from "../types";
 import type { AppSettings } from "@/features/settings/services/settings-service";
 
 export const explorerService = {
@@ -16,4 +16,6 @@ export const explorerService = {
     sourceId: string,
     clientName: string
   ): Promise<AppSettings> => tauri.toggleFavorite(sourceId, clientName),
+
+  readFile: (path: string): Promise<FileContent> => tauri.readFile(path),
 };

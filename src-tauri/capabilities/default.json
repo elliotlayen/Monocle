@@ -13,6 +13,8 @@
     "fs:allow-write-text-file",
     "fs:allow-write-file",
     "fs:allow-read-file",
-    "fs:allow-read-text-file"
+    "fs:allow-read-text-file",
+    "opener:allow-open-path",
+    "clipboard-manager:allow-write-text"
   ]
 }

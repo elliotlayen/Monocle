@@ -102,6 +102,31 @@ pub fn cancel_directory_cmd(
     Ok(())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileContent {
+    pub content: String,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub async fn read_file_cmd(path: String) -> Result<FileContent, String> {
+    tokio::time::timeout(
+        Duration::from_secs(30),
+        tokio::task::spawn_blocking(move || {
+            let metadata = std::fs::metadata(&path)
+                .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
+            let size = metadata.len();
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
+            Ok(FileContent { content, size })
+        }),
+    )
+    .await
+    .map_err(|_| "File read timed out after 30 seconds".to_string())?
+    .map_err(|e| format!("File read task failed: {}", e))?
+}
+
 #[tauri::command]
 pub async fn check_path_reachable(path: String) -> Result<bool, String> {
     let result = tokio::task::spawn_blocking(move || std::fs::metadata(&path).is_ok())

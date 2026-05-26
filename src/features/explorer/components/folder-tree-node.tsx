@@ -39,6 +39,7 @@ interface FolderTreeNodeProps {
   onCollapse: (nodeId: string) => void;
   onCancel: (nodeId: string) => void;
   onToggleFavorite: (sourceId: string, clientName: string) => void;
+  onFileClick: (filePath: string) => void;
 }
 
 export function FolderTreeNode({
@@ -50,6 +51,7 @@ export function FolderTreeNode({
   onCollapse,
   onCancel,
   onToggleFavorite,
+  onFileClick,
 }: FolderTreeNodeProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -242,11 +244,11 @@ export function FolderTreeNode({
         "group flex items-center gap-1 w-full rounded",
         rowPadding,
         !isFile && "hover:bg-muted cursor-pointer",
-        isFile && "cursor-default",
+        isFile && "hover:bg-muted cursor-pointer",
         isError && "text-muted-foreground opacity-60"
       )}
       style={{ paddingLeft: `${depth * 16}px` }}
-      onClick={!isFile ? handleToggle : undefined}
+      onClick={isFile ? () => onFileClick(node.path) : handleToggle}
     >
       {renderChevron()}
       {renderIcon()}
@@ -286,8 +288,9 @@ export function FolderTreeNode({
 }
 
 // Subcomponent: Source node with tag badge support
-interface FolderTreeSourceNodeProps extends FolderTreeNodeProps {
+interface FolderTreeSourceNodeProps extends Omit<FolderTreeNodeProps, "onFileClick"> {
   tag?: string;
+  onFileClick: (filePath: string) => void;
 }
 
 export function FolderTreeSourceNode({
