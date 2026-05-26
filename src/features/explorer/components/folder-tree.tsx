@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useExplorerStore } from "../store";
@@ -30,6 +30,10 @@ export function FolderTree() {
       toggleFavorite: state.toggleFavorite,
     }))
   );
+
+  const handleFileClick = useCallback((filePath: string) => {
+    useExplorerStore.getState().openFile(filePath);
+  }, []);
 
   // Build visible tree from root nodes in source order
   const rootNodes = useMemo(() => {
@@ -126,6 +130,7 @@ export function FolderTree() {
                   onCollapse={collapseNode}
                   onCancel={cancelLoad}
                   onToggleFavorite={toggleFavorite}
+                  onFileClick={handleFileClick}
                 />
                 {renderChildren(child, depth + 1, sourceId)}
               </div>
@@ -145,6 +150,7 @@ export function FolderTree() {
               onCollapse={collapseNode}
               onCancel={cancelLoad}
               onToggleFavorite={toggleFavorite}
+              onFileClick={handleFileClick}
             />
             {renderChildren(child, depth + 1, sourceId)}
           </div>
@@ -189,6 +195,7 @@ export function FolderTree() {
                 onCollapse={collapseNode}
                 onCancel={cancelLoad}
                 onToggleFavorite={toggleFavorite}
+                onFileClick={handleFileClick}
                 tag={source?.tag}
               />
               {renderChildren(root, 0, root.id)}

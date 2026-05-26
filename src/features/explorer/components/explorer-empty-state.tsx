@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FolderSync, Settings } from "lucide-react";
 import { useExplorerStore } from "@/features/explorer/store";
@@ -9,16 +8,11 @@ interface ExplorerEmptyStateProps {
 }
 
 export function ExplorerEmptyState({ onOpenSettings }: ExplorerEmptyStateProps) {
-  const { folderSources, loadSources } = useExplorerStore(
+  const { folderSources } = useExplorerStore(
     useShallow((state) => ({
       folderSources: state.folderSources,
-      loadSources: state.loadSources,
     }))
   );
-
-  useEffect(() => {
-    loadSources();
-  }, [loadSources]);
 
   const hasSources = folderSources.length > 0;
 
@@ -29,7 +23,7 @@ export function ExplorerEmptyState({ onOpenSettings }: ExplorerEmptyStateProps) 
         <h2 className="text-xl font-semibold">Integration Explorer</h2>
         <p className="max-w-sm text-sm text-muted-foreground">
           {hasSources
-            ? "Expand a source in the sidebar to browse folders."
+            ? "Click a file in the sidebar to open it."
             : "Add a folder source in Settings to get started."}
         </p>
         {!hasSources && (

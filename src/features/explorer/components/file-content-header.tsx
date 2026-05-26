@@ -1,0 +1,120 @@
+import { FileCode, FileText, TreePine, Code, Copy, ClipboardCopy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useExplorerStore } from "../store";
+import { formatFileSize } from "../utils/file-size-format";
+import type { FileTab } from "../types";
+
+interface FileContentHeaderProps {
+  tab: FileTab;
+}
+
+export function FileContentHeader({ tab }: FileContentHeaderProps) {
+  const setViewMode = useExplorerStore((state) => state.setViewMode);
+
+  const fileIcon = tab.isXml ? (
+    <FileCode className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+  ) : (
+    <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+  );
+
+  const fileSizeDisplay = tab.isLoading
+    ? "--"
+    : formatFileSize(tab.fileSize);
+
+  return (
+    <div className="flex items-center gap-2 px-4 h-10 border-b bg-muted/50">
+      {/* Left section */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {fileIcon}
+        <span className="text-sm font-semibold truncate">{tab.fileName}</span>
+        <span className="text-xs text-muted-foreground flex-shrink-0 ml-1">
+          {fileSizeDisplay}
+        </span>
+      </div>
+
+      {/* Tree/Source toggle -- only for XML files */}
+      {tab.isXml && (
+        <div className="flex items-center h-7 rounded-md bg-muted border">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={cn(
+                    "px-2.5 h-full flex items-center gap-1.5 text-xs rounded-sm",
+                    tab.viewMode === "tree"
+                      ? "bg-background shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                    tab.parseError && tab.viewMode !== "tree" && "opacity-50 cursor-not-allowed"
+                  )}
+                  onClick={() => {
+                    if (!tab.parseError) {
+                      setViewMode(tab.id, "tree");
+                    }
+                  }}
+                  disabled={tab.parseError}
+                >
+                  <TreePine className="h-3.5 w-3.5" />
+                  Tree
+                </button>
+              </TooltipTrigger>
+              {tab.parseError && (
+                <TooltipContent>
+                  <p>Unable to parse XML</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+          <button
+            className={cn(
+              "px-2.5 h-full flex items-center gap-1.5 text-xs rounded-sm",
+              tab.viewMode === "source"
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setViewMode(tab.id, "source")}
+          >
+            <Code className="h-3.5 w-3.5" />
+            Source
+          </button>
+        </div>
+      )}
+
+      {/* Right section: action buttons */}
+      <Separator orientation="vertical" className="h-5" />
+      <div className="flex items-center gap-1">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Copy file path</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <ClipboardCopy className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Copy raw content</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
+  );
+}
