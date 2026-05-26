@@ -88,7 +88,12 @@ Plans:
 
 Plans:
 
+**Wave 1**
+
 - [ ] 03-01-PLAN.md -- Rust read_file_cmd, clipboard plugin, types/store/services, tab bar, content area, Monaco XML source view, shell wiring, sidebar file click
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 03-02-PLAN.md -- XML parser utility, collapsible tree view with element/attribute/text/comment/PI/CDATA rendering, parse error handling
 - [ ] 03-03-PLAN.md -- File actions hook (clipboard, external editor, save copy), context menus on tabs and sidebar files
 
