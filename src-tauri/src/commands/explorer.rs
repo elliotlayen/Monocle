@@ -1,4 +1,6 @@
 use crate::state::{AppSettings, AppState};
+use crate::validation::{detect_and_decode, validate_characters};
+use crate::validation::validator::ValidationProblem;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -107,6 +109,9 @@ pub fn cancel_directory_cmd(
 pub struct FileContent {
     pub content: String,
     pub size: u64,
+    pub problems: Vec<ValidationProblem>,
+    pub encoding: String,
+    pub has_bom: bool,
 }
 
 #[tauri::command]
@@ -117,9 +122,24 @@ pub async fn read_file_cmd(path: String) -> Result<FileContent, String> {
             let metadata = std::fs::metadata(&path)
                 .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
             let size = metadata.len();
-            let content = std::fs::read_to_string(&path)
+            let raw_bytes = std::fs::read(&path)
                 .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
-            Ok(FileContent { content, size })
+
+            let decode_result = detect_and_decode(&raw_bytes);
+            let problems = validate_characters(
+                &decode_result.content,
+                decode_result.had_errors,
+                &decode_result.encoding_name,
+                decode_result.has_bom,
+            );
+
+            Ok(FileContent {
+                content: decode_result.content,
+                size,
+                problems,
+                encoding: decode_result.encoding_name,
+                has_bom: decode_result.has_bom,
+            })
         }),
     )
     .await
