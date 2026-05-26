@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Explorer Shell & Navigation** - Mode entry point, layout shell, top nav integration with existing modes (completed 2026-05-22)
 - [x] **Phase 2: Folder Sources & Tree Sidebar** - Configurable root folders, lazy-loading folder tree, date formatting, client filtering and favorites (completed 2026-05-26)
-- [ ] **Phase 3: XML File Viewing** - Tree view, syntax-highlighted source view, tabbed multi-file interface, file actions
+- [x] **Phase 3: XML File Viewing** - Tree view, syntax-highlighted source view, tabbed multi-file interface, file actions (completed 2026-05-26)
 - [ ] **Phase 4: Single-File Validation** - Illegal character detection, problem badges in tree, problems panel, inline source highlighting
 - [ ] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export
 - [ ] **Phase 6: Search** - Filename filtering, XML content search, configurable search scope
@@ -90,12 +90,12 @@ Plans:
 
 **Wave 1**
 
-- [ ] 03-01-PLAN.md -- Rust read_file_cmd, clipboard plugin, types/store/services, tab bar, content area, Monaco XML source view, shell wiring, sidebar file click
+- [x] 03-01-PLAN.md -- Rust read_file_cmd, clipboard plugin, types/store/services, tab bar, content area, Monaco XML source view, shell wiring, sidebar file click
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2**
 
-- [ ] 03-02-PLAN.md -- XML parser utility, collapsible tree view with element/attribute/text/comment/PI/CDATA rendering, parse error handling
-- [ ] 03-03-PLAN.md -- File actions hook (clipboard, external editor, save copy), context menus on tabs and sidebar files
+- [x] 03-02-PLAN.md -- XML parser utility, collapsible tree view with element/attribute/text/comment/PI/CDATA rendering, parse error handling
+- [x] 03-03-PLAN.md -- File actions hook (clipboard, external editor, save copy), context menus on tabs and sidebar files
 
 **UI hint**: yes
 
@@ -252,7 +252,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 |-------|----------------|--------|-----------|
 | 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
 | 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
-| 3. XML File Viewing | 0/3 | Not started | - |
+| 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
 | 4. Single-File Validation | 0/? | Not started | - |
 | 5. Bulk Validation & Reporting | 0/? | Not started | - |
 | 6. Search | 0/? | Not started | - |
