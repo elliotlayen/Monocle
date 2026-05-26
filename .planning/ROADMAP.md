@@ -112,11 +112,17 @@ Plans:
   3. A problems panel lists all issues with line number, column, description, and severity, and clicking an issue jumps to that location in the source view
   4. In source view, affected lines have gutter markers and bad characters are highlighted inline
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] 04-01: TBD
+**Wave 1**
+
+- [ ] 04-01-PLAN.md -- Rust validation engine (encoding detection, character scanning), extended read_file_cmd IPC, frontend types/store/service wiring, tree badges
+
+**Wave 2**
+
+- [ ] 04-02-PLAN.md -- Problems panel, validation status bar, drag-resizable layout, Monaco decorations (gutter markers, inline highlights, overview ruler), click-to-jump navigation
 
 **UI hint**: yes
 
@@ -253,7 +259,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
 | 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
-| 4. Single-File Validation | 0/? | Not started | - |
+| 4. Single-File Validation | 0/2 | Planned | - |
 | 5. Bulk Validation & Reporting | 0/? | Not started | - |
 | 6. Search | 0/? | Not started | - |
 | 7. File Comparison | 0/? | Not started | - |
