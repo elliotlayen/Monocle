@@ -118,7 +118,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 04-01-PLAN.md -- Rust validation engine (encoding detection, character scanning), extended read_file_cmd IPC, frontend types/store/service wiring, tree badges
+- [x] 04-01-PLAN.md -- Rust validation engine (encoding detection, character scanning), extended read_file_cmd IPC, frontend types/store/service wiring, tree badges
 
 **Wave 2**
 
@@ -259,7 +259,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
 | 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
-| 4. Single-File Validation | 0/2 | Planned | - |
+| 4. Single-File Validation | 1/2 | In Progress|  |
 | 5. Bulk Validation & Reporting | 0/? | Not started | - |
 | 6. Search | 0/? | Not started | - |
 | 7. File Comparison | 0/? | Not started | - |
