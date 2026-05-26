@@ -8,7 +8,13 @@ vi.mock("./services/explorer-service", () => ({
     cancelDirectory: vi.fn(),
     checkPathReachable: vi.fn(),
     toggleFavorite: vi.fn(),
-    readFile: vi.fn().mockResolvedValue({ content: "<root/>", size: 7 }),
+    readFile: vi.fn().mockResolvedValue({
+      content: "<root/>",
+      size: 7,
+      problems: [],
+      encoding: "UTF-8",
+      hasBom: false,
+    }),
   },
 }));
 
@@ -24,12 +30,24 @@ vi.mock("@/features/notifications/store", () => ({
 }));
 
 describe("explorer store - tab management", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     useExplorerStore.setState({
       tabs: [],
       activeTabId: null,
+      validationCache: new Map(),
+      problemsPanelOpen: false,
+      pendingJump: null,
     });
     vi.clearAllMocks();
+    // Re-establish default readFile mock after clearAllMocks
+    const { explorerService } = await import("./services/explorer-service");
+    vi.mocked(explorerService.readFile).mockResolvedValue({
+      content: "<root/>",
+      size: 7,
+      problems: [],
+      encoding: "UTF-8",
+      hasBom: false,
+    });
   });
 
   describe("openFile", () => {
@@ -195,6 +213,9 @@ describe("explorer store - tab management", () => {
       vi.mocked(explorerService.readFile).mockResolvedValueOnce({
         content: "<root><unclosed>",
         size: 16,
+        problems: [],
+        encoding: "UTF-8",
+        hasBom: false,
       });
 
       await useExplorerStore.getState().openFile("/path/to/bad.xml");
@@ -209,6 +230,9 @@ describe("explorer store - tab management", () => {
       vi.mocked(explorerService.readFile).mockResolvedValueOnce({
         content: "<root/>",
         size: 7,
+        problems: [],
+        encoding: "UTF-8",
+        hasBom: false,
       });
 
       await useExplorerStore.getState().openFile("/path/to/good.xml");
@@ -222,6 +246,9 @@ describe("explorer store - tab management", () => {
       vi.mocked(explorerService.readFile).mockResolvedValueOnce({
         content: "plain text",
         size: 10,
+        problems: [],
+        encoding: "UTF-8",
+        hasBom: false,
       });
 
       await useExplorerStore.getState().openFile("/path/to/readme.txt");
