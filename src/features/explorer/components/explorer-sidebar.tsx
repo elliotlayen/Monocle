@@ -60,7 +60,7 @@ export function ExplorerSidebar() {
       {/* Inner container with fixed width to prevent content reflow */}
       <div
         className="flex flex-col h-full"
-        style={{ width: sidebarWidth }}
+        style={{ width: sidebarOpen ? width : sidebarWidth }}
       >
         {/* Header */}
         <div className="flex-shrink-0 border-b p-3">
