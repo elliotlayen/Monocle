@@ -1,4 +1,4 @@
-import { FileCode, FileText, TreePine, Code, Copy, ClipboardCopy } from "lucide-react";
+import { FileCode, FileText, TreePine, Code, Copy, ClipboardCopy, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -15,9 +15,11 @@ import type { FileTab } from "../types";
 
 interface FileContentHeaderProps {
   tab: FileTab;
+  onExpandAll?: () => void;
+  onCollapseAll?: () => void;
 }
 
-export function FileContentHeader({ tab }: FileContentHeaderProps) {
+export function FileContentHeader({ tab, onExpandAll, onCollapseAll }: FileContentHeaderProps) {
   const setViewMode = useExplorerStore((state) => state.setViewMode);
   const { copyPath, copyContent } = useFileActions();
 
@@ -86,6 +88,36 @@ export function FileContentHeader({ tab }: FileContentHeaderProps) {
             <Code className="h-3.5 w-3.5" />
             Source
           </button>
+        </div>
+      )}
+
+      {/* Expand/Collapse all -- only when tree view is active */}
+      {onExpandAll && onCollapseAll && (
+        <div className="flex items-center gap-0.5">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onExpandAll}>
+                  <ChevronsUpDown className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Expand all</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onCollapseAll}>
+                  <ChevronsDownUp className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Collapse all</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
 

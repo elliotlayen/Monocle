@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
@@ -10,17 +10,50 @@ interface XmlSourceViewProps {
   tabId: string;
   scrollPosition: number;
   onScrollChange: (position: number) => void;
+  savedViewState: unknown | null;
+  onViewStateChange: (state: unknown | null) => void;
 }
 
-export function XmlSourceView({
+export interface XmlSourceViewHandle {
+  foldAll: () => void;
+  unfoldAll: () => void;
+}
+
+export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>(function XmlSourceView({
   content,
   isXml,
   tabId,
   scrollPosition,
   onScrollChange,
-}: XmlSourceViewProps) {
+  savedViewState,
+  onViewStateChange,
+}, ref) {
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const [isMonacoReady, setIsMonacoReady] = useState(false);
   const resolvedTheme = useResolvedTheme();
+
+  const onViewStateChangeRef = useRef(onViewStateChange);
+  onViewStateChangeRef.current = onViewStateChange;
+  const savedViewStateRef = useRef(savedViewState);
+  savedViewStateRef.current = savedViewState;
+
+  useImperativeHandle(ref, () => ({
+    foldAll() {
+      editorRef.current?.getAction("editor.foldAll")?.run();
+    },
+    unfoldAll() {
+      editorRef.current?.getAction("editor.unfoldAll")?.run();
+    },
+  }));
+
+  useEffect(() => {
+    return () => {
+      if (editorRef.current) {
+        onViewStateChangeRef.current(editorRef.current.saveViewState());
+      }
+    };
+  }, []);
+
   const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const scrollPositionRef = useRef(scrollPosition);
 
@@ -73,7 +106,13 @@ export function XmlSourceView({
   );
 
   const handleEditorMount: OnMount = (editorInstance) => {
-    editorInstance.setScrollTop(scrollPositionRef.current);
+    editorRef.current = editorInstance;
+
+    if (savedViewStateRef.current) {
+      editorInstance.restoreViewState(savedViewStateRef.current as editor.ICodeEditorViewState);
+    } else {
+      editorInstance.setScrollTop(scrollPositionRef.current);
+    }
 
     editorInstance.onDidScrollChange((e) => {
       onScrollChange(e.scrollTop);
@@ -100,4 +139,4 @@ export function XmlSourceView({
       )}
     </div>
   );
-}
+});

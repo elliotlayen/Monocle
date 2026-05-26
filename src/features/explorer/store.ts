@@ -38,6 +38,8 @@ interface ExplorerStore {
   setActiveTab: (tabId: string) => void;
   setViewMode: (tabId: string, mode: ViewMode) => void;
   setScrollPosition: (tabId: string, view: ViewMode, position: number) => void;
+  setTreeExpandedIds: (tabId: string, ids: string[]) => void;
+  setMonacoViewState: (tabId: string, state: unknown | null) => void;
 }
 
 function buildChildNodes(
@@ -343,6 +345,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       fileSize: 0,
       viewMode: "source",
       scrollPosition: { source: 0, tree: 0 },
+      treeExpandedIds: [],
+      monacoViewState: null,
       isXml,
       parseError: false,
       isLoading: true,
@@ -443,6 +447,22 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       t.id === tabId
         ? { ...t, scrollPosition: { ...t.scrollPosition, [view]: position } }
         : t
+    );
+    set({ tabs: updated });
+  },
+
+  setTreeExpandedIds: (tabId: string, ids: string[]) => {
+    const { tabs } = get();
+    const updated = tabs.map((t) =>
+      t.id === tabId ? { ...t, treeExpandedIds: ids } : t
+    );
+    set({ tabs: updated });
+  },
+
+  setMonacoViewState: (tabId: string, state: unknown | null) => {
+    const { tabs } = get();
+    const updated = tabs.map((t) =>
+      t.id === tabId ? { ...t, monacoViewState: state } : t
     );
     set({ tabs: updated });
   },
