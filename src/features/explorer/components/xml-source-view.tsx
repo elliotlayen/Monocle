@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { ensureMonacoXmlLoaded } from "@/lib/monaco-xml-loader";
+import { useValidationDecorations } from "../hooks/use-validation-decorations";
+import type { ValidationProblem } from "../types";
 
 interface XmlSourceViewProps {
   content: string;
@@ -12,6 +14,9 @@ interface XmlSourceViewProps {
   onScrollChange: (position: number) => void;
   savedViewState: unknown | null;
   onViewStateChange: (state: unknown | null) => void;
+  problems?: ValidationProblem[];
+  pendingJump?: { tabId: string; line: number; column: number } | null;
+  onJumpHandled?: () => void;
 }
 
 export interface XmlSourceViewHandle {
@@ -27,8 +32,12 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
   onScrollChange,
   savedViewState,
   onViewStateChange,
+  problems,
+  pendingJump,
+  onJumpHandled,
 }, ref) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const [editorMounted, setEditorMounted] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [isMonacoReady, setIsMonacoReady] = useState(false);
   const resolvedTheme = useResolvedTheme();
 
@@ -77,6 +86,29 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
     };
   }, []);
 
+  // Apply Monaco decorations for validation problems
+  useValidationDecorations(editorMounted, problems ?? []);
+
+  // Handle pending jump from problems panel click
+  const onJumpHandledRef = useRef(onJumpHandled);
+  onJumpHandledRef.current = onJumpHandled;
+
+  const stableOnJumpHandled = useCallback(() => {
+    onJumpHandledRef.current?.();
+  }, []);
+
+  useEffect(() => {
+    if (pendingJump && pendingJump.tabId === tabId && editorMounted) {
+      editorMounted.setPosition({
+        lineNumber: pendingJump.line,
+        column: pendingJump.column,
+      });
+      editorMounted.revealLineInCenterIfOutsideViewport(pendingJump.line);
+      editorMounted.focus();
+      stableOnJumpHandled();
+    }
+  }, [pendingJump, tabId, editorMounted, stableOnJumpHandled]);
+
   const options = useMemo<editor.IStandaloneEditorConstructionOptions>(
     () => ({
       readOnly: true,
@@ -85,7 +117,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
       lineNumbers: "on",
       lineNumbersMinChars: 3,
       folding: true,
-      glyphMargin: false,
+      glyphMargin: true,
       scrollBeyondLastLine: false,
       wordWrap: "on",
       automaticLayout: true,
@@ -93,7 +125,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
       lineHeight: 20,
       fontFamily:
         "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
-      overviewRulerLanes: 0,
+      overviewRulerLanes: 2,
       renderLineHighlight: "line",
       contextmenu: false,
       padding: { top: 8, bottom: 8 },
@@ -107,6 +139,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
 
   const handleEditorMount: OnMount = (editorInstance) => {
     editorRef.current = editorInstance;
+    setEditorMounted(editorInstance);
 
     if (savedViewStateRef.current) {
       editorInstance.restoreViewState(savedViewStateRef.current as editor.ICodeEditorViewState);
