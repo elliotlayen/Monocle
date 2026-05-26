@@ -74,7 +74,7 @@ export function FolderTreeNode({
   }, [node.loadState]);
 
   const handleToggle = () => {
-    if (node.type === "file") return;
+    if (!node.isDir) return;
     if (isExpanded) {
       onCollapse(node.id);
     } else {
@@ -86,14 +86,14 @@ export function FolderTreeNode({
   const isClient = node.type === "client";
   const isDate = node.type === "date";
   const isFolder = node.type === "folder";
-  const isFile = node.type === "file";
+  const isFile = !node.isDir;
   const isLoading = node.loadState === "loading";
   const isError = node.loadState === "error";
 
   const rowPadding = isSource ? "py-1.5" : "py-1";
 
   const renderChevron = () => {
-    if (isFile) return null;
+    if (!node.isDir) return null;
 
     if (isLoading) {
       return (
@@ -130,17 +130,21 @@ export function FolderTreeNode({
       return <Folder className={cn(iconSize, "flex-shrink-0")} />;
     }
 
-    if (isFile) {
-      const isXml = node.name.toLowerCase().endsWith(".xml");
-      if (isXml) {
-        return <FileCode className="h-3.5 w-3.5 flex-shrink-0" />;
+    if (node.isDir) {
+      const iconSize = "h-3.5 w-3.5";
+      if (isExpanded) {
+        return <FolderOpen className={cn(iconSize, "flex-shrink-0")} />;
       }
-      return (
-        <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-      );
+      return <Folder className={cn(iconSize, "flex-shrink-0")} />;
     }
 
-    return null;
+    const isXml = node.name.toLowerCase().endsWith(".xml");
+    if (isXml) {
+      return <FileCode className="h-3.5 w-3.5 flex-shrink-0" />;
+    }
+    return (
+      <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+    );
   };
 
   const renderName = () => {
@@ -262,7 +266,7 @@ export function FolderTreeNode({
         isError && "text-muted-foreground opacity-60"
       )}
       style={{ paddingLeft: `${depth * 16}px` }}
-      onClick={isFile ? () => onFileClick(node.path) : handleToggle}
+      onClick={node.isDir ? handleToggle : () => onFileClick(node.path)}
     >
       {renderChevron()}
       {renderIcon()}

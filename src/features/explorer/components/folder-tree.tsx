@@ -85,14 +85,12 @@ export function FolderTree() {
         .sort((a, b) => a.name.localeCompare(b.name));
     } else if (node.type === "client") {
       sortedChildren = sortDateChildren(node.children);
-    } else if (node.type === "date" || node.type === "folder") {
+    } else {
       const dirs = node.children.filter((c) => c.isDir);
       const files = node.children.filter((c) => !c.isDir);
       dirs.sort((a, b) => a.name.localeCompare(b.name));
       files.sort((a, b) => a.name.localeCompare(b.name));
       sortedChildren = [...dirs, ...files];
-    } else {
-      sortedChildren = node.children;
     }
 
     // Get favorites for this source
