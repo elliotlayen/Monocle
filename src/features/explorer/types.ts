@@ -30,9 +30,23 @@ export interface DirEntry {
 
 export type ViewMode = "source" | "tree";
 
+export interface ValidationProblem {
+  line: number;
+  column: number;
+  endColumn: number;
+  message: string;
+  severity: "error" | "warning";
+  code: string;
+}
+
+export type ValidationStatus = "error" | "warning" | "clean";
+
 export interface FileContent {
   content: string;
   size: number;
+  problems: ValidationProblem[];
+  encoding: string;
+  hasBom: boolean;
 }
 
 export interface FileTab {
@@ -48,4 +62,7 @@ export interface FileTab {
   isXml: boolean;
   parseError: boolean;
   isLoading: boolean;
+  problems: ValidationProblem[];
+  encoding: string;
+  hasBom: boolean;
 }

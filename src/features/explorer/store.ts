@@ -1,5 +1,13 @@
 import { create } from "zustand";
-import type { FolderSource, TreeNode, DirEntry, FileTab, ViewMode } from "./types";
+import type {
+  FolderSource,
+  TreeNode,
+  DirEntry,
+  FileTab,
+  ViewMode,
+  ValidationProblem,
+  ValidationStatus,
+} from "./types";
 import { explorerService } from "./services/explorer-service";
 import { settingsService } from "@/features/settings/services/settings-service";
 import { showToast } from "@/features/notifications/store";
@@ -18,6 +26,13 @@ interface ExplorerStore {
   sidebarWidth: number;
   tabs: FileTab[];
   activeTabId: string | null;
+  validationCache: Map<
+    string,
+    { problems: ValidationProblem[]; encoding: string; hasBom: boolean }
+  >;
+  problemsPanelOpen: boolean;
+  problemsPanelHeight: number;
+  pendingJump: { tabId: string; line: number; column: number } | null;
 
   // Actions
   loadSources: () => Promise<void>;
@@ -40,6 +55,11 @@ interface ExplorerStore {
   setScrollPosition: (tabId: string, view: ViewMode, position: number) => void;
   setTreeExpandedIds: (tabId: string, ids: string[]) => void;
   setMonacoViewState: (tabId: string, state: unknown | null) => void;
+  toggleProblemsPanel: () => void;
+  setProblemsPanelHeight: (height: number) => void;
+  jumpToProblem: (tabId: string, line: number, column: number) => void;
+  clearPendingJump: () => void;
+  getValidationStatus: (filePath: string) => ValidationStatus | undefined;
 }
 
 function buildChildNodes(
@@ -110,6 +130,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   sidebarWidth: 280,
   tabs: [],
   activeTabId: null,
+  validationCache: new Map(),
+  problemsPanelOpen: false,
+  problemsPanelHeight: 200,
+  pendingJump: null,
 
   loadSources: async () => {
     try {
@@ -328,7 +352,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     // Check if tab already exists -- switch to it (D-14)
     const existing = tabs.find((t) => t.filePath === filePath);
     if (existing) {
-      set({ activeTabId: existing.id });
+      // Auto-show problems panel if cached validation has problems (D-02)
+      const cached = get().validationCache.get(filePath);
+      if (cached && cached.problems.length > 0) {
+        set({ activeTabId: existing.id, problemsPanelOpen: true });
+      } else {
+        set({ activeTabId: existing.id });
+      }
       return;
     }
 
@@ -350,6 +380,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       isXml,
       parseError: false,
       isLoading: true,
+      problems: [],
+      encoding: "",
+      hasBom: false,
     };
 
     const updatedTabs = recomputeTabNames([...tabs, newTab]);
@@ -374,10 +407,27 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         fileSize: result.size,
         isLoading: false,
         parseError,
+        problems: result.problems,
+        encoding: result.encoding,
+        hasBom: result.hasBom,
         ...(parseError ? { viewMode: "source" as const } : {}),
       };
 
-      set({ tabs: recomputeTabNames(updated) });
+      // Update validation cache with new Map instance
+      const nextCache = new Map(get().validationCache);
+      nextCache.set(filePath, {
+        problems: result.problems,
+        encoding: result.encoding,
+        hasBom: result.hasBom,
+      });
+
+      // Auto-show problems panel if issues found (D-02)
+      const hasProblems = result.problems.length > 0;
+      set({
+        tabs: recomputeTabNames(updated),
+        validationCache: nextCache,
+        ...(hasProblems ? { problemsPanelOpen: true } : {}),
+      });
     } catch {
       // Remove the failed tab and show error toast
       const currentTabs = get().tabs;
@@ -465,5 +515,42 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       t.id === tabId ? { ...t, monacoViewState: state } : t
     );
     set({ tabs: updated });
+  },
+
+  toggleProblemsPanel: () => {
+    set((state) => ({ problemsPanelOpen: !state.problemsPanelOpen }));
+  },
+
+  setProblemsPanelHeight: (height: number) => {
+    set({ problemsPanelHeight: Math.max(100, height) });
+  },
+
+  jumpToProblem: (tabId: string, line: number, column: number) => {
+    const { tabs } = get();
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+
+    if (tab.viewMode === "tree") {
+      const updated = tabs.map((t) =>
+        t.id === tabId ? { ...t, viewMode: "source" as const } : t
+      );
+      set({ tabs: updated, pendingJump: { tabId, line, column } });
+    } else {
+      set({ pendingJump: { tabId, line, column } });
+    }
+  },
+
+  clearPendingJump: () => {
+    set({ pendingJump: null });
+  },
+
+  getValidationStatus: (
+    filePath: string
+  ): ValidationStatus | undefined => {
+    const cached = get().validationCache.get(filePath);
+    if (!cached) return undefined;
+    if (cached.problems.some((p) => p.severity === "error")) return "error";
+    if (cached.problems.some((p) => p.severity === "warning")) return "warning";
+    return "clean";
   },
 }));

@@ -170,15 +170,13 @@ export function FolderTreeNode({
     );
   };
 
+  // Get validation status for file nodes from the store cache
+  const validationStatus = isFile
+    ? useExplorerStore.getState().getValidationStatus(node.path)
+    : undefined;
+
   const renderBadge = () => {
     if (isSource && node.type === "source") {
-      // Access tag from source -- source nodes use the label as name,
-      // and we get the tag from the node data. For source nodes, tag is
-      // part of the FolderSource, but TreeNode doesn't have a tag field.
-      // We use the sourceId to look it up. For now, we pass it via props
-      // or render nothing for tag here since it's not on TreeNode.
-      // Actually the plan says to show the tag badge on source nodes.
-      // We'll handle this by having the parent pass it. For now, skip.
       return null;
     }
 
@@ -187,6 +185,18 @@ export function FolderTreeNode({
         <span className="text-xs text-muted-foreground flex-shrink-0">
           {node.childCount}
         </span>
+      );
+    }
+
+    if (isFile && validationStatus === "error") {
+      return (
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-red-500 dark:bg-red-400 ml-1" />
+      );
+    }
+
+    if (isFile && validationStatus === "warning") {
+      return (
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-amber-500 dark:bg-amber-400 ml-1" />
       );
     }
 

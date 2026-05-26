@@ -3,6 +3,7 @@ mod db;
 mod menu;
 mod state;
 mod types;
+mod validation;
 
 use commands::{
     cancel_directory_cmd, check_path_reachable, get_settings, list_databases_cmd, list_directory_cmd,
