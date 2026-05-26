@@ -4,6 +4,7 @@ import { explorerService } from "./services/explorer-service";
 import { settingsService } from "@/features/settings/services/settings-service";
 import { showToast } from "@/features/notifications/store";
 import { disambiguateTabNames } from "./utils/tab-disambiguator";
+import { parseXml } from "./utils/xml-parser";
 
 interface ExplorerStore {
   // State
@@ -356,12 +357,20 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const tabIndex = currentTabs.findIndex((t) => t.id === filePath);
       if (tabIndex === -1) return;
 
+      let parseError = false;
+      if (isXml) {
+        const parseResult = parseXml(result.content);
+        parseError = parseResult.error !== null;
+      }
+
       const updated = [...currentTabs];
       updated[tabIndex] = {
         ...updated[tabIndex],
         content: result.content,
         fileSize: result.size,
         isLoading: false,
+        parseError,
+        ...(parseError ? { viewMode: "source" as const } : {}),
       };
 
       set({ tabs: recomputeTabNames(updated) });
