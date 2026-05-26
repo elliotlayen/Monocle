@@ -84,11 +84,13 @@ Plans:
   3. User can open multiple files in tabs, each maintaining its own view mode and scroll position
   4. User can copy a file's full path, open it in an external editor, copy raw content, or save a copy to another location
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md -- Rust read_file_cmd, clipboard plugin, types/store/services, tab bar, content area, Monaco XML source view, shell wiring, sidebar file click
+- [ ] 03-02-PLAN.md -- XML parser utility, collapsible tree view with element/attribute/text/comment/PI/CDATA rendering, parse error handling
+- [ ] 03-03-PLAN.md -- File actions hook (clipboard, external editor, save copy), context menus on tabs and sidebar files
 
 **UI hint**: yes
 
@@ -245,7 +247,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 |-------|----------------|--------|-----------|
 | 1. Explorer Shell & Navigation | 1/1 | Complete    | 2026-05-22 |
 | 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
-| 3. XML File Viewing | 0/? | Not started | - |
+| 3. XML File Viewing | 0/3 | Not started | - |
 | 4. Single-File Validation | 0/? | Not started | - |
 | 5. Bulk Validation & Reporting | 0/? | Not started | - |
 | 6. Search | 0/? | Not started | - |
