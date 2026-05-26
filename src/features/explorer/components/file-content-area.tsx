@@ -45,50 +45,26 @@ export function FileContentArea() {
   );
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  if (!activeTab) return null;
-
-  const handleSourceScrollChange = (position: number) => {
-    setScrollPosition(activeTab.id, "source", position);
-  };
-
-  const handleTreeScrollChange = (position: number) => {
-    setScrollPosition(activeTab.id, "tree", position);
-  };
 
   const treeExpandedIds = useMemo(
-    () => new Set(activeTab.treeExpandedIds),
-    [activeTab.treeExpandedIds]
+    () => new Set(activeTab?.treeExpandedIds ?? []),
+    [activeTab?.treeExpandedIds]
   );
 
   const handleTreeExpandedIdsChange = useCallback(
     (ids: Set<string>) => {
-      setTreeExpandedIds(activeTab.id, Array.from(ids));
+      if (activeTab) setTreeExpandedIds(activeTab.id, Array.from(ids));
     },
-    [activeTab.id, setTreeExpandedIds]
+    [activeTab?.id, setTreeExpandedIds]
   );
 
   const handleViewStateChange = useCallback(
     (state: unknown | null) => {
-      setMonacoViewState(activeTab.id, state);
+      if (activeTab) setMonacoViewState(activeTab.id, state);
     },
-    [activeTab.id, setMonacoViewState]
+    [activeTab?.id, setMonacoViewState]
   );
 
-  const showParseErrorBanner = activeTab.isXml && activeTab.parseError;
-  const showTreeView =
-    activeTab.viewMode === "tree" &&
-    activeTab.isXml &&
-    !activeTab.parseError;
-
-  // Compute error/warning counts
-  const errorCount = activeTab.problems.filter(
-    (p) => p.severity === "error"
-  ).length;
-  const warningCount = activeTab.problems.filter(
-    (p) => p.severity === "warning"
-  ).length;
-
-  // Problem click handler -- triggers jumpToProblem store action
   const handleProblemClick = useCallback(
     (line: number, column: number) => {
       if (activeTabId) jumpToProblem(activeTabId, line, column);
@@ -96,13 +72,11 @@ export function FileContentArea() {
     [activeTabId, jumpToProblem]
   );
 
-  // Drag resize state for problems panel
   const [isDragging, setIsDragging] = useState(false);
   const [dragHeight, setDragHeight] = useState(problemsPanelHeight);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
 
-  // Sync dragHeight with store when not dragging
   useEffect(() => {
     if (!isDragging) {
       setDragHeight(problemsPanelHeight);
@@ -120,7 +94,7 @@ export function FileContentArea() {
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const delta = startYRef.current - e.clientY; // Inverted: drag up increases height
+      const delta = startYRef.current - e.clientY;
       const maxHeight = contentAreaRef.current
         ? contentAreaRef.current.clientHeight * 0.5
         : 400;
@@ -147,6 +121,29 @@ export function FileContentArea() {
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging, setProblemsPanelHeight]);
+
+  if (!activeTab) return null;
+
+  const handleSourceScrollChange = (position: number) => {
+    setScrollPosition(activeTab.id, "source", position);
+  };
+
+  const handleTreeScrollChange = (position: number) => {
+    setScrollPosition(activeTab.id, "tree", position);
+  };
+
+  const showParseErrorBanner = activeTab.isXml && activeTab.parseError;
+  const showTreeView =
+    activeTab.viewMode === "tree" &&
+    activeTab.isXml &&
+    !activeTab.parseError;
+
+  const errorCount = activeTab.problems.filter(
+    (p) => p.severity === "error"
+  ).length;
+  const warningCount = activeTab.problems.filter(
+    (p) => p.severity === "warning"
+  ).length;
 
   const hasProblems = activeTab.problems.length > 0;
 

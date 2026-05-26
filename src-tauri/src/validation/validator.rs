@@ -37,7 +37,6 @@ fn is_invalid_xml_char(c: char) -> bool {
 /// Checks for:
 /// - ERROR: null bytes (0x00)
 /// - ERROR: invalid XML control characters (0x01-0x08, 0x0B, 0x0C, 0x0E-0x1F)
-/// - ERROR: unescaped & < > in content
 /// - ERROR: U+FFFD replacement characters when had_decode_errors is true
 /// - WARNING: BOM detected
 /// - WARNING: non-UTF8 encoding
@@ -143,40 +142,6 @@ pub fn validate_characters(
             });
         }
 
-        // Check for unescaped entities
-        if c == '&' {
-            problems.push(ValidationProblem {
-                line,
-                column,
-                end_column: column + 1,
-                message: "Unescaped ampersand in content".to_string(),
-                severity: "error".to_string(),
-                code: "unescaped-ampersand".to_string(),
-            });
-        }
-
-        if c == '<' {
-            problems.push(ValidationProblem {
-                line,
-                column,
-                end_column: column + 1,
-                message: "Unescaped '<' in content".to_string(),
-                severity: "error".to_string(),
-                code: "unescaped-less-than".to_string(),
-            });
-        }
-
-        if c == '>' {
-            problems.push(ValidationProblem {
-                line,
-                column,
-                end_column: column + 1,
-                message: "Unescaped '>' in content".to_string(),
-                severity: "error".to_string(),
-                code: "unescaped-greater-than".to_string(),
-            });
-        }
-
         // Check for U+FFFD replacement characters when there were decode errors
         if c == '\u{FFFD}' && had_decode_errors {
             problems.push(ValidationProblem {
@@ -232,28 +197,9 @@ mod tests {
     }
 
     #[test]
-    fn detects_unescaped_ampersand() {
-        let result = validate_characters("foo & bar", false, "UTF-8", false);
-        let amps: Vec<_> = result.iter().filter(|p| p.code == "unescaped-ampersand").collect();
-        assert_eq!(amps.len(), 1);
-        assert_eq!(amps[0].column, 5);
-        assert_eq!(amps[0].message, "Unescaped ampersand in content");
-    }
-
-    #[test]
-    fn detects_unescaped_less_than() {
-        let result = validate_characters("a < b", false, "UTF-8", false);
-        let lts: Vec<_> = result.iter().filter(|p| p.code == "unescaped-less-than").collect();
-        assert_eq!(lts.len(), 1);
-        assert_eq!(lts[0].message, "Unescaped '<' in content");
-    }
-
-    #[test]
-    fn detects_unescaped_greater_than() {
-        let result = validate_characters("a > b", false, "UTF-8", false);
-        let gts: Vec<_> = result.iter().filter(|p| p.code == "unescaped-greater-than").collect();
-        assert_eq!(gts.len(), 1);
-        assert_eq!(gts[0].message, "Unescaped '>' in content");
+    fn xml_structural_chars_not_flagged() {
+        let result = validate_characters("<root attr=\"a&amp;b\">text &lt; 5</root>", false, "UTF-8", false);
+        assert!(result.is_empty());
     }
 
     #[test]
