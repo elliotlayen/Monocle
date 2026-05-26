@@ -187,4 +187,46 @@ describe("explorer store - tab management", () => {
       expect(tab?.scrollPosition.tree).toBe(0);
     });
   });
+
+  describe("parseError", () => {
+    it("sets parseError to true and forces source view for malformed XML", async () => {
+      const { explorerService } = await import("./services/explorer-service");
+      vi.mocked(explorerService.readFile).mockResolvedValueOnce({
+        content: "<root><unclosed>",
+        size: 16,
+      });
+
+      await useExplorerStore.getState().openFile("/path/to/bad.xml");
+
+      const state = useExplorerStore.getState();
+      expect(state.tabs[0].parseError).toBe(true);
+      expect(state.tabs[0].viewMode).toBe("source");
+    });
+
+    it("sets parseError to false for valid XML", async () => {
+      const { explorerService } = await import("./services/explorer-service");
+      vi.mocked(explorerService.readFile).mockResolvedValueOnce({
+        content: "<root/>",
+        size: 7,
+      });
+
+      await useExplorerStore.getState().openFile("/path/to/good.xml");
+
+      const state = useExplorerStore.getState();
+      expect(state.tabs[0].parseError).toBe(false);
+    });
+
+    it("does not attempt to parse non-XML files (parseError stays false)", async () => {
+      const { explorerService } = await import("./services/explorer-service");
+      vi.mocked(explorerService.readFile).mockResolvedValueOnce({
+        content: "plain text",
+        size: 10,
+      });
+
+      await useExplorerStore.getState().openFile("/path/to/readme.txt");
+
+      const state = useExplorerStore.getState();
+      expect(state.tabs[0].parseError).toBe(false);
+    });
+  });
 });
