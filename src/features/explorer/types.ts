@@ -27,3 +27,23 @@ export interface DirEntry {
   isDir: boolean;
   path: string;
 }
+
+export type ViewMode = "source" | "tree";
+
+export interface FileContent {
+  content: string;
+  size: number;
+}
+
+export interface FileTab {
+  id: string;
+  filePath: string;
+  fileName: string;
+  content: string;
+  fileSize: number;
+  viewMode: ViewMode;
+  scrollPosition: { source: number; tree: number };
+  isXml: boolean;
+  parseError: boolean;
+  isLoading: boolean;
+}

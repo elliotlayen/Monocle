@@ -6,8 +6,8 @@ mod types;
 
 use commands::{
     cancel_directory_cmd, check_path_reachable, get_settings, list_databases_cmd, list_directory_cmd,
-    load_schema_cmd, load_schema_mock, save_settings, set_menu_ui_state_cmd, toggle_favorite_cmd,
-    ExplorerState,
+    load_schema_cmd, load_schema_mock, read_file_cmd, save_settings, set_menu_ui_state_cmd,
+    toggle_favorite_cmd, ExplorerState,
 };
 use state::AppState;
 use std::collections::HashMap;
@@ -22,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -53,6 +54,7 @@ pub fn run() {
             cancel_directory_cmd,
             check_path_reachable,
             toggle_favorite_cmd,
+            read_file_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
