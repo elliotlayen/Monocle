@@ -74,6 +74,8 @@ function buildChildNodes(
         nodeType = "client";
       } else if (parentNode.type === "client") {
         nodeType = "date";
+      } else {
+        nodeType = "folder";
       }
     }
 

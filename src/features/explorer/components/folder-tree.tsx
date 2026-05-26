@@ -67,11 +67,6 @@ export function FolderTree() {
     return [...dateNodes, ...nonDateNodes];
   };
 
-  // Sort file children alphabetically
-  const sortFileChildren = (children: TreeNode[]): TreeNode[] => {
-    return [...children].sort((a, b) => a.name.localeCompare(b.name));
-  };
-
   // Apply filter
   const visibleRoots = useMemo(() => {
     if (!filterText.trim()) return rootNodes;
@@ -90,8 +85,12 @@ export function FolderTree() {
         .sort((a, b) => a.name.localeCompare(b.name));
     } else if (node.type === "client") {
       sortedChildren = sortDateChildren(node.children);
-    } else if (node.type === "date") {
-      sortedChildren = sortFileChildren(node.children);
+    } else if (node.type === "date" || node.type === "folder") {
+      const dirs = node.children.filter((c) => c.isDir);
+      const files = node.children.filter((c) => !c.isDir);
+      dirs.sort((a, b) => a.name.localeCompare(b.name));
+      files.sort((a, b) => a.name.localeCompare(b.name));
+      sortedChildren = [...dirs, ...files];
     } else {
       sortedChildren = node.children;
     }

@@ -85,6 +85,7 @@ export function FolderTreeNode({
   const isSource = node.type === "source";
   const isClient = node.type === "client";
   const isDate = node.type === "date";
+  const isFolder = node.type === "folder";
   const isFile = node.type === "file";
   const isLoading = node.loadState === "loading";
   const isError = node.loadState === "error";
@@ -121,7 +122,7 @@ export function FolderTreeNode({
       return <FolderSync className="h-4 w-4 flex-shrink-0" />;
     }
 
-    if (isClient || isDate) {
+    if (isClient || isDate || isFolder) {
       const iconSize = isClient ? "h-4 w-4" : "h-3.5 w-3.5";
       if (isExpanded) {
         return <FolderOpen className={cn(iconSize, "flex-shrink-0")} />;
