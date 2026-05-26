@@ -6,7 +6,7 @@ export interface FolderSource {
   favorites: string[];
 }
 
-export type TreeNodeType = "source" | "client" | "date" | "folder" | "file";
+export type TreeNodeType = "source" | "folder" | "file";
 
 export type LoadState = "idle" | "loading" | "loaded" | "error";
 

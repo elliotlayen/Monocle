@@ -68,19 +68,10 @@ function buildChildNodes(
   folderSources: FolderSource[]
 ): TreeNode[] {
   return entries.map((entry) => {
-    let nodeType: TreeNode["type"] = "file";
-    if (entry.isDir) {
-      if (parentNode.type === "source") {
-        nodeType = "client";
-      } else if (parentNode.type === "client") {
-        nodeType = "date";
-      } else {
-        nodeType = "folder";
-      }
-    }
+    const nodeType: TreeNode["type"] = entry.isDir ? "folder" : "file";
 
     let isFavorite: boolean | undefined;
-    if (nodeType === "client") {
+    if (entry.isDir && parentNode.type === "source") {
       const source = folderSources.find((s) => s.id === parentNode.id);
       if (source) {
         isFavorite = source.favorites.includes(entry.name);
@@ -286,11 +277,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const nextNodes = new Map(get().treeNodes);
       const source = updatedSources.find((s) => s.id === sourceId);
       if (source) {
-        // Update isFavorite on matching client nodes
         const sourceNode = nextNodes.get(sourceId);
         if (sourceNode?.children) {
           for (const child of sourceNode.children) {
-            if (child.type === "client") {
+            if (child.isDir) {
               const updatedChild = {
                 ...child,
                 isFavorite: source.favorites.includes(child.name),
@@ -298,11 +288,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
               nextNodes.set(child.id, updatedChild);
             }
           }
-          // Also update the children array on the source node
           nextNodes.set(sourceId, {
             ...sourceNode,
             children: sourceNode.children.map((child) =>
-              child.type === "client"
+              child.isDir
                 ? {
                     ...child,
                     isFavorite: source.favorites.includes(child.name),

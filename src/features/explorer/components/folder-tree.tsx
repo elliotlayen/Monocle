@@ -12,7 +12,6 @@ export function FolderTree() {
     treeNodes,
     expandedIds,
     filterText,
-    dateSortOrder,
     expandNode,
     collapseNode,
     cancelLoad,
@@ -23,7 +22,6 @@ export function FolderTree() {
       treeNodes: state.treeNodes,
       expandedIds: state.expandedIds,
       filterText: state.filterText,
-      dateSortOrder: state.dateSortOrder,
       expandNode: state.expandNode,
       collapseNode: state.collapseNode,
       cancelLoad: state.cancelLoad,
@@ -42,31 +40,6 @@ export function FolderTree() {
       .filter((n): n is TreeNode => n !== undefined);
   }, [folderSources, treeNodes]);
 
-  // Apply date sorting to children of client nodes
-  const sortDateChildren = (children: TreeNode[]): TreeNode[] => {
-    const dateNodes: TreeNode[] = [];
-    const nonDateNodes: TreeNode[] = [];
-
-    for (const child of children) {
-      if (child.isDir && /^\d{8}$/.test(child.name)) {
-        dateNodes.push(child);
-      } else {
-        nonDateNodes.push(child);
-      }
-    }
-
-    dateNodes.sort((a, b) => {
-      if (dateSortOrder === "newest") {
-        return b.name.localeCompare(a.name);
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-    nonDateNodes.sort((a, b) => a.name.localeCompare(b.name));
-
-    return [...dateNodes, ...nonDateNodes];
-  };
-
   // Apply filter
   const visibleRoots = useMemo(() => {
     if (!filterText.trim()) return rootNodes;
@@ -74,35 +47,23 @@ export function FolderTree() {
   }, [rootNodes, filterText]);
 
   const renderChildren = (node: TreeNode, depth: number, sourceId: string) => {
-    if (!expandedIds.has(node.id) || !node.children) return null;
+    const current = treeNodes.get(node.id) ?? node;
+    if (!expandedIds.has(current.id) || !current.children) return null;
 
-    let sortedChildren: TreeNode[];
-
-    if (node.type === "source") {
-      // Sort clients alphabetically
-      sortedChildren = [...node.children]
-        .filter((c) => c.isDir || c.type === "file")
-        .sort((a, b) => a.name.localeCompare(b.name));
-    } else if (node.type === "client") {
-      sortedChildren = sortDateChildren(node.children);
-    } else {
-      const dirs = node.children.filter((c) => c.isDir);
-      const files = node.children.filter((c) => !c.isDir);
-      dirs.sort((a, b) => a.name.localeCompare(b.name));
-      files.sort((a, b) => a.name.localeCompare(b.name));
-      sortedChildren = [...dirs, ...files];
-    }
+    const sortedChildren = current.children
+      .map((child) => treeNodes.get(child.id) ?? child)
+      .sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
 
     // Get favorites for this source
     const source = folderSources.find((s) => s.id === sourceId);
     const favorites = source?.favorites ?? [];
     const hasFavorites = node.type === "source" && favorites.length > 0;
 
-    // Build favorites section for source nodes
     const favoritedChildren = hasFavorites
-      ? sortedChildren.filter(
-          (child) => child.type === "client" && child.isFavorite
-        )
+      ? sortedChildren.filter((child) => child.isDir && child.isFavorite)
       : [];
 
     return (

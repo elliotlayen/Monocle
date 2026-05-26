@@ -28,7 +28,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { formatDateFolder } from "../utils/date-format";
 import { useFileActions } from "../hooks/use-file-actions";
 import { useExplorerStore } from "../store";
 import type { TreeNode } from "../types";
@@ -83,12 +82,9 @@ export function FolderTreeNode({
   };
 
   const isSource = node.type === "source";
-  const isClient = node.type === "client";
-  const isDate = node.type === "date";
-  const isFolder = node.type === "folder";
-  const isFile = !node.isDir;
   const isLoading = node.loadState === "loading";
   const isError = node.loadState === "error";
+  const isDirectChild = depth === 1;
 
   const rowPadding = isSource ? "py-1.5" : "py-1";
 
@@ -122,20 +118,11 @@ export function FolderTreeNode({
       return <FolderSync className="h-4 w-4 flex-shrink-0" />;
     }
 
-    if (isClient || isDate || isFolder) {
-      const iconSize = isClient ? "h-4 w-4" : "h-3.5 w-3.5";
-      if (isExpanded) {
-        return <FolderOpen className={cn(iconSize, "flex-shrink-0")} />;
-      }
-      return <Folder className={cn(iconSize, "flex-shrink-0")} />;
-    }
-
     if (node.isDir) {
-      const iconSize = "h-3.5 w-3.5";
       if (isExpanded) {
-        return <FolderOpen className={cn(iconSize, "flex-shrink-0")} />;
+        return <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />;
       }
-      return <Folder className={cn(iconSize, "flex-shrink-0")} />;
+      return <Folder className="h-3.5 w-3.5 flex-shrink-0" />;
     }
 
     const isXml = node.name.toLowerCase().endsWith(".xml");
@@ -148,26 +135,11 @@ export function FolderTreeNode({
   };
 
   const renderName = () => {
-    if (isDate) {
-      const { raw, formatted } = formatDateFolder(node.name);
-      return (
-        <span className="flex items-center gap-1 min-w-0">
-          <span className="text-sm truncate">{raw}</span>
-          {formatted && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              ({formatted})
-            </span>
-          )}
-        </span>
-      );
-    }
-
     return (
       <span
         className={cn(
           "text-sm truncate",
-          isSource && "font-semibold",
-          isClient && "font-medium"
+          isSource && "font-semibold"
         )}
       >
         {node.name}
@@ -176,15 +148,11 @@ export function FolderTreeNode({
   };
 
   const validationStatus = useExplorerStore((state) =>
-    isFile ? state.getValidationStatus(node.path) : undefined
+    !node.isDir ? state.getValidationStatus(node.path) : undefined
   );
 
   const renderBadge = () => {
-    if (isSource && node.type === "source") {
-      return null;
-    }
-
-    if ((isClient || isDate) && node.childCount !== undefined) {
+    if (node.isDir && !isSource && node.childCount !== undefined) {
       return (
         <span className="text-xs text-muted-foreground flex-shrink-0">
           {node.childCount}
@@ -192,13 +160,13 @@ export function FolderTreeNode({
       );
     }
 
-    if (isFile && validationStatus === "error") {
+    if (!node.isDir && validationStatus === "error") {
       return (
         <span className="h-2 w-2 rounded-full flex-shrink-0 bg-red-500 dark:bg-red-400 ml-1" />
       );
     }
 
-    if (isFile && validationStatus === "warning") {
+    if (!node.isDir && validationStatus === "warning") {
       return (
         <span className="h-2 w-2 rounded-full flex-shrink-0 bg-amber-500 dark:bg-amber-400 ml-1" />
       );
@@ -231,7 +199,7 @@ export function FolderTreeNode({
   };
 
   const renderStar = () => {
-    if (!isClient) return null;
+    if (!node.isDir || !isDirectChild) return null;
 
     return (
       <button
@@ -259,10 +227,8 @@ export function FolderTreeNode({
   const rowContent = (
     <div
       className={cn(
-        "group flex items-center gap-1 w-full rounded",
+        "group flex items-center gap-1 w-full rounded hover:bg-muted cursor-pointer",
         rowPadding,
-        !isFile && "hover:bg-muted cursor-pointer",
-        isFile && "hover:bg-muted cursor-pointer",
         isError && "text-muted-foreground opacity-60"
       )}
       style={{ paddingLeft: `${depth * 16}px` }}
@@ -278,15 +244,15 @@ export function FolderTreeNode({
   );
 
   // Check if file is open in a tab (for enabling content-dependent actions)
-  const isFileOpenInTab = isFile
+  const isFileOpenInTab = !node.isDir
     ? useExplorerStore.getState().tabs.some((t) => t.id === node.path)
     : false;
-  const openTab = isFile
+  const openTab = !node.isDir
     ? useExplorerStore.getState().tabs.find((t) => t.id === node.path)
     : undefined;
 
   // Wrap nodes with context menus
-  const wrappedRow = isFile ? (
+  const wrappedRow = !node.isDir ? (
     <ContextMenu>
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
       <ContextMenuContent>
@@ -307,7 +273,7 @@ export function FolderTreeNode({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  ) : isClient ? (
+  ) : node.isDir && isDirectChild ? (
     <ContextMenu>
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
       <ContextMenuContent>
@@ -318,7 +284,7 @@ export function FolderTreeNode({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  ) : isError && !isFile ? (
+  ) : isError && node.isDir ? (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>{rowContent}</TooltipTrigger>
