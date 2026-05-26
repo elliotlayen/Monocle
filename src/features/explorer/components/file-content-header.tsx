@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useExplorerStore } from "../store";
+import { useFileActions } from "../hooks/use-file-actions";
 import { formatFileSize } from "../utils/file-size-format";
 import type { FileTab } from "../types";
 
@@ -18,6 +19,7 @@ interface FileContentHeaderProps {
 
 export function FileContentHeader({ tab }: FileContentHeaderProps) {
   const setViewMode = useExplorerStore((state) => state.setViewMode);
+  const { copyPath, copyContent } = useFileActions();
 
   const fileIcon = tab.isXml ? (
     <FileCode className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -93,7 +95,7 @@ export function FileContentHeader({ tab }: FileContentHeaderProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyPath(tab.filePath)}>
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -105,7 +107,7 @@ export function FileContentHeader({ tab }: FileContentHeaderProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyContent(tab.content)}>
                 <ClipboardCopy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>

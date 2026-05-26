@@ -18,6 +18,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -28,6 +29,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatDateFolder } from "../utils/date-format";
+import { useFileActions } from "../hooks/use-file-actions";
+import { useExplorerStore } from "../store";
 import type { TreeNode } from "../types";
 
 interface FolderTreeNodeProps {
@@ -53,6 +56,7 @@ export function FolderTreeNode({
   onToggleFavorite,
   onFileClick,
 }: FolderTreeNodeProps) {
+  const { copyPath, copyContent, openExternal, saveCopy } = useFileActions();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Track elapsed time during loading state
@@ -259,8 +263,37 @@ export function FolderTreeNode({
     </div>
   );
 
-  // Wrap client nodes with context menu
-  const wrappedRow = isClient ? (
+  // Check if file is open in a tab (for enabling content-dependent actions)
+  const isFileOpenInTab = isFile
+    ? useExplorerStore.getState().tabs.some((t) => t.id === node.path)
+    : false;
+  const openTab = isFile
+    ? useExplorerStore.getState().tabs.find((t) => t.id === node.path)
+    : undefined;
+
+  // Wrap nodes with context menus
+  const wrappedRow = isFile ? (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => copyPath(node.path)}>Copy Path</ContextMenuItem>
+        <ContextMenuItem onClick={() => openExternal(node.path)}>Open in External Editor</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onClick={() => openTab && copyContent(openTab.content)}
+          disabled={!isFileOpenInTab}
+        >
+          Copy Content
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() => openTab && saveCopy(node.name, openTab.content)}
+          disabled={!isFileOpenInTab}
+        >
+          Save Copy...
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  ) : isClient ? (
     <ContextMenu>
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
       <ContextMenuContent>

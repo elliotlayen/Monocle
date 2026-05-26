@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useFileActions } from "../hooks/use-file-actions";
 import type { FileTab as FileTabType } from "../types";
 
 interface FileTabProps {
@@ -32,6 +33,8 @@ export function FileTab({
   onCloseOthers,
   onCloseAll,
 }: FileTabProps) {
+  const { copyPath, copyContent, openExternal, saveCopy } = useFileActions();
+
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
     onClose();
@@ -97,6 +100,11 @@ export function FileTab({
         <ContextMenuSeparator />
         <ContextMenuItem onClick={onCloseOthers}>Close Others</ContextMenuItem>
         <ContextMenuItem onClick={onCloseAll}>Close All</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => copyPath(tab.filePath)}>Copy Path</ContextMenuItem>
+        <ContextMenuItem onClick={() => openExternal(tab.filePath)}>Open in External Editor</ContextMenuItem>
+        <ContextMenuItem onClick={() => copyContent(tab.content)} disabled={tab.isLoading}>Copy Content</ContextMenuItem>
+        <ContextMenuItem onClick={() => saveCopy(tab.fileName, tab.content)} disabled={tab.isLoading}>Save Copy...</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
