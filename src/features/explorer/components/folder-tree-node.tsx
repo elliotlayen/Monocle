@@ -170,10 +170,9 @@ export function FolderTreeNode({
     );
   };
 
-  // Get validation status for file nodes from the store cache
-  const validationStatus = isFile
-    ? useExplorerStore.getState().getValidationStatus(node.path)
-    : undefined;
+  const validationStatus = useExplorerStore((state) =>
+    isFile ? state.getValidationStatus(node.path) : undefined
+  );
 
   const renderBadge = () => {
     if (isSource && node.type === "source") {

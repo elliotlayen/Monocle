@@ -162,71 +162,67 @@ export function FileContentArea() {
           </span>
         </div>
       )}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="flex-1 overflow-hidden">
-          {activeTab.isLoading ? (
-            <div className="flex-1 flex items-center justify-center h-full">
-              <div className="flex flex-col gap-2 w-2/3 max-w-md">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-4 w-2/3" />
-              </div>
-            </div>
-          ) : showTreeView ? (
-            <XmlTreeView
-              ref={treeViewRef}
-              content={activeTab.content}
-              scrollPosition={activeTab.scrollPosition.tree}
-              onScrollChange={handleTreeScrollChange}
-              expandedIds={treeExpandedIds}
-              onExpandedIdsChange={handleTreeExpandedIdsChange}
-            />
-          ) : (
-            <XmlSourceView
-              ref={sourceViewRef}
-              content={activeTab.content}
-              isXml={activeTab.isXml}
-              tabId={activeTab.id}
-              scrollPosition={activeTab.scrollPosition.source}
-              onScrollChange={handleSourceScrollChange}
-              savedViewState={activeTab.monacoViewState}
-              onViewStateChange={handleViewStateChange}
-              problems={activeTab.problems}
-              pendingJump={pendingJump}
-              onJumpHandled={clearPendingJump}
-            />
-          )}
+      {activeTab.isLoading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col gap-2 w-2/3 max-w-md">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
         </div>
-        {problemsPanelOpen && (
-          <>
-            <div
-              className="h-1 cursor-row-resize hover:bg-muted flex-shrink-0"
-              onMouseDown={startDrag}
-            />
-            <div
-              style={{ height: dragHeight }}
-              className="flex-shrink-0 overflow-hidden"
-            >
-              <ProblemsPanel
-                problems={activeTab.problems}
-                isOpen={problemsPanelOpen}
-                onToggle={toggleProblemsPanel}
-                onProblemClick={handleProblemClick}
-              />
-            </div>
-          </>
-        )}
-        {!problemsPanelOpen && hasProblems && (
-          <div className="flex-shrink-0">
+      ) : showTreeView ? (
+        <XmlTreeView
+          ref={treeViewRef}
+          content={activeTab.content}
+          scrollPosition={activeTab.scrollPosition.tree}
+          onScrollChange={handleTreeScrollChange}
+          expandedIds={treeExpandedIds}
+          onExpandedIdsChange={handleTreeExpandedIdsChange}
+        />
+      ) : (
+        <XmlSourceView
+          ref={sourceViewRef}
+          content={activeTab.content}
+          isXml={activeTab.isXml}
+          tabId={activeTab.id}
+          scrollPosition={activeTab.scrollPosition.source}
+          onScrollChange={handleSourceScrollChange}
+          savedViewState={activeTab.monacoViewState}
+          onViewStateChange={handleViewStateChange}
+          problems={activeTab.problems}
+          pendingJump={pendingJump}
+          onJumpHandled={clearPendingJump}
+        />
+      )}
+      {problemsPanelOpen && (
+        <>
+          <div
+            className="h-1 cursor-row-resize hover:bg-muted flex-shrink-0"
+            onMouseDown={startDrag}
+          />
+          <div
+            style={{ height: dragHeight }}
+            className="flex-shrink-0 overflow-hidden"
+          >
             <ProblemsPanel
               problems={activeTab.problems}
-              isOpen={false}
+              isOpen={problemsPanelOpen}
               onToggle={toggleProblemsPanel}
               onProblemClick={handleProblemClick}
             />
           </div>
-        )}
-      </div>
+        </>
+      )}
+      {!problemsPanelOpen && hasProblems && (
+        <div className="flex-shrink-0">
+          <ProblemsPanel
+            problems={activeTab.problems}
+            isOpen={false}
+            onToggle={toggleProblemsPanel}
+            onProblemClick={handleProblemClick}
+          />
+        </div>
+      )}
       <ValidationStatusBar
         errorCount={errorCount}
         warningCount={warningCount}
