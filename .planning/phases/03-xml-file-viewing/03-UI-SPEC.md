@@ -35,8 +35,7 @@ Declared values (must be multiples of 4):
 |-------|-------|-------|
 | xs | 4px | Icon gaps, inline padding, gap between tab close button and label |
 | sm | 8px | Tab internal padding, header bar element gaps, tree node indent padding |
-| md | 12px | Tab bar horizontal padding, content header bar padding (p-3) |
-| lg | 16px | XML tree indentation per level (ml-4), content area padding |
+| lg | 16px | XML tree indentation per level (ml-4), content area padding, tab bar horizontal padding (`px-4`), content header bar padding (`px-4`), parse error banner padding (`px-4`) |
 | xl | 24px | Section spacing between header bar and content body |
 | 2xl | 32px | Empty state vertical spacing |
 | 3xl | 48px | Not used in this phase |
@@ -66,7 +65,7 @@ Monaco Editor uses its own font stack: `ui-monospace, SFMono-Regular, Menlo, Mon
 |------|-------|-------|
 | Dominant (60%) | `var(--background)` / oklch(1 0 0) light, oklch(0.145 0 0) dark | Content area background, Monaco editor background (via vs/vs-dark theme), XML tree view background |
 | Secondary (30%) | `var(--muted)` / oklch(0.97 0 0) light, oklch(0.269 0 0) dark | Tab bar background, content header bar background, inactive tab background |
-| Accent (10%) | `var(--accent)` / oklch(0.97 0 0) light, oklch(0.269 0 0) dark | Active tab indicator, hovered tab background, hovered tree node row, tree/source toggle active state |
+| Accent (10%) | `var(--accent)` / oklch(0.97 0 0) light, oklch(0.269 0 0) dark | Active tab indicator, hovered tab background, tree/source toggle active state |
 | Destructive | `var(--destructive)` | Not used in Phase 3 (no destructive actions) |
 
 Additional semantic colors for this phase:
@@ -82,7 +81,7 @@ Additional semantic colors for this phase:
 | Parse error banner | `oklch(0.75 0.15 85)` (amber-500 equivalent) | Warning banner background when XML tree parse fails |
 | Muted text | `var(--muted-foreground)` | File size text, tab tooltip path, "No file open" body copy |
 
-Accent reserved for: active tab bottom border indicator, hovered tab background (`hover:bg-accent`), hovered XML tree row (`hover:bg-muted`), tree/source segmented control active segment. Never used for text color or icons.
+Accent reserved for: active tab bottom border indicator, hovered tab background (`hover:bg-accent`), tree/source segmented control active segment. Never used for text color or icons.
 
 ---
 
@@ -184,7 +183,7 @@ When no file is open, `FileTabBar` and `FileContentHeader` are not rendered. The
 
 - Container: `flex items-center h-9 bg-muted border-b overflow-x-auto overflow-y-hidden`
 - No scrollbar visible: `scrollbar-width: none; -webkit-scrollbar: display: none` (tabs scroll via mouse wheel or trackpad gesture)
-- Individual tab: `flex items-center gap-1.5 px-3 h-full text-sm border-r border-border cursor-pointer whitespace-nowrap`
+- Individual tab: `flex items-center gap-1.5 px-4 h-full text-sm border-r border-border cursor-pointer whitespace-nowrap`
 - Active tab: `bg-background border-b-2 border-b-primary` (background matches content area, 2px bottom accent border)
 - Inactive tab: `bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground`
 - Tab icon: `h-3.5 w-3.5 flex-shrink-0` (`FileCode` for XML, `FileText` for non-XML)
@@ -201,7 +200,7 @@ When no file is open, `FileTabBar` and `FileContentHeader` are not rendered. The
 +--------------------------------------------------------------+
 ```
 
-- Container: `flex items-center gap-2 px-3 h-10 border-b bg-muted/50`
+- Container: `flex items-center gap-2 px-4 h-10 border-b bg-muted/50`
 - Left section: `flex items-center gap-2 min-w-0 flex-1`
   - File icon: `h-4 w-4 flex-shrink-0 text-muted-foreground`
   - Filename: `text-sm font-semibold truncate`
@@ -302,7 +301,7 @@ When DOMParser fails to parse the XML file (malformed):
 +--------------------------------------------------------------+
 ```
 
-- Container: `flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800`
+- Container: `flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800`
 - Icon: `AlertTriangle` at `h-4 w-4 text-amber-600 dark:text-amber-500`
 - Text: `text-sm text-amber-800 dark:text-amber-200`
 - Position: immediately below the `FileContentHeader`, above the source view
@@ -412,7 +411,7 @@ Tabs do NOT persist across sessions (D-13). App opens with no tabs and empty sta
 | Tree toggle disabled tooltip (parse error) | `Unable to parse XML` |
 | File loading (content area) | Skeleton placeholders, no text |
 | File size while loading | `--` |
-| Error: file read failure | `Failed to read file` (toast notification) |
+| Error: file read failure | `Failed to read file -- check that the file still exists and is accessible` (toast notification) |
 | Non-XML tree toggle | Toggle hidden (no text needed) |
 
 ### Destructive Actions
