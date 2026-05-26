@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Instantly find the right integration file and know if it has problems -- replacing minutes of manual folder clicking with seconds of targeted search and automatic validation.
-**Current focus:** Phase 03 — xml-file-viewing (complete, pending verification)
+**Current focus:** Phase 04 — single-file-validation (next)
 
 ## Current Position
 
-Phase: 03 (xml-file-viewing) — COMPLETE
-Plan: 3 of 3
-Status: All plans executed, pending verification
-Last activity: 2026-05-26 -- Phase 3 execution complete (3/3 plans)
+Phase: 04 (single-file-validation) — NOT STARTED
+Plan: 0 of ?
+Status: Ready to discuss/plan
+Last activity: 2026-05-26 -- Phase 3 verified and complete
 
 Progress: [###-------] 30%
 
