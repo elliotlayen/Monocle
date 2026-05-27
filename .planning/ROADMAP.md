@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Folder Sources & Tree Sidebar** - Configurable root folders, lazy-loading folder tree, date formatting, client filtering and favorites (completed 2026-05-26)
 - [x] **Phase 3: XML File Viewing** - Tree view, syntax-highlighted source view, tabbed multi-file interface, file actions (completed 2026-05-26)
 - [x] **Phase 4: Single-File Validation** - Illegal character detection, problem badges in tree, problems panel, inline source highlighting (completed 2026-05-26)
-- [ ] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export
+- [x] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export (completed 2026-05-27)
 - [ ] **Phase 6: Search** - Filename filtering, XML content search, configurable search scope
 - [ ] **Phase 7: File Comparison** - Side-by-side and inline diff for any two files
 - [ ] **Phase 8: Analytics Dashboard** - Client dashboard, error heatmap, timeline view, file size anomaly detection
@@ -160,7 +160,7 @@ Plans:
 
 **Wave 2**
 
-- [ ] 05-02-PLAN.md -- Scan results tab with sortable file list, expandable problem rows, filter/drill-down, export formatters (CSV, PDF, JSON, clipboard text/markdown), tab integration
+- [x] 05-02-PLAN.md -- Scan results tab with sortable file list, expandable problem rows, filter/drill-down, export formatters (CSV, PDF, JSON, clipboard text/markdown), tab integration
 
 **UI hint**: yes
 
@@ -279,7 +279,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
-| 5. Bulk Validation & Reporting | 1/2 | In Progress|  |
+| 5. Bulk Validation & Reporting | 2/2 | Complete   | 2026-05-27 |
 | 6. Search | 0/? | Not started | - |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
