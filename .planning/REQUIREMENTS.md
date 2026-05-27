@@ -25,8 +25,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **VALD-02**: Files with detected issues show a red badge/icon in the folder tree
 - [ ] **VALD-03**: A problems panel lists all detected issues with line number, column, description, and severity, with click-to-jump to the location in source view
 - [ ] **VALD-04**: Source view highlights bad characters inline with gutter markers on affected lines
-- [ ] **VALD-05**: User can run a bulk validation scan on an entire folder/client with progress streaming and cancellation
-- [ ] **VALD-06**: User can export scan reports in CSV, PDF, JSON, and clipboard text formats
+- [x] **VALD-05**: User can run a bulk validation scan on an entire folder/client with progress streaming and cancellation
+- [x] **VALD-06**: User can export scan reports in CSV, PDF, JSON, and clipboard text formats
 
 ### Search
 
@@ -86,8 +86,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VALD-02 | Phase 4 | Pending |
 | VALD-03 | Phase 4 | Pending |
 | VALD-04 | Phase 4 | Pending |
-| VALD-05 | Phase 5 | Pending |
-| VALD-06 | Phase 5 | Pending |
+| VALD-05 | Phase 5 | Complete |
+| VALD-06 | Phase 5 | Complete |
 | SRCH-01 | Phase 6 | Pending |
 | SRCH-02 | Phase 6 | Pending |
 | SRCH-03 | Phase 6 | Pending |
