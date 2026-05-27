@@ -1,4 +1,4 @@
-import { FileCode, FileText, Loader2, X } from "lucide-react";
+import { FileCode, FileSearch, FileText, Loader2, X } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,6 +48,9 @@ export function FileTab({
   };
 
   const renderIcon = () => {
+    if (tab.isScanResult) {
+      return <FileSearch className="h-3.5 w-3.5 flex-shrink-0" />;
+    }
     if (tab.isLoading) {
       return <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin" />;
     }

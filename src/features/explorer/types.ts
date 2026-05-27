@@ -65,6 +65,7 @@ export interface FileTab {
   problems: ValidationProblem[];
   encoding: string;
   hasBom: boolean;
+  isScanResult?: boolean;
 }
 
 // Bulk scan types

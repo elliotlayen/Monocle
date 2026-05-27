@@ -8,6 +8,7 @@ import { XmlSourceView, type XmlSourceViewHandle } from "./xml-source-view";
 import { XmlTreeView, type XmlTreeViewHandle } from "./xml-tree-view";
 import { ProblemsPanel } from "./problems-panel";
 import { ValidationStatusBar } from "./validation-status-bar";
+import { ScanResultsTab } from "./scan-results-tab";
 
 export function FileContentArea() {
   const treeViewRef = useRef<XmlTreeViewHandle>(null);
@@ -123,6 +124,11 @@ export function FileContentArea() {
   }, [isDragging, setProblemsPanelHeight]);
 
   if (!activeTab) return null;
+
+  // Render scan results tab for the synthetic scan:results tab
+  if (activeTab.id === "scan:results") {
+    return <ScanResultsTab />;
+  }
 
   const handleSourceScrollChange = (position: number) => {
     setScrollPosition(activeTab.id, "source", position);

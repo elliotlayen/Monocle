@@ -500,6 +500,18 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
     }
 
+    // Clear scan result when closing scan results tab
+    if (tabId === "scan:results") {
+      set({
+        tabs: recomputeTabNames(filtered),
+        activeTabId: newActiveTabId,
+        scanStatus: "idle",
+        scanResult: null,
+        scanProgress: null,
+      });
+      return;
+    }
+
     set({ tabs: recomputeTabNames(filtered), activeTabId: newActiveTabId });
   },
 
@@ -604,6 +616,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const operationId = crypto.randomUUID();
     const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
 
+    // Remove existing scan:results tab before starting new scan (Open Q2)
+    const existingTabs = get().tabs.filter((t) => t.id !== "scan:results");
+
     set({
       scanStatus: "scanning",
       scanOperationId: operationId,
@@ -612,6 +627,15 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       scanProgress: null,
       scanResult: null,
       pendingScanRequest: null,
+      tabs: recomputeTabNames(existingTabs),
+      ...(get().activeTabId === "scan:results"
+        ? {
+            activeTabId:
+              existingTabs.length > 0
+                ? existingTabs[existingTabs.length - 1].id
+                : null,
+          }
+        : {}),
     });
 
     try {
@@ -634,12 +658,37 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       // Compute folder badge cache
       const folderBadges = computeAggregateBadges(result.files, folderPath);
 
+      // Create synthetic scan results tab (D-12)
+      const scanTab: FileTab = {
+        id: "scan:results",
+        filePath: "scan:results",
+        fileName: `Scan Results - ${folderName}`,
+        content: "",
+        fileSize: 0,
+        viewMode: "source",
+        scrollPosition: { source: 0, tree: 0 },
+        treeExpandedIds: [],
+        monacoViewState: null,
+        isXml: false,
+        parseError: false,
+        isLoading: false,
+        problems: [],
+        encoding: "",
+        hasBom: false,
+        isScanResult: true,
+      };
+
+      const currentTabs = get().tabs.filter((t) => t.id !== "scan:results");
+      const updatedTabs = recomputeTabNames([...currentTabs, scanTab]);
+
       set({
         scanStatus: result.cancelled ? "cancelled" : "completed",
         scanResult: result,
         scanOperationId: null,
         validationCache: nextCache,
         folderBadgeCache: folderBadges,
+        tabs: updatedTabs,
+        activeTabId: "scan:results",
       });
     } catch {
       set({
