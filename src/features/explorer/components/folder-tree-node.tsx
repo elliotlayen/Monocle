@@ -72,8 +72,19 @@ export function FolderTreeNode({
     return () => clearInterval(interval);
   }, [node.loadState]);
 
+  const requestScan = useExplorerStore((state) => state.requestScan);
+  const scanFilePattern = useExplorerStore((state) => state.scanFilePattern);
+  const setLastInteractedFolder = useExplorerStore(
+    (state) => state.setLastInteractedFolder
+  );
+  const folderBadge = useExplorerStore((state) =>
+    node.isDir ? state.getFolderBadge(node.path) : undefined
+  );
+
   const handleToggle = () => {
     if (!node.isDir) return;
+    // Track last-interacted folder for toolbar scan button (D-01)
+    setLastInteractedFolder(node.path);
     if (isExpanded) {
       onCollapse(node.id);
     } else {
@@ -154,9 +165,29 @@ export function FolderTreeNode({
   const renderBadge = () => {
     if (node.isDir && !isSource && node.childCount !== undefined) {
       return (
-        <span className="text-xs text-muted-foreground flex-shrink-0">
-          {node.childCount}
+        <span className="flex items-center gap-1 flex-shrink-0">
+          <span className="text-xs text-muted-foreground">
+            {node.childCount}
+          </span>
+          {folderBadge === "error" && (
+            <span className="h-2 w-2 rounded-full bg-red-500 dark:bg-red-400" />
+          )}
+          {folderBadge === "warning" && (
+            <span className="h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-400" />
+          )}
         </span>
+      );
+    }
+
+    // Folder nodes without childCount (not yet loaded but scanned)
+    if (node.isDir && !isSource && folderBadge === "error") {
+      return (
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-red-500 dark:bg-red-400 ml-1" />
+      );
+    }
+    if (node.isDir && !isSource && folderBadge === "warning") {
+      return (
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-amber-500 dark:bg-amber-400 ml-1" />
       );
     }
 
@@ -281,6 +312,23 @@ export function FolderTreeNode({
           onClick={() => onToggleFavorite(sourceId, node.name)}
         >
           {node.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onClick={() => requestScan(node.path, scanFilePattern)}
+        >
+          Scan for Issues...
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  ) : node.isDir && !isSource ? (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem
+          onClick={() => requestScan(node.path, scanFilePattern)}
+        >
+          Scan for Issues...
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
