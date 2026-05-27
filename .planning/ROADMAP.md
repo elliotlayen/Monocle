@@ -150,11 +150,19 @@ Plans:
   3. Scan results display as a summary report listing each file, its issues, and aggregate statistics
   4. User can export scan reports in CSV, PDF, JSON, and clipboard text formats
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] 05-01: TBD
+**Wave 1**
+
+- [ ] 05-01-PLAN.md -- Rust bulk_scan_cmd with walkdir/glob, event streaming, frontend types/store/services, progress panel, context menu and toolbar scan triggers, tree badges
+
+**Wave 2**
+
+- [ ] 05-02-PLAN.md -- Scan results tab with sortable file list, expandable problem rows, filter/drill-down, export formatters (CSV, PDF, JSON, clipboard text/markdown), tab integration
+
+**UI hint**: yes
 
 ### Phase 6: Search
 
@@ -271,7 +279,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 2. Folder Sources & Tree Sidebar | 3/3 | Complete   | 2026-05-26 |
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
-| 5. Bulk Validation & Reporting | 0/? | Not started | - |
+| 5. Bulk Validation & Reporting | 0/2 | Planned | - |
 | 6. Search | 0/? | Not started | - |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
