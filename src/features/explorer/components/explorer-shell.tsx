@@ -83,7 +83,7 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
       {/* Scan confirmation dialog (D-04) */}
       <AlertDialog
         open={pendingScanRequest !== null}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
           if (!open) dismissPendingScan();
         }}
       >
