@@ -2217,6 +2217,7 @@ dependencies = [
  "chrono",
  "encoding_rs",
  "futures-util",
+ "glob",
  "once_cell",
  "regex",
  "serde",
@@ -2234,6 +2235,7 @@ dependencies = [
  "tiberius",
  "tokio",
  "tokio-util",
+ "walkdir",
 ]
 
 [[package]]

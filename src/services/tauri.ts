@@ -8,7 +8,11 @@ import type {
   AppSettings,
   SettingsUpdate,
 } from "@/features/settings/services/settings-service";
-import type { DirEntry, FileContent } from "@/features/explorer/types";
+import type {
+  DirEntry,
+  FileContent,
+  ScanSummary,
+} from "@/features/explorer/types";
 
 // Centralized error handling wrapper
 async function invokeCommand<T>(
@@ -59,4 +63,14 @@ export const tauri = {
     invokeCommand<AppSettings>("toggle_favorite_cmd", { sourceId, clientName }),
   readFile: (path: string) =>
     invokeCommand<FileContent>("read_file_cmd", { path }),
+
+  // Bulk scan commands
+  bulkScan: (folderPath: string, filePattern: string, operationId: string) =>
+    invokeCommand<ScanSummary>("bulk_scan_cmd", {
+      folderPath,
+      filePattern,
+      operationId,
+    }),
+  cancelScan: (operationId: string) =>
+    invokeCommand<void>("cancel_scan_cmd", { operationId }),
 };

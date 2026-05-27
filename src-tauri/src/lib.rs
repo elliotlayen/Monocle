@@ -6,9 +6,9 @@ mod types;
 mod validation;
 
 use commands::{
-    cancel_directory_cmd, check_path_reachable, get_settings, list_databases_cmd, list_directory_cmd,
-    load_schema_cmd, load_schema_mock, read_file_cmd, save_settings, set_menu_ui_state_cmd,
-    toggle_favorite_cmd, ExplorerState,
+    bulk_scan_cmd, cancel_directory_cmd, cancel_scan_cmd, check_path_reachable, get_settings,
+    list_databases_cmd, list_directory_cmd, load_schema_cmd, load_schema_mock, read_file_cmd,
+    save_settings, set_menu_ui_state_cmd, toggle_favorite_cmd, ExplorerState,
 };
 use state::AppState;
 use std::collections::HashMap;
@@ -56,6 +56,8 @@ pub fn run() {
             check_path_reachable,
             toggle_favorite_cmd,
             read_file_cmd,
+            bulk_scan_cmd,
+            cancel_scan_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

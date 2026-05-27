@@ -66,3 +66,43 @@ export interface FileTab {
   encoding: string;
   hasBom: boolean;
 }
+
+// Bulk scan types
+
+export interface ScanProgressPayload {
+  filePath: string;
+  fileName: string;
+  status: "clean" | "error" | "warning";
+  errorCount: number;
+  warningCount: number;
+  filesProcessed: number;
+  totalFiles: number;
+  totalErrors: number;
+  totalWarnings: number;
+  totalClean: number;
+}
+
+export interface ScanFileResult {
+  filePath: string;
+  fileName: string;
+  relativePath: string;
+  status: "clean" | "error" | "warning";
+  problems: ValidationProblem[];
+  encoding: string;
+  hasBom: boolean;
+}
+
+export interface ScanSummary {
+  folderPath: string;
+  filePattern: string;
+  totalFiles: number;
+  errorFiles: number;
+  warningFiles: number;
+  cleanFiles: number;
+  totalErrors: number;
+  totalWarnings: number;
+  files: ScanFileResult[];
+  cancelled: boolean;
+}
+
+export type ScanStatus = "idle" | "scanning" | "completed" | "cancelled";

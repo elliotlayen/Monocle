@@ -1,5 +1,5 @@
 import { tauri } from "@/services/tauri";
-import type { DirEntry, FileContent } from "../types";
+import type { DirEntry, FileContent, ScanSummary } from "../types";
 import type { AppSettings } from "@/features/settings/services/settings-service";
 
 export const explorerService = {
@@ -18,4 +18,13 @@ export const explorerService = {
   ): Promise<AppSettings> => tauri.toggleFavorite(sourceId, clientName),
 
   readFile: (path: string): Promise<FileContent> => tauri.readFile(path),
+
+  bulkScan: (
+    folderPath: string,
+    filePattern: string,
+    operationId: string
+  ): Promise<ScanSummary> => tauri.bulkScan(folderPath, filePattern, operationId),
+
+  cancelScan: (operationId: string): Promise<void> =>
+    tauri.cancelScan(operationId),
 };

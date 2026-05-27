@@ -41,8 +41,9 @@ export function useTauriEvent<T>(
 }
 
 // Event hubs (add as needed when backend emits events)
-// Example:
-// export const connectionStatusHub = createEventHub<{ connected: boolean }>("connection-status");
+import type { ScanProgressPayload } from "@/features/explorer/types";
+export const scanProgressHub =
+  createEventHub<ScanProgressPayload>("scan-progress");
 
 // Menu event hubs for cross-component communication
 export const menuToggleSidebarHub = createEventHub<void>("menu:toggle-sidebar");

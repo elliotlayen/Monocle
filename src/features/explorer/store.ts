@@ -7,12 +7,16 @@ import type {
   ViewMode,
   ValidationProblem,
   ValidationStatus,
+  ScanStatus,
+  ScanProgressPayload,
+  ScanSummary,
 } from "./types";
 import { explorerService } from "./services/explorer-service";
 import { settingsService } from "@/features/settings/services/settings-service";
 import { showToast } from "@/features/notifications/store";
 import { disambiguateTabNames } from "./utils/tab-disambiguator";
 import { parseXml } from "./utils/xml-parser";
+import { computeAggregateBadges } from "./utils/badge-aggregation";
 
 interface ExplorerStore {
   // State
@@ -33,6 +37,21 @@ interface ExplorerStore {
   problemsPanelOpen: boolean;
   problemsPanelHeight: number;
   pendingJump: { tabId: string; line: number; column: number } | null;
+
+  // Scan state
+  scanStatus: ScanStatus;
+  scanOperationId: string | null;
+  scanFolderPath: string | null;
+  scanFolderName: string | null;
+  scanFilePattern: string;
+  scanProgress: ScanProgressPayload | null;
+  scanResult: ScanSummary | null;
+  folderBadgeCache: Map<string, ValidationStatus>;
+  lastInteractedFolderPath: string | null;
+  pendingScanRequest: {
+    folderPath: string;
+    filePattern: string;
+  } | null;
 
   // Actions
   loadSources: () => Promise<void>;
@@ -60,6 +79,18 @@ interface ExplorerStore {
   jumpToProblem: (tabId: string, line: number, column: number) => void;
   clearPendingJump: () => void;
   getValidationStatus: (filePath: string) => ValidationStatus | undefined;
+
+  // Scan actions
+  requestScan: (folderPath: string, filePattern: string) => void;
+  startScan: (folderPath: string, filePattern: string) => Promise<void>;
+  updateScanProgress: (payload: ScanProgressPayload) => void;
+  cancelScan: () => Promise<void>;
+  clearScanResult: () => void;
+  setScanFilePattern: (pattern: string) => void;
+  setLastInteractedFolder: (path: string) => void;
+  getFolderBadge: (folderPath: string) => ValidationStatus | undefined;
+  confirmPendingScan: () => void;
+  dismissPendingScan: () => void;
 }
 
 function buildChildNodes(
@@ -127,6 +158,18 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   problemsPanelOpen: false,
   problemsPanelHeight: 200,
   pendingJump: null,
+
+  // Scan initial state
+  scanStatus: "idle",
+  scanOperationId: null,
+  scanFolderPath: null,
+  scanFolderName: null,
+  scanFilePattern: "*.xml",
+  scanProgress: null,
+  scanResult: null,
+  folderBadgeCache: new Map(),
+  lastInteractedFolderPath: null,
+  pendingScanRequest: null,
 
   loadSources: async () => {
     try {
@@ -543,5 +586,167 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     if (cached.problems.some((p) => p.severity === "error")) return "error";
     if (cached.problems.some((p) => p.severity === "warning")) return "warning";
     return "clean";
+  },
+
+  // Scan actions
+
+  requestScan: (folderPath: string, filePattern: string) => {
+    const { scanStatus } = get();
+    if (scanStatus === "scanning") {
+      // Store pending request for confirmation dialog (D-04)
+      set({ pendingScanRequest: { folderPath, filePattern } });
+    } else {
+      get().startScan(folderPath, filePattern);
+    }
+  },
+
+  startScan: async (folderPath: string, filePattern: string) => {
+    const operationId = crypto.randomUUID();
+    const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
+
+    set({
+      scanStatus: "scanning",
+      scanOperationId: operationId,
+      scanFolderPath: folderPath,
+      scanFolderName: folderName,
+      scanProgress: null,
+      scanResult: null,
+      pendingScanRequest: null,
+    });
+
+    try {
+      const result = await explorerService.bulkScan(
+        folderPath,
+        filePattern,
+        operationId
+      );
+
+      // Update validation cache with all file results
+      const nextCache = new Map(get().validationCache);
+      for (const file of result.files) {
+        nextCache.set(file.filePath, {
+          problems: file.problems,
+          encoding: file.encoding,
+          hasBom: file.hasBom,
+        });
+      }
+
+      // Compute folder badge cache
+      const folderBadges = computeAggregateBadges(result.files, folderPath);
+
+      set({
+        scanStatus: result.cancelled ? "cancelled" : "completed",
+        scanResult: result,
+        scanOperationId: null,
+        validationCache: nextCache,
+        folderBadgeCache: folderBadges,
+      });
+    } catch {
+      set({
+        scanStatus: "idle",
+        scanOperationId: null,
+      });
+      showToast({
+        type: "error",
+        title: "Scan failed",
+        message: "An error occurred while scanning the folder",
+        duration: 5000,
+      });
+    }
+  },
+
+  updateScanProgress: (payload: ScanProgressPayload) => {
+    // Update validation cache entry for the scanned file
+    const nextCache = new Map(get().validationCache);
+    nextCache.set(payload.filePath, {
+      problems: [], // Minimal entry; full problems come with ScanSummary
+      encoding: "",
+      hasBom: false,
+    });
+
+    // Set a synthetic problem entry based on status so getValidationStatus works
+    if (payload.status === "error") {
+      nextCache.set(payload.filePath, {
+        problems: [
+          {
+            line: 0,
+            column: 0,
+            endColumn: 0,
+            message: "Has errors (details available after scan completes)",
+            severity: "error",
+            code: "scan-preview",
+          },
+        ],
+        encoding: "",
+        hasBom: false,
+      });
+    } else if (payload.status === "warning") {
+      nextCache.set(payload.filePath, {
+        problems: [
+          {
+            line: 0,
+            column: 0,
+            endColumn: 0,
+            message: "Has warnings (details available after scan completes)",
+            severity: "warning",
+            code: "scan-preview",
+          },
+        ],
+        encoding: "",
+        hasBom: false,
+      });
+    }
+
+    set({ scanProgress: payload, validationCache: nextCache });
+  },
+
+  cancelScan: async () => {
+    const { scanOperationId } = get();
+    if (scanOperationId) {
+      try {
+        await explorerService.cancelScan(scanOperationId);
+      } catch {
+        // Best-effort cancel
+      }
+    }
+  },
+
+  clearScanResult: () => {
+    set({
+      scanStatus: "idle",
+      scanResult: null,
+      scanProgress: null,
+    });
+  },
+
+  setScanFilePattern: (pattern: string) => {
+    set({ scanFilePattern: pattern });
+  },
+
+  setLastInteractedFolder: (path: string) => {
+    set({ lastInteractedFolderPath: path });
+  },
+
+  getFolderBadge: (folderPath: string): ValidationStatus | undefined => {
+    return get().folderBadgeCache.get(folderPath);
+  },
+
+  confirmPendingScan: () => {
+    const { pendingScanRequest } = get();
+    if (!pendingScanRequest) return;
+
+    const { folderPath, filePattern } = pendingScanRequest;
+    // Cancel current scan, then start new one
+    const doIt = async () => {
+      await get().cancelScan();
+      // Small delay to allow cancellation to propagate
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      get().startScan(folderPath, filePattern);
+    };
+    doIt();
+  },
+
+  dismissPendingScan: () => {
+    set({ pendingScanRequest: null });
   },
 }));
