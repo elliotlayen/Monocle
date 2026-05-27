@@ -691,19 +691,19 @@ let files: Vec<_> = WalkDir::new("/path/to/scan")
 | A4 | `walkdir` handles UNC paths on Windows without hanging | Pitfalls | MEDIUM -- walkdir uses `std::fs` internally (same as existing working code), but untested with UNC paths in this project. Needs real-world validation. |
 | A5 | Tauri `app.emit()` can be called from within `spawn_blocking` closure | Architecture | LOW -- AppHandle is Clone + Send, should work in blocking thread. Already confirmed by Tauri docs showing it used in commands. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Event throttling strategy for fast scans**
+1. **Event throttling strategy for fast scans** (RESOLVED: 50ms throttle implemented in bulk_scan_cmd)
    - What we know: Local SSD scans could process thousands of files/second. Tauri docs note events "directly evaluate JavaScript" and are "not designed for high throughput."
    - What's unclear: Exact threshold where event frequency causes frontend lag.
    - Recommendation: Implement simple throttling (emit at most every 50ms) in the Rust scan loop. Test with a local directory of 1000+ small XML files.
 
-2. **Scan results tab lifecycle**
+2. **Scan results tab lifecycle** (RESOLVED: old results tab removed when new scan starts)
    - What we know: D-12 says tab persists until user closes it. Session-only.
    - What's unclear: What happens if user starts a new scan while old results tab is open? Should old results tab close automatically?
    - Recommendation: Close previous scan results tab when starting a new scan (since D-04 only allows one scan at a time, keeping old results alongside progress is confusing).
 
-3. **Maximum scan size guardrails**
+3. **Maximum scan size guardrails** (RESOLVED: two-phase approach shows file count; cancellation always available)
    - What we know: Network shares can have hundreds of thousands of files.
    - What's unclear: Should there be a confirmation dialog for very large scans (e.g., >10,000 files)?
    - Recommendation: Show file count after the initial walkdir pass (before validation starts) and let the user confirm or cancel if count exceeds a threshold. This is a UX enhancement the planner can include.
