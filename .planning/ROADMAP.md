@@ -183,7 +183,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 06-01-PLAN.md -- Rust content_search_cmd with query parsing, types/IPC/events/store data layer, encoding-safe file search with streaming results
+- [x] 06-01-PLAN.md -- Rust content_search_cmd with query parsing, types/IPC/events/store data layer, encoding-safe file search with streaming results
 
 **Wave 2**
 
@@ -290,7 +290,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
 | 5. Bulk Validation & Reporting | 2/2 | Complete    | 2026-05-27 |
-| 6. Search | 0/3 | Planned | - |
+| 6. Search | 1/3 | In Progress|  |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
 | 9. Folder Watching & Notifications | 0/? | Not started | - |
