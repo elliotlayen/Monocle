@@ -800,6 +800,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   updateScanProgress: (payload: ScanProgressPayload) => {
+    const { scanOperationId } = get();
+    if (payload.operationId !== scanOperationId) return;
     // Update validation cache entry for the scanned file
     const nextCache = new Map(get().validationCache);
     nextCache.set(payload.filePath, {

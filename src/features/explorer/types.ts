@@ -71,6 +71,7 @@ export interface FileTab {
 // Bulk scan types
 
 export interface ScanProgressPayload {
+  operationId: string;
   filePath: string;
   fileName: string;
   status: "clean" | "error" | "warning";

@@ -479,6 +479,7 @@ pub async fn content_search_cmd(
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanProgressPayload {
+    pub operation_id: String,
     pub file_path: String,
     pub file_name: String,
     pub status: String,
@@ -541,6 +542,7 @@ pub async fn bulk_scan_cmd(
     }
 
     let op_id = operation_id.clone();
+    let op_id_cleanup = op_id.clone();
     let folder_path_clone = folder_path.clone();
     let file_pattern_clone = file_pattern.clone();
 
@@ -659,6 +661,7 @@ pub async fn bulk_scan_cmd(
             let elapsed = last_emit_time.elapsed();
             if elapsed >= Duration::from_millis(50) || is_last {
                 let payload = ScanProgressPayload {
+                    operation_id: op_id.clone(),
                     file_path: file_path.to_string_lossy().to_string(),
                     file_name,
                     status: status.to_string(),
@@ -693,7 +696,7 @@ pub async fn bulk_scan_cmd(
 
     // Clean up active listing
     if let Ok(mut listings) = explorer_state.active_listings.lock() {
-        listings.remove(&op_id);
+        listings.remove(&op_id_cleanup);
     }
 
     Ok(result)
@@ -863,6 +866,7 @@ mod tests {
     #[test]
     fn test_scan_progress_payload_clone() {
         let payload = ScanProgressPayload {
+            operation_id: "test-op-id".to_string(),
             file_path: "/test/file.xml".to_string(),
             file_name: "file.xml".to_string(),
             status: "error".to_string(),
