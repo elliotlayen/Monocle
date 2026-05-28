@@ -9,6 +9,7 @@ import { XmlTreeView, type XmlTreeViewHandle } from "./xml-tree-view";
 import { ProblemsPanel } from "./problems-panel";
 import { ValidationStatusBar } from "./validation-status-bar";
 import { ScanResultsTab } from "./scan-results-tab";
+import { formatXml } from "../utils/xml-formatter";
 
 export function FileContentArea() {
   const treeViewRef = useRef<XmlTreeViewHandle>(null);
@@ -48,6 +49,31 @@ export function FileContentArea() {
   );
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // Format toggle state (local -- view-only concern)
+  const [isFormatted, setIsFormatted] = useState(false);
+  const prevTabIdRef = useRef(activeTabId);
+
+  // Reset format state when switching tabs
+  useEffect(() => {
+    if (activeTabId !== prevTabIdRef.current) {
+      setIsFormatted(false);
+      prevTabIdRef.current = activeTabId;
+    }
+  }, [activeTabId]);
+
+  const handleToggleFormat = useCallback(() => {
+    setIsFormatted((prev) => !prev);
+  }, []);
+
+  // Compute display content for source view
+  const sourceContent = useMemo(() => {
+    if (!activeTab) return "";
+    if (isFormatted && activeTab.isXml && activeTab.viewMode === "source") {
+      return formatXml(activeTab.content);
+    }
+    return activeTab.content;
+  }, [activeTab?.content, activeTab?.isXml, activeTab?.viewMode, isFormatted]);
 
   const treeExpandedIds = useMemo(
     () => new Set(activeTab?.treeExpandedIds ?? []),
@@ -159,6 +185,8 @@ export function FileContentArea() {
     <div ref={contentAreaRef} className="flex flex-col flex-1 overflow-hidden">
       <FileContentHeader
         tab={activeTab}
+        isFormatted={isFormatted}
+        onToggleFormat={handleToggleFormat}
         onExpandAll={showTreeView ? () => treeViewRef.current?.expandAll() : () => sourceViewRef.current?.unfoldAll()}
         onCollapseAll={showTreeView ? () => treeViewRef.current?.collapseAll() : () => sourceViewRef.current?.foldAll()}
       />
@@ -190,7 +218,7 @@ export function FileContentArea() {
       ) : (
         <XmlSourceView
           ref={sourceViewRef}
-          content={activeTab.content}
+          content={sourceContent}
           isXml={activeTab.isXml}
           tabId={activeTab.id}
           scrollPosition={activeTab.scrollPosition.source}

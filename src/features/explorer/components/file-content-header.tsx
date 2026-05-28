@@ -1,4 +1,4 @@
-import { FileCode, FileText, TreePine, Code, Copy, ClipboardCopy, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { FileCode, FileText, TreePine, Code, Copy, ClipboardCopy, ChevronsDownUp, ChevronsUpDown, WrapText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -15,11 +15,13 @@ import type { FileTab } from "../types";
 
 interface FileContentHeaderProps {
   tab: FileTab;
+  isFormatted?: boolean;
+  onToggleFormat?: () => void;
   onExpandAll?: () => void;
   onCollapseAll?: () => void;
 }
 
-export function FileContentHeader({ tab, onExpandAll, onCollapseAll }: FileContentHeaderProps) {
+export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAll, onCollapseAll }: FileContentHeaderProps) {
   const setViewMode = useExplorerStore((state) => state.setViewMode);
   const { copyPath, copyContent } = useFileActions();
 
@@ -95,6 +97,27 @@ export function FileContentHeader({ tab, onExpandAll, onCollapseAll }: FileConte
             Source
           </button>
         </div>
+      )}
+
+      {/* Format XML toggle -- only in source view for XML files */}
+      {tab.isXml && tab.viewMode === "source" && onToggleFormat && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-7 w-7", isFormatted && "bg-accent")}
+                onClick={onToggleFormat}
+              >
+                <WrapText className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{isFormatted ? "Show raw XML" : "Format XML (line numbers refer to original)"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       {/* Expand/Collapse all -- only when tree view is active */}
