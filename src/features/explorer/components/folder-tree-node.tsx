@@ -275,12 +275,12 @@ export function FolderTreeNode({
   );
 
   // Check if file is open in a tab (for enabling content-dependent actions)
-  const isFileOpenInTab = !node.isDir
-    ? useExplorerStore.getState().tabs.some((t) => t.id === node.path)
-    : false;
-  const openTab = !node.isDir
-    ? useExplorerStore.getState().tabs.find((t) => t.id === node.path)
-    : undefined;
+  const isFileOpenInTab = useExplorerStore((state) =>
+    !node.isDir ? state.tabs.some((t) => t.id === node.path) : false
+  );
+  const openTab = useExplorerStore((state) =>
+    !node.isDir ? state.tabs.find((t) => t.id === node.path) : undefined
+  );
 
   // Wrap nodes with context menus
   const wrappedRow = !node.isDir ? (
