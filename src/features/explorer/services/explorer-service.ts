@@ -28,6 +28,12 @@ export const explorerService = {
   cancelScan: (operationId: string): Promise<void> =>
     tauri.cancelScan(operationId),
 
+  // cancelContentSearch shares the active_listings map with cancelScan —
+  // both scan and content-search operations are keyed by operationId in the
+  // same backend HashMap, so cancel_scan_cmd correctly cancels either.
+  cancelContentSearch: (operationId: string): Promise<void> =>
+    tauri.cancelScan(operationId),
+
   contentSearch: (
     query: string,
     folderPaths: string,

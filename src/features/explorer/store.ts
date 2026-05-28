@@ -1038,7 +1038,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const { searchOperationId } = get();
     if (searchOperationId) {
       try {
-        await explorerService.cancelScan(searchOperationId);
+        await explorerService.cancelContentSearch(searchOperationId);
       } catch {
         // Best-effort cancel
       }
