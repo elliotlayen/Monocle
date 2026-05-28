@@ -11,9 +11,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useExplorerStore } from "../store";
 import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
+import { useSearch } from "../hooks/use-search";
 import { FolderTree } from "./folder-tree";
 import { SearchBar } from "./search-bar";
 import { SearchControlsRow } from "./search-controls-row";
+import { SearchResults } from "./search-results";
 
 export function ExplorerSidebar() {
   const {
@@ -29,6 +31,12 @@ export function ExplorerSidebar() {
     setSearchScope,
     lastInteractedFolderPath,
     folderSources,
+    searchResults,
+    searchErrors,
+    searchSummary,
+    searchProgress,
+    searchQuery,
+    openFile,
   } = useExplorerStore(
     useShallow((state) => ({
       sidebarOpen: state.sidebarOpen,
@@ -43,8 +51,17 @@ export function ExplorerSidebar() {
       setSearchScope: state.setSearchScope,
       lastInteractedFolderPath: state.lastInteractedFolderPath,
       folderSources: state.folderSources,
+      searchResults: state.searchResults,
+      searchErrors: state.searchErrors,
+      searchSummary: state.searchSummary,
+      searchProgress: state.searchProgress,
+      searchQuery: state.searchQuery,
+      openFile: state.openFile,
     }))
   );
+
+  // Subscribe to search events (searchResultHub, searchProgressHub)
+  const { cancelContentSearch, clearSearchResults } = useSearch();
 
   const { width, isDragging, startDrag } = useExplorerSidebar(
     sidebarWidth,
@@ -90,6 +107,16 @@ export function ExplorerSidebar() {
     return null;
   })();
 
+  // Derive scope label for SearchResults
+  const currentScopeLabel = (() => {
+    const store = useExplorerStore.getState();
+    const scope = store.searchScope;
+    if (scope === "folder" && selectedNodeName) return `Folder: ${selectedNodeName}`;
+    if (scope === "source" && selectedSourceLabel) return `Source: ${selectedSourceLabel}`;
+    if (scope === "all") return "All sources";
+    return "";
+  })();
+
   // Wire onSearch for SearchControlsRow
   const handleSearch = useCallback(() => {
     const store = useExplorerStore.getState();
@@ -118,6 +145,28 @@ export function ExplorerSidebar() {
   const handleSearchExecute = useCallback(() => {
     handleSearch();
   }, [handleSearch]);
+
+  // Wire file click from search results
+  const handleFileClick = useCallback(
+    (filePath: string) => {
+      openFile(filePath);
+    },
+    [openFile]
+  );
+
+  // Determine what to show in the body area
+  const showSearchResults =
+    searchMode === "content" &&
+    (searchStatus !== "idle" ||
+      searchResults.length > 0 ||
+      searchErrors.length > 0);
+
+  const showNoSelectionPrompt =
+    searchMode === "content" &&
+    searchStatus === "idle" &&
+    searchResults.length === 0 &&
+    searchErrors.length === 0 &&
+    !selectedNodePath;
 
   return (
     <div
@@ -184,8 +233,35 @@ export function ExplorerSidebar() {
           />
         )}
 
-        {/* Tree body */}
-        <FolderTree />
+        {/* Body: SearchResults, no-selection prompt, or FolderTree */}
+        {showSearchResults ? (
+          <SearchResults
+            results={searchResults}
+            errors={searchErrors}
+            summary={searchSummary}
+            progress={searchProgress}
+            status={searchStatus}
+            scopeLabel={searchSummary?.scopeLabel ?? currentScopeLabel}
+            searchQuery={searchQuery}
+            onCancel={cancelContentSearch}
+            onClear={clearSearchResults}
+            onFileClick={handleFileClick}
+          />
+        ) : showNoSelectionPrompt ? (
+          <>
+            <div className="flex flex-col items-center justify-center py-12 px-8">
+              <p className="text-sm text-muted-foreground text-center">
+                Select a folder in the tree
+              </p>
+              <p className="text-sm text-muted-foreground text-center">
+                to set search scope
+              </p>
+            </div>
+            <FolderTree />
+          </>
+        ) : (
+          <FolderTree />
+        )}
       </div>
 
       {/* Resize handle */}
