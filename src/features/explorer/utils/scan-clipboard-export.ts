@@ -34,6 +34,10 @@ export function formatScanAsText(result: ScanSummary): string {
   return lines.join("\n");
 }
 
+function escapeMarkdownCell(value: string): string {
+  return value.replace(/\|/g, "\\|");
+}
+
 export function formatScanAsMarkdown(result: ScanSummary): string {
   const lines: string[] = [];
 
@@ -73,7 +77,7 @@ export function formatScanAsMarkdown(result: ScanSummary): string {
     }
 
     lines.push(
-      `| ${file.relativePath} | ${statusBadge} | ${errorCount} | ${warningCount} | ${file.encoding} |`
+      `| ${escapeMarkdownCell(file.relativePath)} | ${statusBadge} | ${errorCount} | ${warningCount} | ${escapeMarkdownCell(file.encoding)} |`
     );
   }
 
