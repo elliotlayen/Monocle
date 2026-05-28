@@ -606,22 +606,26 @@ for folder_path in &folder_paths {
 | A3 | Monaco `findMatches()` with `matchCase: false` produces same match count as Rust `to_lowercase().matches()` for the same input | Pitfalls | Medium -- Unicode edge cases may differ between Rust and JavaScript lowercase. Acceptable because match count is informational, not authoritative |
 | A4 | For "All sources" scope, backend accepts a JSON array of folder paths rather than a single path | Architecture | Low -- alternative is making multiple IPC calls. Single call with array is simpler |
 
-## Open Questions
+
+## Open Questions (RESOLVED)
 
 1. **Keyboard shortcut handling when Monaco editor is focused**
    - What we know: Cmd+F is Monaco's native "Find" shortcut. D-08 wants Cmd+F to focus sidebar search.
    - What's unclear: Whether to intercept Cmd+F globally (breaking Monaco's native find) or only when sidebar/tree has focus.
    - Recommendation: Register shortcuts at the Explorer shell level. When Monaco editor has focus, let its native find work. Add a note in the UI (tooltip) that Cmd+F focuses sidebar search when sidebar is focused. This avoids breaking Monaco's UX.
+   - RESOLVED: Plan 06-03 Task 1 checks `document.activeElement?.closest('.monaco-editor')` before intercepting. When Monaco has focus, its native Cmd+F is preserved.
 
 2. **"All sources" scope: single command call or multiple?**
    - What we know: D-09 has "All sources" as a scope option. The backend `content_search_cmd` could accept either a single folder path or an array.
    - What's unclear: Whether to pass all source paths in one call or iterate from the frontend.
    - Recommendation: Accept a `folder_paths: Vec<String>` parameter (JSON array). A single backend call with all paths is simpler for cancellation and progress tracking.
+   - RESOLVED: Plan 06-01 Task 1 implements `folder_paths: String` (JSON array) parameter. Single backend call with all paths.
 
 3. **Match count discrepancy between backend and Monaco**
    - What we know: Backend counts matches via `to_lowercase().matches()`. Monaco counts via `findMatches()` with `matchCase: false`.
    - What's unclear: Whether they will always produce identical counts for the same content.
    - Recommendation: Accept minor discrepancies. The backend count is for the results list; Monaco highlighting is for visual reference. Document this as expected behavior.
+   - RESOLVED: Accepted as expected behavior. Backend count is for results list sorting/display; Monaco highlighting is for visual reference only. Documented in Assumptions Log A3.
 
 ## Environment Availability
 
