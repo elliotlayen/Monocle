@@ -84,7 +84,9 @@ function renderElementNode(
         <FileCode className="h-3.5 w-3.5 flex-shrink-0" />
 
         {/* Tag name */}
-        <span className="text-sm text-foreground">{node.tagName}</span>
+        <span className="text-sm text-[oklch(0.55_0.18_280)] dark:text-[oklch(0.72_0.14_280)]">
+          {node.tagName}
+        </span>
 
         {/* Inline attributes */}
         {shownAttrs > 0 && (
