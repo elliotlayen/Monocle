@@ -25,6 +25,8 @@ created: 2026-05-28
 
 Source: `components.json`, Phase 2/3/4 UI-SPEC contracts.
 
+**Focal point:** Primary visual anchor is the unified search input at the top of the sidebar. All other search UI elements (controls row, results list, progress indicator) are subordinate to this input.
+
 ---
 
 ## Spacing Scale
@@ -34,12 +36,18 @@ Declared values (must be multiples of 4):
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Icon-to-label gaps in search results, toggle pill internal padding, inline gaps |
-| sm | 8px | Search bar row internal padding, controls row gaps, result row internal padding |
-| md | 12px | Sidebar header padding (`p-3`), search bar vertical padding |
-| lg | 16px | Results area horizontal padding (`px-4`), summary header horizontal padding |
-| xl | 24px | Section spacing (not used in this phase) |
+| sm | 8px | Search bar row internal padding, controls row gaps, result row internal padding, folder group header vertical padding (`py-1`) and icon gaps (`gap-2`) |
+| md | 16px | Results area horizontal padding (`px-4`), summary header horizontal padding |
+| lg | 24px | Section spacing (not used in this phase) |
+| xl | 32px | Layout gaps (not used in this phase) |
+| 2xl | 48px | Major section breaks (not used in this phase) |
+| 3xl | 64px | Page-level spacing (not used in this phase) |
 
-Exceptions: Segmented control toggle buttons are 24px tall (`h-6`) to stay compact next to the 32px (`h-8`) search input. The controls row in Content mode is 32px tall to match input/button heights. Sidebar width remains the existing resizable value (default 280px, min 200px, max 480px) from Phase 2.
+Exceptions:
+- Segmented control toggle buttons are 24px tall (`h-6`) to stay compact next to the 32px (`h-8`) search input.
+- The controls row in Content mode is 32px tall to match input/button heights.
+- Sidebar width remains the existing resizable value (default 280px, min 200px, max 480px) from Phase 2.
+- Sidebar-internal horizontal padding uses `px-3` (12px) inherited from the existing `explorer-sidebar.tsx` header container (`p-3`). This is an existing codebase pattern outside this phase's control; new Phase 6 components align to this value for visual consistency with the existing sidebar. The 12px value is NOT in the declared scale -- it is a justified exception for codebase alignment only.
 
 ---
 
@@ -48,13 +56,11 @@ Exceptions: Segmented control toggle buttons are 24px tall (`h-6`) to stay compa
 | Role | Size | Weight | Line Height | Usage in Phase 6 |
 |------|------|--------|-------------|-------------------|
 | Body | 14px (text-sm) | 400 (normal) | 1.43 (20px) | Search input text, result filenames, scope dropdown labels, file pattern input text |
-| Label | 12px (text-xs) | 400 (normal) | 1.33 (16px) | Match count per file, summary header stats, progress indicator text, error messages in result rows, folder group headers |
+| Label | 12px (text-xs) | 400 (normal) | 1.33 (16px) | Match count per file, summary header stats, progress indicator text, error messages in result rows, folder group headers, toggle button text (Filename/Content) |
 | Heading | 14px (text-sm) | 600 (font-semibold) | 1.43 (20px) | "Explorer" sidebar heading (existing), summary header label |
 | Display | 20px (text-xl) | 600 (font-semibold) | 1.4 (28px) | Not used in this phase |
 
 Two-weight contract: **400 regular** and **600 semibold**. No other weights.
-
-Toggle button text (Filename/Content) uses 12px (text-xs) at weight 500 (font-medium) -- this is the only exception, matching shadcn Button `size="sm"` defaults.
 
 ---
 
@@ -73,7 +79,7 @@ Additional semantic colors for this phase:
 |------|-------|-------|
 | Match highlight (Monaco) | `oklch(0.82 0.12 85 / 0.25)` light, `oklch(0.80 0.12 85 / 0.20)` dark | Monaco find-match decoration background when opening a file from search results |
 | Current match highlight (Monaco) | `oklch(0.82 0.12 85 / 0.50)` light, `oklch(0.80 0.12 85 / 0.40)` dark | Monaco current-find-match decoration for the first match scrolled to |
-| Primary (search button) | `var(--primary)` | Search button fill in Content mode |
+| Primary (search button) | `var(--primary)` | Search Files button fill in Content mode |
 | Muted text | `var(--muted-foreground)` | Match counts, progress text, scope labels, placeholder text, "Select a folder" prompt |
 
 Accent reserved for: active toggle segment background (`bg-accent`), hovered search result row (`hover:bg-accent`). Never used for text color or icons.
@@ -87,11 +93,11 @@ Accent reserved for: active toggle segment background (`bg-accent`), hovered sea
 | Component | Location | Description |
 |-----------|----------|-------------|
 | `SearchBar` | `src/features/explorer/components/search-bar.tsx` | Unified search input with Filename/Content segmented toggle. Replaces the existing filter input in `ExplorerSidebar`. Contains the input field and toggle control. |
-| `SearchControlsRow` | `src/features/explorer/components/search-controls-row.tsx` | Compact row below search bar, visible only in Content mode. Contains scope dropdown, file pattern input, and Search button on a single line. |
+| `SearchControlsRow` | `src/features/explorer/components/search-controls-row.tsx` | Compact row below search bar, visible only in Content mode. Contains scope dropdown, file pattern input, and Search Files button on a single line. |
 | `SearchResults` | `src/features/explorer/components/search-results.tsx` | Container that replaces the folder tree when content search results are displayed. Contains summary header, progress indicator, and grouped result list. |
 | `SearchResultGroup` | `src/features/explorer/components/search-result-group.tsx` | Collapsible folder group within search results. Shows folder path as header and file results as children. |
 | `SearchResultRow` | `src/features/explorer/components/search-result-row.tsx` | Single file entry in search results. Shows filename and match count. Clickable to open file with match highlighting. |
-| `SearchProgress` | `src/features/explorer/components/search-progress.tsx` | Inline progress indicator at top of results area during active search. Shows files scanned count and cancel button. |
+| `SearchProgress` | `src/features/explorer/components/search-progress.tsx` | Inline progress indicator at top of results area during active search. Shows files scanned count and Stop Search button. |
 
 ### Existing Components Modified
 
@@ -105,7 +111,7 @@ Accent reserved for: active toggle segment background (`bg-accent`), hovered sea
 | Component | Usage in This Phase |
 |-----------|-------------------|
 | `Input` | Search text input, file pattern input |
-| `Button` | Toggle segments (variant="ghost"), Search button (variant="default"), Cancel button (variant="outline") |
+| `Button` | Toggle segments (variant="ghost"), Search Files button (variant="default"), Stop Search button (variant="outline") |
 | `Select` | Scope dropdown (SelectTrigger + SelectContent + SelectItem) |
 | `ScrollArea` | Search results scrollable list |
 | `Tooltip` | Keyboard shortcut hints on toggle segments |
@@ -119,13 +125,15 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 | Icon | Usage |
 |------|-------|
 | `Search` | Search input left icon (h-4 w-4, muted-foreground) -- reuses existing pattern |
-| `X` | Clear search input button (h-3.5 w-3.5), cancel search button icon (h-3.5 w-3.5) |
+| `X` | Clear search input button (h-3.5 w-3.5), Stop Search button icon (h-3.5 w-3.5) |
 | `FileText` | File result row icon (h-4 w-4, muted-foreground) |
 | `Folder` | Folder group header icon (h-3.5 w-3.5, muted-foreground) |
 | `ChevronDown` | Folder group expanded indicator (h-3.5 w-3.5) |
 | `ChevronRight` | Folder group collapsed indicator (h-3.5 w-3.5) |
 | `AlertCircle` | Error file result icon (h-4 w-4, destructive color) |
 | `Loader2` | Search in-progress spinner (h-4 w-4, animate-spin) |
+
+Icon-only clear button (`X` inside the search input) is a justified exception to label requirements -- the button has `aria-label="Clear search"` and sits in a universally understood position (right edge of input field). The icon-only pattern is standard for inline clear affordances.
 
 ---
 
@@ -139,7 +147,7 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 +--------------------------------------------+
 | [Search icon] [___search input___] [Fn|Ct] |
 +--------------------------------------------+
-| [scope dropdown] [*.xml] [Search]          |  <- Content mode only
+| [scope dropdown] [*.xml] [Search Files]    |  <- Content mode only
 +--------------------------------------------+
 |                                            |
 |  FolderTree (Filename mode)                |
@@ -161,7 +169,7 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 - Search icon: `Search` lucide icon, `absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground` (positioned inside input via relative parent)
 - Input: `h-8 text-sm pl-8 pr-8 flex-1` -- shadcn `Input` component. When text is present, shows an `X` clear button at the right edge (`absolute right-2 top-1/2 -translate-y-1/2`).
 - Segmented toggle: two adjacent ghost buttons acting as a toggle group, `flex items-center rounded-md border bg-muted/50`
-  - Each button: `h-6 px-2 text-xs font-medium rounded-sm` with `bg-transparent` when inactive, `bg-background shadow-sm` when active
+  - Each button: `h-6 px-2 text-xs font-semibold rounded-sm` with `bg-transparent` when inactive, `bg-background shadow-sm` when active
   - Labels: "Filename" and "Content"
   - Active segment: solid background with subtle shadow to appear raised
   - Total toggle width: auto (fits content), approximately 140px
@@ -169,17 +177,17 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 ### SearchControlsRow (Content mode only, D-04)
 
 ```
-[Scope: Folder: 20251223  v] [*.xml    ] [Search]
+[Scope: Folder: 20251223  v] [*.xml    ] [Search Files]
 ```
 
-- Container: `flex items-center gap-2 px-3 pb-2` (appears below the search bar, inside the sidebar header border-b area)
+- Container: `flex items-center gap-2 px-3 pb-2` (appears below the search bar, inside the sidebar header border-b area; `px-3` aligns with existing sidebar `p-3` -- see Spacing Scale exceptions)
 - Scope dropdown: shadcn `Select` component, `h-8 text-xs flex-1 min-w-0`
   - `SelectTrigger`: `h-8 text-xs` showing resolved scope name (D-12)
   - Options: "Selected folder", "This source", "All sources" with resolved names
   - Default: "Selected folder" (D-10)
 - File pattern input: `h-8 text-xs w-20` -- narrow input defaulting to `*.xml` (D-14)
-- Search button: shadcn `Button` variant="default" size="sm" `h-8 px-3 text-xs font-medium`
-  - Label: "Search"
+- Search Files button: shadcn `Button` variant="default" size="sm" `h-8 px-3 text-xs font-semibold`
+  - Label: "Search Files"
   - Disabled state: when no folder is selected (D-11) or when search is running
 
 ### SearchResults (replaces FolderTree, D-16)
@@ -188,7 +196,7 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 +--------------------------------------------+
 | 12 files, 47 matches in Folder: 20251223 X |  <- Summary header
 +--------------------------------------------+
-| Searching... 45 of 200 files    [Cancel]   |  <- Progress (during search)
+| Searching... 45 of 200 files  [Stop Search]|  <- Progress (during search)
 +--------------------------------------------+
 | v Folder: 20251223/                        |
 |   [FileText] patient001.xml    3 matches   |
@@ -203,20 +211,20 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 - ScrollArea wrapping the entire results list
 
 **Summary header:**
-- Container: `flex items-center gap-2 px-3 py-2 border-b bg-muted/30`
+- Container: `flex items-center gap-2 px-4 py-2 border-b bg-muted/30`
 - Stats text: `text-xs text-muted-foreground flex-1` showing `"{N} files, {N} matches in {scope label}"` (D-17)
 - Clear button: `Button` variant="ghost" size="icon" `h-5 w-5` with `X` icon (h-3 w-3). Clears results and restores tree.
 - When search is in progress: stats update progressively. Shows `"{N} files scanned"` until search completes.
 
 **Progress indicator (D-19):**
-- Container: `flex items-center gap-2 px-3 py-2 border-b bg-muted/20`
+- Container: `flex items-center gap-2 px-4 py-2 border-b bg-muted/20`
 - Spinner: `Loader2` icon, `h-4 w-4 animate-spin text-muted-foreground`
 - Text: `text-xs text-muted-foreground flex-1` showing `"Searching... {N} of {total} files"`
-- Cancel button: `Button` variant="outline" size="sm" `h-6 px-2 text-xs` showing `[X] Cancel`
-- Disappears when search completes or is cancelled
+- Stop Search button: `Button` variant="outline" size="sm" `h-6 px-2 text-xs` showing `[X] Stop Search`
+- Disappears when search completes or is stopped
 
 **Folder group (D-17):**
-- Header: `flex items-center gap-1.5 px-3 py-1.5 cursor-pointer hover:bg-accent/50`
+- Header: `flex items-center gap-2 px-4 py-1 cursor-pointer hover:bg-accent/50`
   - Chevron: `ChevronDown` or `ChevronRight` (h-3.5 w-3.5, text-muted-foreground)
   - Folder icon: `Folder` (h-3.5 w-3.5, text-muted-foreground)
   - Folder name: `text-xs font-semibold truncate` -- shows the relative folder path
@@ -224,8 +232,8 @@ None. All required shadcn components (`input`, `button`, `select`, `scroll-area`
 - Files sorted alphabetically within each group (D-20)
 
 **File result row (D-17):**
-- Container: `flex items-center gap-2 px-3 py-1 pl-7 cursor-pointer hover:bg-accent`
-  - `pl-7` for indentation under folder group
+- Container: `flex items-center gap-2 px-4 py-1 pl-8 cursor-pointer hover:bg-accent`
+  - `pl-8` for indentation under folder group (32px, consistent with scale)
 - File icon: `FileText` (h-4 w-4, text-muted-foreground)
 - Filename: `text-sm truncate flex-1`
 - Match count: `text-xs text-muted-foreground flex-shrink-0` showing `"{N} matches"` or `"{N} match"` (singular)
@@ -256,7 +264,7 @@ When in Content mode with no folder selected in the tree:
 +--------------------------------------------+
 ```
 
-- Container: `flex flex-col items-center justify-center h-full px-6`
+- Container: `flex flex-col items-center justify-center h-full px-8`
 - Text: `text-sm text-muted-foreground text-center` (two lines)
 - Not a modal, not a toast -- inline muted message in the sidebar body area (per context specifics)
 
@@ -285,10 +293,10 @@ When in Content mode with no folder selected in the tree:
 
 | Trigger | Action | Result |
 |---------|--------|--------|
-| Click Search button (Content mode) | Start content search | Tree replaced by SearchResults. Progress indicator appears. Results stream in progressively. |
-| Press Enter in search input (Content mode) | Start content search (same as button) | Identical to Search button click. |
+| Click Search Files button (Content mode) | Start content search | Tree replaced by SearchResults. Progress indicator appears. Results stream in progressively. |
+| Press Enter in search input (Content mode) | Start content search (same as button) | Identical to Search Files button click. |
 | Search running | Results stream in | File results appear grouped by folder as backend emits per-file events. Summary header stats update live. |
-| Click Cancel during search | Cancel active search | Search stops. Results found so far remain displayed. Progress indicator disappears. Summary header shows final count. |
+| Click Stop Search during search | Stop active search | Search stops. Results found so far remain displayed. Progress indicator disappears. Summary header shows final count. |
 | Search completes | Progress indicator removed | Summary header shows final totals. All results displayed. |
 | Network error during search (D-27) | Search aborts | Toast notification: "Network share unreachable. Search stopped after N files." Results so far preserved. |
 
@@ -297,9 +305,9 @@ When in Content mode with no folder selected in the tree:
 | Trigger | Action | Result |
 |---------|--------|--------|
 | Enter Content mode with folder selected | Scope auto-selects "Selected folder" | Dropdown shows resolved name (e.g., "Folder: 20251223"). |
-| Enter Content mode with no selection | Show prompt | "Select a folder in the tree to set search scope" message. Search button disabled. |
+| Enter Content mode with no selection | Show prompt | "Select a folder in the tree to set search scope" message. Search Files button disabled. |
 | Select different tree node (before search starts) | Scope auto-updates (D-13) | Dropdown label updates to reflect new selection. |
-| Change scope dropdown | Update scope setting | Label updates. Does not trigger search -- user must click Search. |
+| Change scope dropdown | Update scope setting | Label updates. Does not trigger search -- user must click Search Files. |
 | Search running or results displayed | Scope locked (D-13) | Dropdown is disabled. Scope cannot change until results are cleared. |
 
 ### File Opening from Search (D-22, D-23)
@@ -400,7 +408,7 @@ New actions:
 | `setSearchScope(scope)` | Update content search scope selection. |
 | `setSearchFilePattern(pattern)` | Update file pattern filter. |
 | `startContentSearch()` | Execute content search. Sets status to "searching", clears previous results. |
-| `cancelContentSearch()` | Cancel active content search via CancellationToken. |
+| `cancelContentSearch()` | Stop active content search via CancellationToken. |
 | `clearSearchResults()` | Clear results, restore tree view. Reset status to "idle". |
 
 ---
@@ -413,16 +421,16 @@ New actions:
 | Search input placeholder (Content mode) | `Search file contents...` |
 | Toggle label: Filename | `Filename` |
 | Toggle label: Content | `Content` |
-| Search button label | `Search` |
+| Search button label | `Search Files` |
 | File pattern input placeholder | `*.xml` |
 | Scope: selected folder | `Folder: {folder_name}` |
 | Scope: source root | `Source: {source_label}` |
 | Scope: all sources | `All sources` |
 | Summary header (during search) | `{N} files scanned` |
 | Summary header (complete) | `{N} files, {M} matches in {scope_label}` |
-| Summary header (cancelled) | `{N} files, {M} matches in {scope_label} (cancelled)` |
+| Summary header (cancelled) | `{N} files, {M} matches in {scope_label} (stopped)` |
 | Progress text | `Searching... {N} of {total} files` |
-| Cancel button | `Cancel` |
+| Stop Search button | `Stop Search` |
 | Match count (singular) | `1 match` |
 | Match count (plural) | `{N} matches` |
 | Error group header | `Errors ({N} files)` |
@@ -454,7 +462,7 @@ New actions:
 | Result rows | `role="button"` (clickable to open file). `aria-label="{filename}, {N} matches"`. |
 | Error result rows | `role="button"`. `aria-label="{filename}, error: {message}"`. |
 | Progress indicator | `role="status" aria-live="polite"` for screen reader updates during search. |
-| Keyboard navigation | Tab cycles through: search input, toggle buttons, controls row inputs, Search button. Arrow keys navigate result rows within groups. Enter opens file from result row. |
+| Keyboard navigation | Tab cycles through: search input, toggle buttons, controls row inputs, Search Files button. Arrow keys navigate result rows within groups. Enter opens file from result row. |
 | Focus indicators | Default shadcn focus-visible ring: `focus-visible:ring-1 focus-visible:ring-ring` on all interactive elements. |
 | Color contrast | Match highlight in Monaco is supplemental (yellow/amber tint). File information accessible via result row text, not color-dependent. Error icon color supplemented by "Errors" group heading text. |
 
