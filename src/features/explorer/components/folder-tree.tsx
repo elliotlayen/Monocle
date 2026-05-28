@@ -16,6 +16,9 @@ export function FolderTree() {
     filterText,
     dateSortOrder,
     dateFilterPreset,
+    showIssuesOnly,
+    validationCache,
+    folderBadgeCache,
     expandNode,
     collapseNode,
     cancelLoad,
@@ -32,6 +35,9 @@ export function FolderTree() {
       filterText: state.filterText,
       dateSortOrder: state.dateSortOrder,
       dateFilterPreset: state.dateFilterPreset,
+      showIssuesOnly: state.showIssuesOnly,
+      validationCache: state.validationCache,
+      folderBadgeCache: state.folderBadgeCache,
       expandNode: state.expandNode,
       collapseNode: state.collapseNode,
       cancelLoad: state.cancelLoad,
@@ -56,9 +62,14 @@ export function FolderTree() {
 
   // Apply filter
   const visibleRoots = useMemo(() => {
-    if (!filterText.trim()) return rootNodes;
-    return filterTreeNodes(rootNodes, filterText);
-  }, [rootNodes, filterText]);
+    const hasTextFilter = filterText.trim().length > 0;
+    if (!hasTextFilter && !showIssuesOnly) return rootNodes;
+    return filterTreeNodes(rootNodes, filterText, {
+      showIssuesOnly,
+      validationCache,
+      folderBadgeCache,
+    });
+  }, [rootNodes, filterText, showIssuesOnly, validationCache, folderBadgeCache]);
 
   const selectedFolderPath = searchMode === "content" ? lastInteractedFolderPath : null;
   const showCheckboxes = searchMode === "content";

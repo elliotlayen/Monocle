@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useShallow } from "zustand/shallow";
-import { ArrowUpDown, Calendar, PanelLeftClose } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +33,8 @@ export function ExplorerSidebar() {
     toggleDateSort,
     dateFilterPreset,
     setDateFilterPreset,
+    showIssuesOnly,
+    toggleIssuesOnly,
     loadSources,
     searchMode,
     searchStatus,
@@ -54,6 +56,8 @@ export function ExplorerSidebar() {
       toggleDateSort: state.toggleDateSort,
       dateFilterPreset: state.dateFilterPreset,
       setDateFilterPreset: state.setDateFilterPreset,
+      showIssuesOnly: state.showIssuesOnly,
+      toggleIssuesOnly: state.toggleIssuesOnly,
       loadSources: state.loadSources,
       searchMode: state.searchMode,
       searchStatus: state.searchStatus,
@@ -207,6 +211,26 @@ export function ExplorerSidebar() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-7 w-7",
+                        showIssuesOnly && "bg-accent"
+                      )}
+                      onClick={toggleIssuesOnly}
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{showIssuesOnly ? "Show all files" : "Show issues only"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Button
                 variant="ghost"
                 size="icon"

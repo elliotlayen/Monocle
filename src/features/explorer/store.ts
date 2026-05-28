@@ -35,6 +35,7 @@ interface ExplorerStore {
   filterText: string;
   dateSortOrder: "newest" | "oldest";
   dateFilterPreset: DateFilterPreset;
+  showIssuesOnly: boolean;
   sidebarOpen: boolean;
   sidebarWidth: number;
   tabs: FileTab[];
@@ -83,6 +84,7 @@ interface ExplorerStore {
   setFilterText: (text: string) => void;
   toggleDateSort: () => void;
   setDateFilterPreset: (preset: DateFilterPreset) => void;
+  toggleIssuesOnly: () => void;
   toggleFavorite: (sourceId: string, clientName: string) => Promise<void>;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
@@ -228,6 +230,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   filterText: "",
   dateSortOrder: "newest",
   dateFilterPreset: "all",
+  showIssuesOnly: false,
   sidebarOpen: true,
   sidebarWidth: 280,
   tabs: [],
@@ -402,6 +405,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     })),
 
   setDateFilterPreset: (preset: DateFilterPreset) => set({ dateFilterPreset: preset }),
+
+  toggleIssuesOnly: () =>
+    set((state) => ({ showIssuesOnly: !state.showIssuesOnly })),
 
   toggleFavorite: async (sourceId: string, folderPath: string) => {
     try {
