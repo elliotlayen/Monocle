@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useExplorerStore } from "../store";
 import { filterTreeNodes } from "../utils/tree-filter";
@@ -41,6 +42,17 @@ export function FolderTree() {
       toggleSearchCheck: state.toggleSearchCheck,
     }))
   );
+
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState<Set<string>>(new Set());
+
+  const toggleFavoritesCollapsed = useCallback((sourceId: string) => {
+    setFavoritesCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  }, []);
 
   const handleFileClick = useCallback((filePath: string) => {
     useExplorerStore.getState().openFile(filePath);
@@ -135,16 +147,22 @@ export function FolderTree() {
 
     return (
       <div>
-        {/* Favorites section */}
+        {/* Favorites section (collapsible) */}
         {hasFavorites && favoritedNodes.length > 0 && (
           <div>
             <div
-              className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1"
+              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1 cursor-pointer hover:text-foreground"
               style={{ paddingLeft: `${(depth + 1) * 16}px` }}
+              onClick={() => toggleFavoritesCollapsed(sourceId)}
             >
+              {favoritesCollapsed.has(sourceId) ? (
+                <ChevronRight className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
               Favorites
             </div>
-            {favoritedNodes.map((favNode) => (
+            {!favoritesCollapsed.has(sourceId) && favoritedNodes.map((favNode) => (
               <div key={`fav-${favNode.id}`}>
                 <FolderTreeNode
                   node={favNode}

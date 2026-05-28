@@ -237,28 +237,10 @@ export function FolderTreeNode({
   };
 
   const renderStar = () => {
-    if (!node.isDir || isSource) return null;
+    if (!node.isDir || isSource || !node.isFavorite) return null;
 
     return (
-      <button
-        className={cn(
-          "flex-shrink-0",
-          node.isFavorite ? "visible" : "invisible group-hover:visible"
-        )}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFavorite(sourceId, node.path);
-        }}
-      >
-        <Star
-          className={cn(
-            "h-3.5 w-3.5 cursor-pointer",
-            node.isFavorite
-              ? "fill-amber-500 text-amber-500"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        />
-      </button>
+      <Star className="h-3.5 w-3.5 flex-shrink-0 fill-amber-500 text-amber-500" />
     );
   };
 

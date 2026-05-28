@@ -197,7 +197,7 @@ export function ExplorerSidebar() {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <DialogContent className="sm:max-w-fit">
+                <DialogContent className="sm:max-w-3xl">
                   <DialogHeader>
                     <DialogTitle>Filters</DialogTitle>
                   </DialogHeader>
@@ -228,6 +228,7 @@ export function ExplorerSidebar() {
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="range"
+                            className="[--cell-size:2.5rem]"
                             defaultMonth={dateRange?.from ?? undefined}
                             selected={dateRange?.from ? dateRange as DateRange : undefined}
                             onSelect={(range: DateRange | undefined) => setDateRange(range ?? null)}
