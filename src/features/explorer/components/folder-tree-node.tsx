@@ -58,7 +58,6 @@ export function FolderTreeNode({
   onCancel,
   onToggleFavorite,
   onFileClick,
-  selectedFolderPath,
   showCheckbox,
   isChecked,
   onToggleCheck,
@@ -104,7 +103,6 @@ export function FolderTreeNode({
   const isLoading = node.loadState === "loading";
   const isError = node.loadState === "error";
   const isDirectChild = depth === 1;
-  const isSelected = node.isDir && selectedFolderPath === node.path;
 
   const rowPadding = isSource ? "py-1.5" : "py-1";
 
@@ -269,8 +267,7 @@ export function FolderTreeNode({
       className={cn(
         "group flex items-center gap-1 w-full rounded hover:bg-muted cursor-pointer",
         rowPadding,
-        isError && "text-muted-foreground opacity-60",
-        isSelected && "bg-accent/50 border-l-2 border-primary"
+        isError && "text-muted-foreground opacity-60"
       )}
       style={{ paddingLeft: `${depth * 16}px` }}
       onClick={node.isDir ? handleToggle : () => onFileClick(node.path)}
