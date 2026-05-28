@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-05-28T19:01:23.907Z"
-last_activity: 2026-05-28
+last_updated: "2026-05-28T21:02:42.792Z"
+last_activity: 2026-05-28 -- Phase 06.1 planning complete
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 6
-  total_plans: 14
+  total_plans: 17
   completed_plans: 14
-  percent: 55
+  percent: 50
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Instantly find the right integration file and know if it has problems -- replacing minutes of manual folder clicking with seconds of targeted search and automatic validation.
-**Current focus:** Phase 06 — search
+**Current focus:** Phase 06.1 — Explorer UX polish
 
 ## Current Position
 
-Phase: 7
+Phase: 06.1
 Plan: Not started
-Status: Executing Phase 06
-Last activity: 2026-05-28
+Status: Ready to execute
+Last activity: 2026-05-28 -- Phase 06.1 planning complete
 
 Progress: [###-------] 30%
 
@@ -68,6 +68,7 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 04.1 inserted after Phase 04 (URGENT): Generic folder tree refactor - remove hardcoded hierarchy and fix stale node references. Work already completed in commits c139b20, 7b273d6.
+- Phase 06.1 inserted after Phase 06 (URGENT): Explorer UX polish - XML formatting, tree view syntax colors, segmented control fixes, sidebar toggle, date filter, issues-only indicator
 
 ### Pending Todos
 
