@@ -1,7 +1,13 @@
 import { useEffect, useCallback } from "react";
 import { useShallow } from "zustand/shallow";
-import { ArrowUpDown, PanelLeftClose } from "lucide-react";
+import { ArrowUpDown, Calendar, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -10,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useExplorerStore, parseSearchTermsFrontend } from "../store";
+import type { DateFilterPreset } from "../store";
 import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
 import { useSearch } from "../hooks/use-search";
 import { FolderTree } from "./folder-tree";
@@ -24,6 +31,8 @@ export function ExplorerSidebar() {
     setSidebarWidth,
     dateSortOrder,
     toggleDateSort,
+    dateFilterPreset,
+    setDateFilterPreset,
     loadSources,
     searchMode,
     searchStatus,
@@ -43,6 +52,8 @@ export function ExplorerSidebar() {
       setSidebarWidth: state.setSidebarWidth,
       dateSortOrder: state.dateSortOrder,
       toggleDateSort: state.toggleDateSort,
+      dateFilterPreset: state.dateFilterPreset,
+      setDateFilterPreset: state.setDateFilterPreset,
       loadSources: state.loadSources,
       searchMode: state.searchMode,
       searchStatus: state.searchStatus,
@@ -106,6 +117,13 @@ export function ExplorerSidebar() {
     [openFile, setActiveSearchTerms, searchQuery]
   );
 
+  const dateFilterLabels: Record<DateFilterPreset, string> = {
+    all: "All dates",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+  };
+
   // Determine what to show in the body area
   const showSearchResults =
     searchMode === "content" &&
@@ -153,6 +171,42 @@ export function ExplorerSidebar() {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <DropdownMenu>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-7 w-7",
+                            dateFilterPreset !== "all" && "bg-accent"
+                          )}
+                        >
+                          <Calendar className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Date filter: {dateFilterLabels[dateFilterPreset]}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <DropdownMenuContent align="end">
+                  {(Object.entries(dateFilterLabels) as [DateFilterPreset, string][]).map(
+                    ([value, label]) => (
+                      <DropdownMenuCheckboxItem
+                        key={value}
+                        checked={dateFilterPreset === value}
+                        onCheckedChange={() => setDateFilterPreset(value)}
+                      >
+                        {label}
+                      </DropdownMenuCheckboxItem>
+                    )
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="icon"
