@@ -122,8 +122,8 @@ export function FolderTree() {
           </div>
         )}
 
-        {/* All children alphabetically */}
-        {sortedChildren.map((child) => (
+        {/* All children alphabetically (exclude favorites already shown above) */}
+        {sortedChildren.filter((child) => !favoritedChildren.includes(child)).map((child) => (
           <div key={child.id}>
             <FolderTreeNode
               node={child}
