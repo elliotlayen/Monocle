@@ -3,8 +3,10 @@ import { useShallow } from "zustand/shallow";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useExplorerStore } from "../store";
 import { filterTreeNodes } from "../utils/tree-filter";
+import { formatDateFolder } from "../utils/date-format";
 import { FolderTreeNode, FolderTreeSourceNode } from "./folder-tree-node";
 import type { TreeNode } from "../types";
+import type { DateFilterPreset } from "../store";
 
 export function FolderTree() {
   const {
@@ -12,6 +14,8 @@ export function FolderTree() {
     treeNodes,
     expandedIds,
     filterText,
+    dateSortOrder,
+    dateFilterPreset,
     expandNode,
     collapseNode,
     cancelLoad,
@@ -26,6 +30,8 @@ export function FolderTree() {
       treeNodes: state.treeNodes,
       expandedIds: state.expandedIds,
       filterText: state.filterText,
+      dateSortOrder: state.dateSortOrder,
+      dateFilterPreset: state.dateFilterPreset,
       expandNode: state.expandNode,
       collapseNode: state.collapseNode,
       cancelLoad: state.cancelLoad,
@@ -68,16 +74,55 @@ export function FolderTree() {
     [searchCheckedPaths]
   );
 
+  const filterByDatePreset = useCallback(
+    (nodes: TreeNode[]): TreeNode[] => {
+      if (dateFilterPreset === "all") return nodes;
+
+      const daysMap: Record<Exclude<DateFilterPreset, "all">, number> = {
+        "7d": 7,
+        "30d": 30,
+        "90d": 90,
+      };
+      const days = daysMap[dateFilterPreset];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      cutoff.setHours(0, 0, 0, 0);
+
+      return nodes.filter((child) => {
+        // Non-directory nodes always pass through
+        if (!child.isDir) return true;
+        // Non-date-pattern folders always pass through
+        const dateInfo = formatDateFolder(child.name);
+        if (!dateInfo.formatted) return true;
+        // Parse the YYYYMMDD name into a Date
+        const year = parseInt(child.name.slice(0, 4), 10);
+        const month = parseInt(child.name.slice(4, 6), 10);
+        const day = parseInt(child.name.slice(6, 8), 10);
+        const folderDate = new Date(year, month - 1, day);
+        return folderDate >= cutoff;
+      });
+    },
+    [dateFilterPreset]
+  );
+
   const renderChildren = (node: TreeNode, depth: number, sourceId: string) => {
     const current = treeNodes.get(node.id) ?? node;
     if (!expandedIds.has(current.id) || !current.children) return null;
 
-    const sortedChildren = current.children
-      .map((child) => treeNodes.get(child.id) ?? child)
-      .sort((a, b) => {
-        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
+    const sortedChildren = filterByDatePreset(
+      current.children
+        .map((child) => treeNodes.get(child.id) ?? child)
+        .sort((a, b) => {
+          if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+          // Apply dateSortOrder to 8-digit date-pattern folder names (YYYYMMDD)
+          if (a.isDir && b.isDir && /^\d{8}$/.test(a.name) && /^\d{8}$/.test(b.name)) {
+            return dateSortOrder === "newest"
+              ? b.name.localeCompare(a.name)
+              : a.name.localeCompare(b.name);
+          }
+          return a.name.localeCompare(b.name);
+        })
+    );
 
     // Get favorites for this source — collect from all depths
     const source = folderSources.find((s) => s.id === sourceId);

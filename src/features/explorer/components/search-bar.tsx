@@ -2,13 +2,13 @@ import { useEffect, useRef } from "react";
 import { useShallow } from "zustand/shallow";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { useExplorerStore } from "../store";
 
 interface SearchBarProps {
@@ -64,24 +64,24 @@ export function SearchBar({ onSearchExecute }: SearchBarProps) {
       {/* Row 1: Mode toggle */}
       <TooltipProvider>
         <div
-          className="flex items-center rounded-md border bg-muted/50 p-0.5 self-start"
+          className="flex items-center h-7 rounded-md bg-muted border p-0.5 self-start"
           role="group"
           aria-label="Search mode"
         >
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className={`h-6 px-2 text-xs font-semibold rounded-sm ${
+              <button
+                className={cn(
+                  "h-full px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-sm",
                   searchMode === "filename"
                     ? "bg-background shadow-sm"
-                    : "bg-transparent hover:bg-transparent"
-                }`}
+                    : "text-muted-foreground hover:text-foreground"
+                )}
                 onClick={() => setSearchMode("filename")}
                 aria-pressed={searchMode === "filename"}
               >
                 Filename
-              </Button>
+              </button>
             </TooltipTrigger>
             <TooltipContent>
               <p>Search filenames (Cmd+F)</p>
@@ -89,18 +89,18 @@ export function SearchBar({ onSearchExecute }: SearchBarProps) {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className={`h-6 px-2 text-xs font-semibold rounded-sm ${
+              <button
+                className={cn(
+                  "h-full px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-sm",
                   searchMode === "content"
                     ? "bg-background shadow-sm"
-                    : "bg-transparent hover:bg-transparent"
-                }`}
+                    : "text-muted-foreground hover:text-foreground"
+                )}
                 onClick={() => setSearchMode("content")}
                 aria-pressed={searchMode === "content"}
               >
                 Content
-              </Button>
+              </button>
             </TooltipTrigger>
             <TooltipContent>
               <p>Search file contents (Cmd+Shift+F)</p>
