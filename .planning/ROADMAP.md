@@ -177,11 +177,21 @@ Plans:
   3. User can choose search scope -- current folder, current client (all dates), or all configured sources -- before executing a search
   4. Search results stream in progressively as files are scanned, with the ability to cancel a long-running search
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 
-- [ ] 06-01: TBD
+**Wave 1**
+
+- [ ] 06-01-PLAN.md -- Rust content_search_cmd with query parsing, types/IPC/events/store data layer, encoding-safe file search with streaming results
+
+**Wave 2**
+
+- [ ] 06-02-PLAN.md -- SearchBar with Filename/Content toggle, SearchControlsRow (scope/pattern/button), SearchResults with folder grouping, progress indicator, useSearch hook, sidebar wiring
+
+**Wave 3**
+
+- [ ] 06-03-PLAN.md -- Monaco find-match highlighting on file open from search, keyboard shortcuts (Cmd+F/Cmd+Shift+F), mode switching polish, visual verification
 
 **UI hint**: yes
 
@@ -280,7 +290,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
 | 5. Bulk Validation & Reporting | 2/2 | Complete    | 2026-05-27 |
-| 6. Search | 0/? | Not started | - |
+| 6. Search | 0/3 | Planned | - |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
 | 9. Folder Watching & Notifications | 0/? | Not started | - |
