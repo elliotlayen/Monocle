@@ -18,6 +18,8 @@ export function FolderTree() {
     toggleFavorite,
     lastInteractedFolderPath,
     searchMode,
+    searchCheckedPaths,
+    toggleSearchCheck,
   } = useExplorerStore(
     useShallow((state) => ({
       folderSources: state.folderSources,
@@ -30,6 +32,8 @@ export function FolderTree() {
       toggleFavorite: state.toggleFavorite,
       lastInteractedFolderPath: state.lastInteractedFolderPath,
       searchMode: state.searchMode,
+      searchCheckedPaths: state.searchCheckedPaths,
+      toggleSearchCheck: state.toggleSearchCheck,
     }))
   );
 
@@ -51,6 +55,18 @@ export function FolderTree() {
   }, [rootNodes, filterText]);
 
   const selectedFolderPath = searchMode === "content" ? lastInteractedFolderPath : null;
+  const showCheckboxes = searchMode === "content";
+
+  const isPathChecked = useCallback(
+    (path: string) => {
+      if (searchCheckedPaths.has(path)) return true;
+      for (const checked of searchCheckedPaths) {
+        if (path.startsWith(checked + "/") || path.startsWith(checked + "\\")) return true;
+      }
+      return false;
+    },
+    [searchCheckedPaths]
+  );
 
   const renderChildren = (node: TreeNode, depth: number, sourceId: string) => {
     const current = treeNodes.get(node.id) ?? node;
@@ -96,6 +112,9 @@ export function FolderTree() {
                   onToggleFavorite={toggleFavorite}
                   onFileClick={handleFileClick}
                   selectedFolderPath={selectedFolderPath}
+                  showCheckbox={showCheckboxes}
+                  isChecked={isPathChecked(child.path)}
+                  onToggleCheck={toggleSearchCheck}
                 />
                 {renderChildren(child, depth + 1, sourceId)}
               </div>
@@ -116,6 +135,10 @@ export function FolderTree() {
               onCancel={cancelLoad}
               onToggleFavorite={toggleFavorite}
               onFileClick={handleFileClick}
+              selectedFolderPath={selectedFolderPath}
+              showCheckbox={showCheckboxes}
+              isChecked={isPathChecked(child.path)}
+              onToggleCheck={toggleSearchCheck}
             />
             {renderChildren(child, depth + 1, sourceId)}
           </div>
@@ -162,6 +185,9 @@ export function FolderTree() {
                 onToggleFavorite={toggleFavorite}
                 onFileClick={handleFileClick}
                 tag={source?.tag}
+                showCheckbox={showCheckboxes}
+                isChecked={isPathChecked(root.path ?? root.id)}
+                onToggleCheck={toggleSearchCheck}
               />
               {renderChildren(root, 0, root.id)}
             </div>

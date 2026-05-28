@@ -43,6 +43,9 @@ interface FolderTreeNodeProps {
   onToggleFavorite: (sourceId: string, clientName: string) => void;
   onFileClick: (filePath: string) => void;
   selectedFolderPath?: string | null;
+  showCheckbox?: boolean;
+  isChecked?: boolean;
+  onToggleCheck?: (path: string) => void;
 }
 
 export function FolderTreeNode({
@@ -56,6 +59,9 @@ export function FolderTreeNode({
   onToggleFavorite,
   onFileClick,
   selectedFolderPath,
+  showCheckbox,
+  isChecked,
+  onToggleCheck,
 }: FolderTreeNodeProps) {
   const { copyPath, copyContent, openExternal, saveCopy } = useFileActions();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -270,6 +276,18 @@ export function FolderTreeNode({
       onClick={node.isDir ? handleToggle : () => onFileClick(node.path)}
     >
       {renderChevron()}
+      {showCheckbox && node.isDir && (
+        <input
+          type="checkbox"
+          checked={isChecked ?? false}
+          className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCheck?.(node.path);
+          }}
+          onChange={() => {}}
+        />
+      )}
       {renderIcon()}
       {renderName()}
       {renderBadge()}
@@ -403,6 +421,18 @@ export function FolderTreeSourceNode({
         <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       ) : (
         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      )}
+      {props.showCheckbox && (
+        <input
+          type="checkbox"
+          checked={props.isChecked ?? false}
+          className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onToggleCheck?.(node.path);
+          }}
+          onChange={() => {}}
+        />
       )}
       {isError ? (
         <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0" />

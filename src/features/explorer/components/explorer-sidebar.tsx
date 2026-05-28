@@ -28,9 +28,7 @@ export function ExplorerSidebar() {
     loadSources,
     searchMode,
     searchStatus,
-    setSearchScope,
-    lastInteractedFolderPath,
-    folderSources,
+    searchCheckedPaths,
     searchResults,
     searchErrors,
     searchSummary,
@@ -49,9 +47,7 @@ export function ExplorerSidebar() {
       loadSources: state.loadSources,
       searchMode: state.searchMode,
       searchStatus: state.searchStatus,
-      setSearchScope: state.setSearchScope,
-      lastInteractedFolderPath: state.lastInteractedFolderPath,
-      folderSources: state.folderSources,
+      searchCheckedPaths: state.searchCheckedPaths,
       searchResults: state.searchResults,
       searchErrors: state.searchErrors,
       searchSummary: state.searchSummary,
@@ -75,73 +71,27 @@ export function ExplorerSidebar() {
     loadSources();
   }, [loadSources]);
 
-  // D-13: Scope auto-updates to "folder" when tree selection changes while idle
-  useEffect(() => {
-    if (lastInteractedFolderPath && searchStatus === "idle") {
-      setSearchScope("folder");
-    }
-  }, [lastInteractedFolderPath, searchStatus, setSearchScope]);
-
-  // Derive selected node props for SearchControlsRow
-  const selectedNodePath = lastInteractedFolderPath;
-  const selectedNodeName = selectedNodePath
-    ? selectedNodePath.split(/[/\\]/).pop() ?? selectedNodePath
-    : null;
-
-  // Find which source contains the selected node
-  const selectedSourceLabel = (() => {
-    if (!selectedNodePath) return null;
-    for (const source of folderSources) {
-      if (selectedNodePath.startsWith(source.path)) {
-        return source.label;
-      }
-    }
-    return null;
-  })();
-
-  const selectedSourcePath = (() => {
-    if (!selectedNodePath) return null;
-    for (const source of folderSources) {
-      if (selectedNodePath.startsWith(source.path)) {
-        return source.path;
-      }
-    }
-    return null;
-  })();
-
-  // Derive scope label for SearchResults
+  // Derive scope label from checked paths
   const currentScopeLabel = (() => {
-    const store = useExplorerStore.getState();
-    const scope = store.searchScope;
-    if (scope === "folder" && selectedNodeName) return `Folder: ${selectedNodeName}`;
-    if (scope === "source" && selectedSourceLabel) return `Source: ${selectedSourceLabel}`;
-    if (scope === "all") return "All sources";
-    return "";
+    if (searchCheckedPaths.size === 0) return "";
+    const names = Array.from(searchCheckedPaths).map(
+      (p) => p.split(/[/\\]/).pop() ?? p
+    );
+    if (names.length <= 2) return names.join(", ");
+    return `${names.length} folders`;
   })();
 
-  // Wire onSearch for SearchControlsRow
+  // Wire onSearch — uses checked paths
   const handleSearch = useCallback(() => {
     const store = useExplorerStore.getState();
-    const { searchScope: scope, folderSources: sources } = store;
-
-    let paths: string[] = [];
-    let scopeLabel = "";
-
-    if (scope === "folder" && selectedNodePath) {
-      paths = [selectedNodePath];
-      scopeLabel = `Folder: ${selectedNodeName}`;
-    } else if (scope === "source" && selectedSourcePath) {
-      paths = [selectedSourcePath];
-      scopeLabel = `Source: ${selectedSourceLabel}`;
-    } else if (scope === "all") {
-      paths = sources.map((s) => s.path);
-      scopeLabel = "All sources";
-    }
+    const paths = Array.from(store.searchCheckedPaths);
 
     if (paths.length > 0) {
+      const names = paths.map((p) => p.split(/[/\\]/).pop() ?? p);
+      const scopeLabel = names.length <= 2 ? names.join(", ") : `${names.length} folders`;
       store.startContentSearch(paths, scopeLabel);
     }
-  }, [selectedNodePath, selectedNodeName, selectedSourcePath, selectedSourceLabel]);
+  }, []);
 
   // Wire onSearchExecute for SearchBar (Enter key in content mode)
   const handleSearchExecute = useCallback(() => {
@@ -163,13 +113,6 @@ export function ExplorerSidebar() {
     (searchStatus !== "idle" ||
       searchResults.length > 0 ||
       searchErrors.length > 0);
-
-  const showNoSelectionPrompt =
-    searchMode === "content" &&
-    searchStatus === "idle" &&
-    searchResults.length === 0 &&
-    searchErrors.length === 0 &&
-    !selectedNodePath;
 
   return (
     <div
@@ -225,16 +168,10 @@ export function ExplorerSidebar() {
           <SearchBar onSearchExecute={handleSearchExecute} />
         </div>
 
-        {/* Content search controls row (visible only in content mode) */}
-        {searchMode === "content" && (
-          <SearchControlsRow
-            selectedNodePath={selectedNodePath}
-            selectedNodeName={selectedNodeName}
-            selectedSourceLabel={selectedSourceLabel}
-          />
-        )}
+        {/* Content search file pattern (visible only in content mode) */}
+        {searchMode === "content" && <SearchControlsRow />}
 
-        {/* Body: SearchResults, no-selection prompt, or FolderTree */}
+        {/* Body: SearchResults or FolderTree (with checkboxes in content mode) */}
         {showSearchResults ? (
           <SearchResults
             results={searchResults}
@@ -248,18 +185,6 @@ export function ExplorerSidebar() {
             onClear={clearSearchResults}
             onFileClick={handleFileClick}
           />
-        ) : showNoSelectionPrompt ? (
-          <>
-            <div className="flex flex-col items-center justify-center py-12 px-8">
-              <p className="text-sm text-muted-foreground text-center">
-                Select a folder in the tree
-              </p>
-              <p className="text-sm text-muted-foreground text-center">
-                to set search scope
-              </p>
-            </div>
-            <FolderTree />
-          </>
         ) : (
           <FolderTree />
         )}

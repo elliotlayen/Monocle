@@ -11,7 +11,6 @@ import type {
   ScanProgressPayload,
   ScanSummary,
   SearchMode,
-  SearchScope,
   SearchStatus,
   SearchResultFile,
   SearchErrorFile,
@@ -63,7 +62,7 @@ interface ExplorerStore {
   // Search state
   searchMode: SearchMode;
   searchQuery: string;
-  searchScope: SearchScope;
+  searchCheckedPaths: Set<string>;
   searchFilePattern: string;
   searchStatus: SearchStatus;
   searchProgress: SearchProgressPayloadType | null;
@@ -115,7 +114,7 @@ interface ExplorerStore {
   // Search actions
   setSearchMode: (mode: SearchMode) => void;
   setSearchQuery: (text: string) => void;
-  setSearchScope: (scope: SearchScope) => void;
+  toggleSearchCheck: (path: string) => void;
   setSearchFilePattern: (pattern: string) => void;
   startContentSearch: (folderPaths: string[], scopeLabel: string) => Promise<void>;
   updateSearchProgress: (payload: SearchProgressPayloadType) => void;
@@ -244,7 +243,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   // Search initial state
   searchMode: "filename",
   searchQuery: "",
-  searchScope: "folder",
+  searchCheckedPaths: new Set<string>(),
   searchFilePattern: "*.xml",
   searchStatus: "idle",
   searchProgress: null,
@@ -930,8 +929,20 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
-  setSearchScope: (scope: SearchScope) => {
-    set({ searchScope: scope });
+  toggleSearchCheck: (path: string) => {
+    const prev = get().searchCheckedPaths;
+    const next = new Set(prev);
+    if (next.has(path)) {
+      next.delete(path);
+    } else {
+      next.add(path);
+      // Remove any descendant paths — parent already covers them
+      for (const p of next) {
+        if (p !== path && p.startsWith(path + "/")) next.delete(p);
+        if (p !== path && p.startsWith(path + "\\")) next.delete(p);
+      }
+    }
+    set({ searchCheckedPaths: next });
   },
 
   setSearchFilePattern: (pattern: string) => {
@@ -1042,6 +1053,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       searchProgress: null,
       searchStatus: "idle",
       activeSearchTerms: null,
+      searchCheckedPaths: new Set<string>(),
     });
   },
 

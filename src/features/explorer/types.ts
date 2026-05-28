@@ -112,8 +112,6 @@ export type ScanStatus = "idle" | "scanning" | "completed" | "cancelled";
 
 export type SearchMode = "filename" | "content";
 
-export type SearchScope = "folder" | "source" | "all";
-
 export type SearchStatus = "idle" | "searching" | "completed" | "cancelled";
 
 export interface SearchResultFile {
