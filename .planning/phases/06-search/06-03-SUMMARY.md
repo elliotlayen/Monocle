@@ -13,12 +13,21 @@ tech_stack:
 key_files:
   created:
     - src/features/explorer/hooks/use-search-highlight.ts
+    - src/features/settings/components/sections/explorer-settings-section.tsx
   modified:
     - src/features/explorer/components/xml-source-view.tsx
     - src/features/explorer/components/file-content-area.tsx
     - src/features/explorer/components/explorer-sidebar.tsx
     - src/features/explorer/components/search-bar.tsx
     - src/features/explorer/store.ts
+    - src/features/explorer/components/folder-tree.tsx
+    - src/features/explorer/components/folder-tree-node.tsx
+    - src/features/explorer/components/explorer-nav-bar.tsx
+    - src/features/explorer/hooks/use-search.ts
+    - src/services/events.ts
+    - src/components/app-settings-sheet.tsx
+  deleted:
+    - src/features/explorer/components/search-controls-row.tsx
 decisions:
   - "useSearchHighlight follows exact same decoration collection pattern as useValidationDecorations for consistency"
   - "parseSearchTermsFrontend implemented inline in store.ts rather than a separate utils file for co-location with search state"
@@ -81,21 +90,66 @@ Monaco find-match decoration hook for search term highlighting with amber/yellow
 
 ## Deviations from Plan
 
-None -- plan executed exactly as written.
+Significant post-plan UX improvements driven by visual checkpoint feedback:
+
+### Search bar layout overhaul
+- Stacked mode toggle and search input vertically (was horizontal, got cut off at narrow widths)
+- Removed Search Files button (Enter key is sufficient)
+
+### Scope selection replaced with folder checkboxes
+- Removed SearchScope type, scope dropdown, and resolveSearchScope function
+- Added checkboxes on folder/source nodes in content mode (right-aligned to avoid accidental clicks)
+- Checking a parent covers all children; search runs across all checked paths
+- Replaced lastInteractedFolderPath highlight with checkbox-based scope
+
+### File pattern inputs moved to Settings
+- Removed *.xml input from toolbar nav bar and search controls row
+- Deleted search-controls-row.tsx entirely
+- Created Explorer settings section (Settings > Explorer) for both scan and search file patterns
+
+### Nav bar consistency
+- Restyled Home button as "Leave Explorer" with variant="destructive" and LogOut icon
+- Moved Settings button before Leave, matching canvas/schema disconnect pattern
+
+### Bug fixes
+- Fixed duplicate search results from event hub async race condition (ensureListening)
+- Added filePath deduplication in appendSearchResult as safety net
+- Fixed clearing search results when query emptied in content mode
+- Fixed favorites showing duplicates (excluded from main children list)
+
+### Favorites system overhaul
+- Favorites now store full paths instead of names (supports any depth)
+- isFavorite checked at all folder depths, not just direct source children
+- toggleFavorite updates correct node anywhere in tree
+- Star icon and context menu available at all folder depths
+- Favorites section collects from full treeNodes map, not just direct children
 
 ## Verification Results
 
 - `npm run build` -- TypeScript compiles successfully
 - `npm run lint` -- no lint errors
 - `npm run test -- --run` -- 200 tests pass (30 test files)
+- `cargo test` -- 45 Rust tests pass (including 8 search tests)
+- Visual checkpoint approved by user after iterative fixes
 
 ## Commits
 
 | Task | Name | Commit | Key Files |
 |------|------|--------|-----------|
 | 1 | Search highlight hook + keyboard shortcuts + mode switching | f6c411f | use-search-highlight.ts, xml-source-view.tsx, file-content-area.tsx, explorer-sidebar.tsx, search-bar.tsx, store.ts |
-| 2 | Visual verification checkpoint | -- | Awaiting human verification |
+| 2 | Visual verification checkpoint | approved | All post-plan fixes below |
+| -- | Search bar layout + selected folder indicator | 0ee1d96 | search-bar.tsx, search-controls-row.tsx, folder-tree.tsx, folder-tree-node.tsx |
+| -- | Remove Search Files button + spacing fix | 2462f57 | search-controls-row.tsx, explorer-sidebar.tsx |
+| -- | Fix duplicate search results (event hub race) | 5d7e054 | events.ts, store.ts |
+| -- | Match spacing above/below header divider | 9195d4e | search-controls-row.tsx |
+| -- | Clear search results on empty query | d41d176 | store.ts |
+| -- | Replace scope dropdown with folder checkboxes | fccd5d6 | 7 files |
+| -- | Move checkboxes to right side | ff39a5c | folder-tree-node.tsx |
+| -- | Remove selected folder highlight | d2688ad | folder-tree-node.tsx |
+| -- | Move file patterns to Settings > Explorer | 9ed618a | 5 files |
+| -- | Restyle Home as Leave Explorer | 9c1c29f | explorer-nav-bar.tsx |
+| -- | Fix favorites duplicate rendering | b3985e9 | folder-tree.tsx |
+| -- | Allow favorites at any folder depth | c52a457 | folder-tree-node.tsx |
+| -- | Support favorites with full paths at any depth | c5bf4ac | folder-tree-node.tsx, folder-tree.tsx, store.ts |
 
-## Self-Check: PENDING
-
-Task 2 is a human-verify checkpoint. Self-check will complete after checkpoint approval.
+## Self-Check: PASSED
