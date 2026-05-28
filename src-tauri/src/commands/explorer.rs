@@ -257,7 +257,7 @@ pub async fn bulk_scan_cmd(
             .map(|e| e.into_path())
             .collect();
 
-        let total_files = matching_files.len() as u32;
+        let total_files = matching_files.len().min(u32::MAX as usize) as u32;
         let mut files_processed: u32 = 0;
         let mut total_errors: u32 = 0;
         let mut total_warnings: u32 = 0;
@@ -318,8 +318,8 @@ pub async fn bulk_scan_cmd(
                 decode_result.has_bom,
             );
 
-            let file_error_count = problems.iter().filter(|p| p.severity == "error").count() as u32;
-            let file_warning_count = problems.iter().filter(|p| p.severity == "warning").count() as u32;
+            let file_error_count = problems.iter().filter(|p| p.severity == "error").count().min(u32::MAX as usize) as u32;
+            let file_warning_count = problems.iter().filter(|p| p.severity == "warning").count().min(u32::MAX as usize) as u32;
 
             let status = if file_error_count > 0 {
                 "error"
@@ -329,18 +329,18 @@ pub async fn bulk_scan_cmd(
                 "clean"
             };
 
-            total_errors += file_error_count;
-            total_warnings += file_warning_count;
+            total_errors = total_errors.saturating_add(file_error_count);
+            total_warnings = total_warnings.saturating_add(file_warning_count);
             match status {
-                "error" => error_files += 1,
-                "warning" => warning_files += 1,
+                "error" => error_files = error_files.saturating_add(1),
+                "warning" => warning_files = warning_files.saturating_add(1),
                 _ => {
-                    total_clean += 1;
-                    clean_files += 1;
+                    total_clean = total_clean.saturating_add(1);
+                    clean_files = clean_files.saturating_add(1);
                 }
             }
 
-            files_processed += 1;
+            files_processed = files_processed.saturating_add(1);
 
             file_results.push(ScanFileResult {
                 file_path: file_path.to_string_lossy().to_string(),
