@@ -11,6 +11,10 @@ use tauri::{AppHandle, Emitter, State};
 use tokio_util::sync::CancellationToken;
 use walkdir::WalkDir;
 
+/// Maximum file size to read during bulk scan (50 MB).
+/// Files larger than this are silently skipped to prevent unbounded memory consumption.
+const MAX_SCAN_FILE_SIZE: u64 = 50 * 1024 * 1024;
+
 pub struct ExplorerState {
     pub active_listings: Mutex<HashMap<String, CancellationToken>>,
 }
@@ -282,6 +286,19 @@ pub async fn bulk_scan_cmd(
                 .strip_prefix(&folder_path_clone)
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|_| file_path.to_string_lossy().to_string());
+
+            // Skip files that exceed the size limit to prevent excessive memory use
+            match std::fs::metadata(file_path) {
+                Ok(m) if m.len() > MAX_SCAN_FILE_SIZE => {
+                    files_processed += 1;
+                    continue;
+                }
+                Err(_) => {
+                    files_processed += 1;
+                    continue;
+                }
+                _ => {}
+            }
 
             // Try to read and validate the file
             let raw_bytes = match std::fs::read(file_path) {
