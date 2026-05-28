@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Home, Settings, ScanSearch, Loader2 } from "lucide-react";
+import { LogOut, Settings, ScanSearch, Loader2 } from "lucide-react";
 import { useExplorerStore } from "../store";
 
 interface ExplorerNavBarProps {
@@ -80,25 +80,25 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
                 variant="outline"
                 size="sm"
                 className="h-9 px-2"
-                onClick={onHome}
-              >
-                <Home className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Home</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-2"
                 onClick={onOpenSettings}
               >
                 <Settings className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-9 px-2"
+                onClick={onHome}
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Leave Explorer</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
