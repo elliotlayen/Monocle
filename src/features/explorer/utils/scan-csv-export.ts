@@ -12,13 +12,17 @@ export function escapeCsv(value: string): string {
   return value;
 }
 
+function sanitizeCsvComment(value: string): string {
+  return value.replace(/[\r\n]/g, " ");
+}
+
 export function exportScanToCsv(result: ScanSummary): string {
   const lines: string[] = [];
 
   // Metadata comments (D-21)
   lines.push("# Scan Report");
-  lines.push(`# Folder: ${result.folderPath}`);
-  lines.push(`# Pattern: ${result.filePattern}`);
+  lines.push(`# Folder: ${sanitizeCsvComment(result.folderPath)}`);
+  lines.push(`# Pattern: ${sanitizeCsvComment(result.filePattern)}`);
   lines.push(`# Date: ${new Date().toISOString()}`);
   lines.push(`# Total Files: ${result.totalFiles}`);
   lines.push(`# Errors: ${result.totalErrors}`);
