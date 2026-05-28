@@ -522,7 +522,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   closeAllTabs: () => {
-    set({ tabs: [], activeTabId: null });
+    set({
+      tabs: [],
+      activeTabId: null,
+      scanStatus: "idle",
+      scanResult: null,
+      scanProgress: null,
+    });
   },
 
   setActiveTab: (tabId: string) => {
