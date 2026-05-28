@@ -197,18 +197,28 @@ export function ExplorerSidebar() {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <DialogContent className="sm:max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle>Filters</DialogTitle>
-                  </DialogHeader>
-                  <div className="flex flex-col gap-4">
+                <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl sm:h-[min(90vh,42rem)]">
+                  <div className="flex items-center justify-between pl-6 pr-14 h-14 flex-shrink-0 border-b">
+                    <DialogHeader className="p-0">
+                      <DialogTitle>Filters</DialogTitle>
+                    </DialogHeader>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn("h-7 px-2 text-xs", !hasDateFilter && "invisible")}
+                      onClick={() => setDateRange(null)}
+                    >
+                      Clear all
+                    </Button>
+                  </div>
+                  <div className="flex flex-col gap-4 p-6 overflow-y-auto">
                     <div className="flex flex-col gap-2">
                       <label className="text-sm font-medium">Date range</label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="justify-start px-2.5 font-normal"
+                            className="w-full justify-start px-3 font-normal"
                           >
                             <CalendarIcon className="h-4 w-4" />
                             {dateRange?.from ? (
@@ -225,10 +235,9 @@ export function ExplorerSidebar() {
                             )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent className="w-auto p-0 overflow-hidden" align="start">
                           <Calendar
                             mode="range"
-                            className="[--cell-size:2.5rem]"
                             defaultMonth={dateRange?.from ?? undefined}
                             selected={dateRange?.from ? dateRange as DateRange : undefined}
                             onSelect={(range: DateRange | undefined) => setDateRange(range ?? null)}
@@ -237,16 +246,6 @@ export function ExplorerSidebar() {
                         </PopoverContent>
                       </Popover>
                     </div>
-                    {hasDateFilter && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="self-start"
-                        onClick={() => setDateRange(null)}
-                      >
-                        Clear all filters
-                      </Button>
-                    )}
                   </div>
                 </DialogContent>
               </Dialog>
