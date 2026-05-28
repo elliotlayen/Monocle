@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: XML File Viewing** - Tree view, syntax-highlighted source view, tabbed multi-file interface, file actions (completed 2026-05-26)
 - [x] **Phase 4: Single-File Validation** - Illegal character detection, problem badges in tree, problems panel, inline source highlighting (completed 2026-05-26)
 - [x] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export (completed 2026-05-27)
-- [ ] **Phase 6: Search** - Filename filtering, XML content search, configurable search scope
+- [x] **Phase 6: Search** - Filename filtering, XML content search, configurable search scope (completed 2026-05-28)
 - [ ] **Phase 7: File Comparison** - Side-by-side and inline diff for any two files
 - [ ] **Phase 8: Analytics Dashboard** - Client dashboard, error heatmap, timeline view, file size anomaly detection
 - [ ] **Phase 9: Folder Watching & Notifications** - Polling-based folder monitoring with desktop and in-app notifications
@@ -191,7 +191,7 @@ Plans:
 
 **Wave 3**
 
-- [ ] 06-03-PLAN.md -- Monaco find-match highlighting on file open from search, keyboard shortcuts (Cmd+F/Cmd+Shift+F), mode switching polish, visual verification
+- [x] 06-03-PLAN.md -- Monaco find-match highlighting on file open from search, keyboard shortcuts (Cmd+F/Cmd+Shift+F), mode switching polish, visual verification
 
 **UI hint**: yes
 
@@ -290,7 +290,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 3. XML File Viewing | 3/3 | Complete | 2026-05-26 |
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
 | 5. Bulk Validation & Reporting | 2/2 | Complete    | 2026-05-27 |
-| 6. Search | 2/3 | In Progress|  |
+| 6. Search | 3/3 | Complete   | 2026-05-28 |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
 | 9. Folder Watching & Notifications | 0/? | Not started | - |
