@@ -924,6 +924,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set({ searchQuery: text, filterText: text });
     } else {
       set({ searchQuery: text });
+      if (!text) {
+        get().clearSearchResults();
+      }
     }
   },
 
