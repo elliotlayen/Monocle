@@ -792,7 +792,14 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       await new Promise((resolve) => setTimeout(resolve, 100));
       get().startScan(folderPath, filePattern);
     };
-    doIt();
+    doIt().catch(() => {
+      showToast({
+        type: "error",
+        title: "Failed to start scan",
+        message: "An error occurred while restarting the scan",
+        duration: 5000,
+      });
+    });
   },
 
   dismissPendingScan: () => {
