@@ -42,7 +42,7 @@ export function SearchControlsRow({
     : "This source";
 
   return (
-    <div className="flex flex-col gap-2 px-3 pt-2 pb-2">
+    <div className="flex flex-col gap-2 px-3 pt-3 pb-2">
       <Select
         value={searchScope}
         onValueChange={(value) =>
