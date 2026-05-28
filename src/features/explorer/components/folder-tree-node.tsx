@@ -276,23 +276,26 @@ export function FolderTreeNode({
       onClick={node.isDir ? handleToggle : () => onFileClick(node.path)}
     >
       {renderChevron()}
-      {showCheckbox && node.isDir && (
-        <input
-          type="checkbox"
-          checked={isChecked ?? false}
-          className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleCheck?.(node.path);
-          }}
-          onChange={() => {}}
-        />
-      )}
       {renderIcon()}
       {renderName()}
       {renderBadge()}
       {renderLoadingInfo()}
       {renderStar()}
+      {showCheckbox && node.isDir && (
+        <>
+          <span className="flex-1" />
+          <input
+            type="checkbox"
+            checked={isChecked ?? false}
+            className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0 mr-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCheck?.(node.path);
+            }}
+            onChange={() => {}}
+          />
+        </>
+      )}
     </div>
   );
 
@@ -422,18 +425,6 @@ export function FolderTreeSourceNode({
       ) : (
         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       )}
-      {props.showCheckbox && (
-        <input
-          type="checkbox"
-          checked={props.isChecked ?? false}
-          className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            props.onToggleCheck?.(node.path);
-          }}
-          onChange={() => {}}
-        />
-      )}
       {isError ? (
         <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
       ) : (
@@ -462,6 +453,21 @@ export function FolderTreeSourceNode({
             <X className="h-3 w-3" />
           </Button>
         </span>
+      )}
+      {props.showCheckbox && (
+        <>
+          <span className="flex-1" />
+          <input
+            type="checkbox"
+            checked={props.isChecked ?? false}
+            className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0 mr-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onToggleCheck?.(node.path);
+            }}
+            onChange={() => {}}
+          />
+        </>
       )}
     </div>
   );
