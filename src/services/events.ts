@@ -7,9 +7,11 @@ type Callback<T> = (payload: T) => void;
 export function createEventHub<T>(eventName: string) {
   const subscribers = new Set<Callback<T>>();
   let unlisten: UnlistenFn | null = null;
+  let listening = false;
 
   const ensureListening = async () => {
-    if (unlisten) return;
+    if (unlisten || listening) return;
+    listening = true;
     unlisten = await listen<T>(eventName, (event) => {
       subscribers.forEach((cb) => cb(event.payload));
     });
@@ -24,6 +26,7 @@ export function createEventHub<T>(eventName: string) {
         if (subscribers.size === 0 && unlisten) {
           unlisten();
           unlisten = null;
+          listening = false;
         }
       };
     },

@@ -1011,8 +1011,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         searchErrors: [...state.searchErrors, errorFile],
       }));
     } else {
-      // Append and maintain alphabetical sort by fileName
       set((state) => {
+        if (state.searchResults.some((r) => r.filePath === payload.filePath)) return state;
         const updated = [...state.searchResults, payload];
         updated.sort((a, b) => a.fileName.localeCompare(b.fileName));
         return { searchResults: updated };
