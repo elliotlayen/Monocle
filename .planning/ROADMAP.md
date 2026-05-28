@@ -201,14 +201,14 @@ Plans:
 **Goal:** Users see a polished, consistent explorer UI with readable XML formatting, proper syntax colors, working date display and sort, and the ability to filter the tree to files with validation issues
 **Requirements**: UX-01, UX-02, UX-03, UX-04, UX-05, UX-06
 **Depends on:** Phase 6
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 06.1-01-PLAN.md -- XML formatter utility with tests, tree view element tag syntax colors, SidebarToggle extraction to shared component
-- [ ] 06.1-02-PLAN.md -- Segmented control standardization (Tree/Source + Filename/Content), wire formatDateFolder to tree nodes, connect dateSortOrder to sort logic, date filter preset dropdown
+- [x] 06.1-01-PLAN.md -- XML formatter utility with tests, tree view element tag syntax colors, SidebarToggle extraction to shared component
+- [x] 06.1-02-PLAN.md -- Segmented control standardization (Tree/Source + Filename/Content), wire formatDateFolder to tree nodes, connect dateSortOrder to sort logic, date filter preset dropdown
 
 **Wave 2**
 
@@ -312,7 +312,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
 | 5. Bulk Validation & Reporting | 2/2 | Complete    | 2026-05-27 |
 | 6. Search | 3/3 | Complete    | 2026-05-28 |
-| 06.1. Explorer UX Polish | 0/3 | Not started | - |
+| 06.1. Explorer UX Polish | 2/3 | In Progress|  |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
 | 9. Folder Watching & Notifications | 0/? | Not started | - |

@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-05-28T21:02:42.792Z"
-last_activity: 2026-05-28 -- Phase 06.1 planning complete
+last_updated: "2026-05-28T21:06:21.159Z"
+last_activity: 2026-05-28 -- Phase 06.1 execution started
 progress:
   total_phases: 12
   completed_phases: 6
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Instantly find the right integration file and know if it has problems -- replacing minutes of manual folder clicking with seconds of targeted search and automatic validation.
-**Current focus:** Phase 06.1 — Explorer UX polish
+**Current focus:** Phase 06.1 — explorer-ux-polish-xml-formatting-tree-view-syntax-colors-se
 
 ## Current Position
 
-Phase: 06.1
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-28 -- Phase 06.1 planning complete
+Phase: 06.1 (explorer-ux-polish-xml-formatting-tree-view-syntax-colors-se) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 06.1
+Last activity: 2026-05-28 -- Phase 06.1 execution started
 
 Progress: [###-------] 30%
 
