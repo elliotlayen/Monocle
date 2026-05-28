@@ -77,7 +77,7 @@ describe("formatXml", () => {
     );
     const lines = result.split("\n");
     const childLine = lines.find((l) => l.includes("<child>"));
-    expect(childLine).toMatch(/^    <child>/);
+    expect(childLine).toMatch(/^ {4}<child>/);
   });
 
   it("formats nested elements with correct indentation depth", () => {
@@ -87,7 +87,7 @@ describe("formatXml", () => {
     const lines = result.split("\n");
     // c element should be at depth 3 (6 spaces with 2-space indent)
     const cLine = lines.find((l) => l.includes("<c>"));
-    expect(cLine).toMatch(/^      <c>deep<\/c>/);
+    expect(cLine).toMatch(/^ {6}<c>deep<\/c>/);
   });
 
   it("handles elements with multiple attributes", () => {
