@@ -35,10 +35,7 @@ export function SearchResultGroup({
     ? `Errors (${fileCount} ${fileCount === 1 ? "file" : "files"})`
     : folderName;
 
-  // Sort files alphabetically by fileName (D-20)
-  const sortedFiles = [...files].sort((a, b) =>
-    a.fileName.localeCompare(b.fileName)
-  );
+  // files is pre-sorted alphabetically by the store (appendSearchResult)
   const sortedErrors = errorFiles
     ? [...errorFiles].sort((a, b) => a.fileName.localeCompare(b.fileName))
     : [];
@@ -49,6 +46,9 @@ export function SearchResultGroup({
       <div
         className="flex items-center gap-2 px-4 py-1 cursor-pointer hover:bg-accent/50"
         onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded); }}
         aria-expanded={expanded}
       >
         {expanded ? (
@@ -88,7 +88,7 @@ export function SearchResultGroup({
                   isError
                 />
               ))
-            : sortedFiles.map((file) => (
+            : files.map((file) => (
                 <SearchResultRow
                   key={file.filePath}
                   file={file}
