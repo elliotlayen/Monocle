@@ -67,7 +67,7 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
                 variant="outline"
                 size="sm"
                 className="h-9 px-2"
-                disabled={!canScan && !isScanning}
+                disabled={!canScan}
                 onClick={handleScanClick}
               >
                 {isScanning ? (
