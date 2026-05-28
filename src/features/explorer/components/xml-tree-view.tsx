@@ -58,6 +58,19 @@ export const XmlTreeView = forwardRef<XmlTreeViewHandle, XmlTreeViewProps>(funct
     },
   }), [parseResult, onExpandedIdsChange]);
 
+  const initialExpandDone = useRef(false);
+
+  useEffect(() => {
+    if (parseResult.document && expandedIds.size === 0 && !initialExpandDone.current) {
+      initialExpandDone.current = true;
+      const keys: string[] = [];
+      collectExpandableKeys(parseResult.document.documentElement, "0", keys);
+      if (keys.length > 0) {
+        onExpandedIdsChange(new Set(keys));
+      }
+    }
+  }, [parseResult.document, expandedIds.size, onExpandedIdsChange]);
+
   // Restore scroll position on mount
   useEffect(() => {
     if (scrollRef.current && scrollPosition > 0 && !restoredRef.current) {

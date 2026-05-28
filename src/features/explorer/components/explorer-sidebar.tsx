@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { ArrowUpDown, CalendarIcon, PanelLeftClose } from "lucide-react";
+import { ArrowUpDown, CalendarIcon, Filter, PanelLeftClose } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,6 +10,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -182,37 +188,62 @@ export function ExplorerSidebar() {
                             hasDateFilter && "bg-accent"
                           )}
                         >
-                          <CalendarIcon className="h-4 w-4" />
+                          <Filter className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{hasDateFilter ? "Date filter active" : "Filter by date range"}</p>
+                      <p>{hasDateFilter ? "Filters active" : "Filters"}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <DialogContent className="sm:max-w-fit">
                   <DialogHeader>
-                    <DialogTitle>Filter by date range</DialogTitle>
+                    <DialogTitle>Filters</DialogTitle>
                   </DialogHeader>
-                  <div className="flex flex-col gap-3">
-                    <Calendar
-                      mode="range"
-                      selected={dateRange?.from ? dateRange as DateRange : undefined}
-                      onSelect={(range: DateRange | undefined) => setDateRange(range ?? null)}
-                      numberOfMonths={2}
-                    />
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Date range</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="justify-start px-2.5 font-normal"
+                          >
+                            <CalendarIcon className="h-4 w-4" />
+                            {dateRange?.from ? (
+                              dateRange.to ? (
+                                <>
+                                  {format(dateRange.from, "LLL dd, y")} -{" "}
+                                  {format(dateRange.to, "LLL dd, y")}
+                                </>
+                              ) : (
+                                format(dateRange.from, "LLL dd, y")
+                              )
+                            ) : (
+                              <span className="text-muted-foreground">Pick a date range</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="range"
+                            defaultMonth={dateRange?.from ?? undefined}
+                            selected={dateRange?.from ? dateRange as DateRange : undefined}
+                            onSelect={(range: DateRange | undefined) => setDateRange(range ?? null)}
+                            numberOfMonths={2}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                     {hasDateFilter && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="self-start"
-                        onClick={() => {
-                          setDateRange(null);
-                          setDateDialogOpen(false);
-                        }}
+                        onClick={() => setDateRange(null)}
                       >
-                        Clear filter
+                        Clear all filters
                       </Button>
                     )}
                   </div>

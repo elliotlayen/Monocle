@@ -102,7 +102,36 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
         </div>
       )}
 
-      {/* Tree/Source toggle -- only for XML files, placed on the right */}
+      {/* Action buttons */}
+      <Separator orientation="vertical" className="h-5" />
+      <div className="flex items-center gap-1">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyPath(tab.filePath)}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Copy file path</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyContent(tab.content)}>
+                <ClipboardCopy className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Copy raw content</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Tree/Source toggle -- rightmost, only for XML files */}
       {tab.isXml && (
         <div
           className="flex items-center h-7 rounded-md bg-muted border p-0.5"
@@ -154,35 +183,6 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
           </button>
         </div>
       )}
-
-      {/* Right section: action buttons */}
-      <Separator orientation="vertical" className="h-5" />
-      <div className="flex items-center gap-1">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyPath(tab.filePath)}>
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Copy file path</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyContent(tab.content)}>
-                <ClipboardCopy className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Copy raw content</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
     </div>
   );
 }
