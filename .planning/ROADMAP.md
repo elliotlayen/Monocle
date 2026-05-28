@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Single-File Validation** - Illegal character detection, problem badges in tree, problems panel, inline source highlighting (completed 2026-05-26)
 - [x] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export (completed 2026-05-27)
 - [x] **Phase 6: Search** - Filename filtering, XML content search, configurable search scope (completed 2026-05-28)
-- [ ] **Phase 06.1: Explorer UX Polish** - XML formatting, tree view syntax colors, segmented control fixes, sidebar toggle, date wiring, issues-only filter (INSERTED)
+- [x] **Phase 06.1: Explorer UX Polish** - XML formatting, tree view syntax colors, segmented control fixes, sidebar toggle, date wiring, issues-only filter (INSERTED) (completed 2026-05-28)
 - [ ] **Phase 7: File Comparison** - Side-by-side and inline diff for any two files
 - [ ] **Phase 8: Analytics Dashboard** - Client dashboard, error heatmap, timeline view, file size anomaly detection
 - [ ] **Phase 9: Folder Watching & Notifications** - Polling-based folder monitoring with desktop and in-app notifications
@@ -201,7 +201,7 @@ Plans:
 **Goal:** Users see a polished, consistent explorer UI with readable XML formatting, proper syntax colors, working date display and sort, and the ability to filter the tree to files with validation issues
 **Requirements**: UX-01, UX-02, UX-03, UX-04, UX-05, UX-06
 **Depends on:** Phase 6
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -212,7 +212,7 @@ Plans:
 
 **Wave 2**
 
-- [ ] 06.1-03-PLAN.md -- XML format toggle in source view, issues-only filter toggle in sidebar, visual verification checkpoint
+- [x] 06.1-03-PLAN.md -- XML format toggle in source view, issues-only filter toggle in sidebar, visual verification checkpoint
 
 **UI hint**: yes
 
@@ -312,7 +312,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
 | 5. Bulk Validation & Reporting | 2/2 | Complete    | 2026-05-27 |
 | 6. Search | 3/3 | Complete    | 2026-05-28 |
-| 06.1. Explorer UX Polish | 2/3 | In Progress|  |
+| 06.1. Explorer UX Polish | 3/3 | Complete   | 2026-05-28 |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
 | 9. Folder Watching & Notifications | 0/? | Not started | - |
