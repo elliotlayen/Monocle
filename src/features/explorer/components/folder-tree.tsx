@@ -16,6 +16,8 @@ export function FolderTree() {
     collapseNode,
     cancelLoad,
     toggleFavorite,
+    lastInteractedFolderPath,
+    searchMode,
   } = useExplorerStore(
     useShallow((state) => ({
       folderSources: state.folderSources,
@@ -26,6 +28,8 @@ export function FolderTree() {
       collapseNode: state.collapseNode,
       cancelLoad: state.cancelLoad,
       toggleFavorite: state.toggleFavorite,
+      lastInteractedFolderPath: state.lastInteractedFolderPath,
+      searchMode: state.searchMode,
     }))
   );
 
@@ -45,6 +49,8 @@ export function FolderTree() {
     if (!filterText.trim()) return rootNodes;
     return filterTreeNodes(rootNodes, filterText);
   }, [rootNodes, filterText]);
+
+  const selectedFolderPath = searchMode === "content" ? lastInteractedFolderPath : null;
 
   const renderChildren = (node: TreeNode, depth: number, sourceId: string) => {
     const current = treeNodes.get(node.id) ?? node;
@@ -89,6 +95,7 @@ export function FolderTree() {
                   onCancel={cancelLoad}
                   onToggleFavorite={toggleFavorite}
                   onFileClick={handleFileClick}
+                  selectedFolderPath={selectedFolderPath}
                 />
                 {renderChildren(child, depth + 1, sourceId)}
               </div>

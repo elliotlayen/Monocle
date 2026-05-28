@@ -50,8 +50,8 @@ export function SearchControlsRow({
     (!selectedNodePath && searchScope !== "all") || isSearching;
 
   return (
-    <div className="flex items-center gap-2 px-3 pb-2">
-      {/* Scope dropdown */}
+    <div className="flex flex-col gap-2 px-3 pb-2">
+      {/* Row 1: Scope dropdown (full width) */}
       <Select
         value={searchScope}
         onValueChange={(value) =>
@@ -60,7 +60,7 @@ export function SearchControlsRow({
         disabled={scopeDisabled}
       >
         <SelectTrigger
-          className="h-8 text-xs flex-1 min-w-0"
+          className="h-8 text-xs w-full"
           aria-label="Search scope"
         >
           <SelectValue />
@@ -72,24 +72,24 @@ export function SearchControlsRow({
         </SelectContent>
       </Select>
 
-      {/* File pattern input */}
-      <Input
-        className="h-8 text-xs w-20"
-        value={searchFilePattern}
-        onChange={(e) => setSearchFilePattern(e.target.value)}
-        placeholder="*.xml"
-      />
-
-      {/* Search Files button */}
-      <Button
-        variant="default"
-        size="sm"
-        className="h-8 px-3 text-xs font-semibold"
-        disabled={searchDisabled}
-        onClick={onSearch}
-      >
-        Search Files
-      </Button>
+      {/* Row 2: File pattern + Search Files button */}
+      <div className="flex items-center gap-2">
+        <Input
+          className="h-8 text-xs flex-1 min-w-0"
+          value={searchFilePattern}
+          onChange={(e) => setSearchFilePattern(e.target.value)}
+          placeholder="*.xml"
+        />
+        <Button
+          variant="default"
+          size="sm"
+          className="h-8 px-3 text-xs font-semibold flex-shrink-0"
+          disabled={searchDisabled}
+          onClick={onSearch}
+        >
+          Search Files
+        </Button>
+      </div>
     </div>
   );
 }

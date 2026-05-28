@@ -60,47 +60,11 @@ export function SearchBar({ onSearchExecute }: SearchBarProps) {
   const hasQuery = searchQuery.length > 0;
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Search input with icon */}
-      <div className="relative flex-1">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          ref={inputRef}
-          role="searchbox"
-          aria-label="Search files"
-          placeholder={placeholder}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && searchMode === "content") {
-              onSearchExecute();
-            }
-            if (e.key === "Escape") {
-              setSearchQuery("");
-              if (searchMode === "content") {
-                clearSearchResults();
-              }
-              inputRef.current?.blur();
-            }
-          }}
-          className={`h-8 text-sm pl-8 ${hasQuery ? "pr-8" : ""}`}
-        />
-        {hasQuery && (
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-            onClick={() => setSearchQuery("")}
-            aria-label="Clear search"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-
-      {/* Segmented toggle */}
+    <div className="flex flex-col gap-2">
+      {/* Row 1: Mode toggle */}
       <TooltipProvider>
         <div
-          className="flex items-center rounded-md border bg-muted/50 p-0.5"
+          className="flex items-center rounded-md border bg-muted/50 p-0.5 self-start"
           role="group"
           aria-label="Search mode"
         >
@@ -144,6 +108,42 @@ export function SearchBar({ onSearchExecute }: SearchBarProps) {
           </Tooltip>
         </div>
       </TooltipProvider>
+
+      {/* Row 2: Search input (full width) */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          role="searchbox"
+          aria-label="Search files"
+          placeholder={placeholder}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && searchMode === "content") {
+              onSearchExecute();
+            }
+            if (e.key === "Escape") {
+              setSearchQuery("");
+              if (searchMode === "content") {
+                clearSearchResults();
+              }
+              inputRef.current?.blur();
+            }
+          }}
+          className={`h-8 text-sm pl-8 ${hasQuery ? "pr-8" : ""}`}
+        />
+        {hasQuery && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+            onClick={() => setSearchQuery("")}
+            aria-label="Clear search"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
