@@ -12,9 +12,14 @@ export function createEventHub<T>(eventName: string) {
   const ensureListening = async () => {
     if (unlisten || listening) return;
     listening = true;
-    unlisten = await listen<T>(eventName, (event) => {
-      subscribers.forEach((cb) => cb(event.payload));
-    });
+    try {
+      unlisten = await listen<T>(eventName, (event) => {
+        subscribers.forEach((cb) => cb(event.payload));
+      });
+    } catch {
+      listening = false;
+      throw;
+    }
   };
 
   return {
