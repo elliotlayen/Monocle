@@ -30,9 +30,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Search
 
-- [ ] **SRCH-01**: User can filter files by filename pattern within the current view
-- [ ] **SRCH-02**: User can search for specific values inside XML file content across multiple files
-- [ ] **SRCH-03**: User can choose search scope: current folder, current client (all dates), or all sources
+- [x] **SRCH-01**: User can filter files by filename pattern within the current view
+- [x] **SRCH-02**: User can search for specific values inside XML file content across multiple files
+- [x] **SRCH-03**: User can choose search scope: current folder, current client (all dates), or all sources
 
 ### Analysis
 
@@ -88,9 +88,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VALD-04 | Phase 4 | Pending |
 | VALD-05 | Phase 5 | Complete |
 | VALD-06 | Phase 5 | Complete |
-| SRCH-01 | Phase 6 | Pending |
-| SRCH-02 | Phase 6 | Pending |
-| SRCH-03 | Phase 6 | Pending |
+| SRCH-01 | Phase 6 | Complete |
+| SRCH-02 | Phase 6 | Complete |
+| SRCH-03 | Phase 6 | Complete |
 | ANLS-01 | Phase 7 | Pending |
 | ANLS-02 | Phase 8 | Pending |
 | ANLS-03 | Phase 8 | Pending |
