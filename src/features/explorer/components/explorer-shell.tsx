@@ -15,7 +15,7 @@ import { ExplorerSidebar } from "./explorer-sidebar";
 import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
-import { SidebarToggle } from "@/features/schema-graph/components/sidebar-toggle";
+import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { useExplorerStore } from "../store";
 
 interface ExplorerShellProps {

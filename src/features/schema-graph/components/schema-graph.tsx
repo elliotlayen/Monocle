@@ -53,7 +53,7 @@ import {
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
 import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
 import { DetailPopover } from "./detail-popover";
-import { SidebarToggle } from "./sidebar-toggle";
+import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { useDetailPopover } from "../hooks/use-detail-popover";
 import type { DetailSidebarData } from "./detail-content";
 import { cn } from "@/lib/utils";

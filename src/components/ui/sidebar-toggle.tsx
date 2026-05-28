@@ -20,7 +20,7 @@ export function SidebarToggle({ onClick, visible }: SidebarToggleProps) {
       onClick={onClick}
     >
       <PanelLeft className="h-4 w-4" />
-      <span className="sr-only">Open details panel</span>
+      <span className="sr-only">Open sidebar</span>
     </Button>
   );
 }
