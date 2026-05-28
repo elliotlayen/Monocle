@@ -46,13 +46,17 @@ export function FileContentHeader({ tab, onExpandAll, onCollapseAll }: FileConte
 
       {/* Tree/Source toggle -- only for XML files */}
       {tab.isXml && (
-        <div className="flex items-center h-7 rounded-md bg-muted border">
+        <div
+          className="flex items-center h-7 rounded-md bg-muted border p-0.5"
+          role="group"
+          aria-label="View mode"
+        >
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   className={cn(
-                    "px-2.5 h-full flex items-center gap-1.5 text-xs rounded-sm",
+                    "h-full px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-sm",
                     tab.viewMode === "tree"
                       ? "bg-background shadow-sm"
                       : "text-muted-foreground hover:text-foreground",
@@ -64,6 +68,7 @@ export function FileContentHeader({ tab, onExpandAll, onCollapseAll }: FileConte
                     }
                   }}
                   disabled={tab.parseError}
+                  aria-pressed={tab.viewMode === "tree"}
                 >
                   <TreePine className="h-3.5 w-3.5" />
                   Tree
@@ -78,12 +83,13 @@ export function FileContentHeader({ tab, onExpandAll, onCollapseAll }: FileConte
           </TooltipProvider>
           <button
             className={cn(
-              "px-2.5 h-full flex items-center gap-1.5 text-xs rounded-sm",
+              "h-full px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-sm",
               tab.viewMode === "source"
                 ? "bg-background shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setViewMode(tab.id, "source")}
+            aria-pressed={tab.viewMode === "source"}
           >
             <Code className="h-3.5 w-3.5" />
             Source
