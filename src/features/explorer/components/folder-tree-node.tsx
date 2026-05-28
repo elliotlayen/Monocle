@@ -247,7 +247,7 @@ export function FolderTreeNode({
         )}
         onClick={(e) => {
           e.stopPropagation();
-          onToggleFavorite(sourceId, node.name);
+          onToggleFavorite(sourceId, node.path);
         }}
       >
         <Star
@@ -331,7 +331,7 @@ export function FolderTreeNode({
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
-          onClick={() => onToggleFavorite(sourceId, node.name)}
+          onClick={() => onToggleFavorite(sourceId, node.path)}
         >
           {node.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
         </ContextMenuItem>

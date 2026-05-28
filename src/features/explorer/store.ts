@@ -126,17 +126,19 @@ interface ExplorerStore {
 
 function buildChildNodes(
   entries: DirEntry[],
-  parentNode: TreeNode,
+  _parentNode: TreeNode,
   folderSources: FolderSource[]
 ): TreeNode[] {
   return entries.map((entry) => {
     const nodeType: TreeNode["type"] = entry.isDir ? "folder" : "file";
 
     let isFavorite: boolean | undefined;
-    if (entry.isDir && parentNode.type === "source") {
-      const source = folderSources.find((s) => s.id === parentNode.id);
+    if (entry.isDir) {
+      const source = folderSources.find((s) =>
+        entry.path.startsWith(s.path)
+      );
       if (source) {
-        isFavorite = source.favorites.includes(entry.name);
+        isFavorite = source.favorites.includes(entry.path);
       }
     }
 
@@ -392,38 +394,36 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       dateSortOrder: state.dateSortOrder === "newest" ? "oldest" : "newest",
     })),
 
-  toggleFavorite: async (sourceId: string, clientName: string) => {
+  toggleFavorite: async (sourceId: string, folderPath: string) => {
     try {
       const updatedSettings =
-        await explorerService.toggleFavorite(sourceId, clientName);
+        await explorerService.toggleFavorite(sourceId, folderPath);
       const updatedSources = updatedSettings.folderSources ?? [];
 
-      // Update local folder sources
       const nextNodes = new Map(get().treeNodes);
       const source = updatedSources.find((s) => s.id === sourceId);
       if (source) {
-        const sourceNode = nextNodes.get(sourceId);
-        if (sourceNode?.children) {
-          for (const child of sourceNode.children) {
-            if (child.isDir) {
-              const updatedChild = {
-                ...child,
-                isFavorite: source.favorites.includes(child.name),
-              };
-              nextNodes.set(child.id, updatedChild);
+        // Update isFavorite on all directory nodes belonging to this source
+        for (const [id, node] of nextNodes) {
+          if (node.isDir && id.startsWith(source.path)) {
+            const shouldBeFav = source.favorites.includes(node.path);
+            if (node.isFavorite !== shouldBeFav) {
+              const updated = { ...node, isFavorite: shouldBeFav };
+              nextNodes.set(id, updated);
+              // Also update in parent's children array
+              for (const [, parent] of nextNodes) {
+                if (parent.children?.some((c) => c.id === id)) {
+                  nextNodes.set(parent.id, {
+                    ...parent,
+                    children: parent.children.map((c) =>
+                      c.id === id ? updated : c
+                    ),
+                  });
+                  break;
+                }
+              }
             }
           }
-          nextNodes.set(sourceId, {
-            ...sourceNode,
-            children: sourceNode.children.map((child) =>
-              child.isDir
-                ? {
-                    ...child,
-                    isFavorite: source.favorites.includes(child.name),
-                  }
-                : child
-            ),
-          });
         }
       }
 

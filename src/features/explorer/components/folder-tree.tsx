@@ -79,19 +79,27 @@ export function FolderTree() {
         return a.name.localeCompare(b.name);
       });
 
-    // Get favorites for this source
+    // Get favorites for this source — collect from all depths
     const source = folderSources.find((s) => s.id === sourceId);
     const favorites = source?.favorites ?? [];
     const hasFavorites = node.type === "source" && favorites.length > 0;
 
-    const favoritedChildren = hasFavorites
-      ? sortedChildren.filter((child) => child.isDir && child.isFavorite)
-      : [];
+    const favoritedNodes: TreeNode[] = [];
+    if (hasFavorites) {
+      for (const favPath of favorites) {
+        const favNode = treeNodes.get(favPath);
+        if (favNode) favoritedNodes.push(favNode);
+      }
+      favoritedNodes.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Direct children that are favorited (to exclude from main list)
+    const favoritedChildIds = new Set(favoritedNodes.map((n) => n.id));
 
     return (
       <div>
         {/* Favorites section */}
-        {hasFavorites && favoritedChildren.length > 0 && (
+        {hasFavorites && favoritedNodes.length > 0 && (
           <div>
             <div
               className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1"
@@ -99,13 +107,13 @@ export function FolderTree() {
             >
               Favorites
             </div>
-            {favoritedChildren.map((child) => (
-              <div key={`fav-${child.id}`}>
+            {favoritedNodes.map((favNode) => (
+              <div key={`fav-${favNode.id}`}>
                 <FolderTreeNode
-                  node={child}
+                  node={favNode}
                   depth={depth + 1}
                   sourceId={sourceId}
-                  isExpanded={expandedIds.has(child.id)}
+                  isExpanded={expandedIds.has(favNode.id)}
                   onExpand={expandNode}
                   onCollapse={collapseNode}
                   onCancel={cancelLoad}
@@ -113,17 +121,17 @@ export function FolderTree() {
                   onFileClick={handleFileClick}
                   selectedFolderPath={selectedFolderPath}
                   showCheckbox={showCheckboxes}
-                  isChecked={isPathChecked(child.path)}
+                  isChecked={isPathChecked(favNode.path)}
                   onToggleCheck={toggleSearchCheck}
                 />
-                {renderChildren(child, depth + 1, sourceId)}
+                {renderChildren(favNode, depth + 1, sourceId)}
               </div>
             ))}
           </div>
         )}
 
         {/* All children alphabetically (exclude favorites already shown above) */}
-        {sortedChildren.filter((child) => !favoritedChildren.includes(child)).map((child) => (
+        {sortedChildren.filter((child) => !favoritedChildIds.has(child.id)).map((child) => (
           <div key={child.id}>
             <FolderTreeNode
               node={child}
