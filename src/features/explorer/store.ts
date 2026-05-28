@@ -71,6 +71,7 @@ interface ExplorerStore {
   searchErrors: SearchErrorFile[];
   searchSummary: SearchSummary | null;
   searchOperationId: string | null;
+  activeSearchTerms: string[] | null;
 
   // Actions
   loadSources: () => Promise<void>;
@@ -121,6 +122,7 @@ interface ExplorerStore {
   appendSearchResult: (payload: SearchResultFile) => void;
   cancelContentSearch: () => Promise<void>;
   clearSearchResults: () => void;
+  setActiveSearchTerms: (terms: string[] | null) => void;
 }
 
 function buildChildNodes(
@@ -172,6 +174,44 @@ function recomputeTabNames(tabs: FileTab[]): FileTab[] {
   }));
 }
 
+/**
+ * Parse search query into individual terms (frontend port of Rust parse_search_terms).
+ * Splits on spaces, handles quoted phrases, lowercases all terms.
+ */
+export function parseSearchTermsFrontend(query: string): string[] {
+  const terms: string[] = [];
+  const trimmed = query.trim();
+  if (!trimmed) return terms;
+
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch === '"') {
+      if (inQuotes) {
+        // End of quoted phrase
+        if (current) terms.push(current.toLowerCase());
+        current = "";
+        inQuotes = false;
+      } else {
+        // Start of quoted phrase -- push anything accumulated so far
+        if (current) terms.push(current.toLowerCase());
+        current = "";
+        inQuotes = true;
+      }
+    } else if (ch === " " && !inQuotes) {
+      if (current) terms.push(current.toLowerCase());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+
+  if (current) terms.push(current.toLowerCase());
+  return terms;
+}
+
 export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   // Initial state
   folderSources: [],
@@ -212,6 +252,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   searchErrors: [],
   searchSummary: null,
   searchOperationId: null,
+  activeSearchTerms: null,
 
   loadSources: async () => {
     try {
@@ -866,6 +907,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         searchErrors: [],
         searchSummary: null,
         searchStatus: "idle",
+        activeSearchTerms: null,
         filterText: searchQuery,
       });
     } else if (mode === "filename") {
@@ -996,6 +1038,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       searchSummary: null,
       searchProgress: null,
       searchStatus: "idle",
+      activeSearchTerms: null,
     });
+  },
+
+  setActiveSearchTerms: (terms: string[] | null) => {
+    set({ activeSearchTerms: terms });
   },
 }));

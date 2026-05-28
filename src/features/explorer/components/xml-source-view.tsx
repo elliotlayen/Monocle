@@ -4,6 +4,7 @@ import type { editor } from "monaco-editor";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { ensureMonacoXmlLoaded } from "@/lib/monaco-xml-loader";
 import { useValidationDecorations } from "../hooks/use-validation-decorations";
+import { useSearchHighlight } from "../hooks/use-search-highlight";
 import type { ValidationProblem } from "../types";
 
 interface XmlSourceViewProps {
@@ -15,6 +16,7 @@ interface XmlSourceViewProps {
   savedViewState: unknown | null;
   onViewStateChange: (state: unknown | null) => void;
   problems?: ValidationProblem[];
+  searchHighlightTerms?: string[] | null;
   pendingJump?: { tabId: string; line: number; column: number } | null;
   onJumpHandled?: () => void;
 }
@@ -33,6 +35,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
   savedViewState,
   onViewStateChange,
   problems,
+  searchHighlightTerms,
   pendingJump,
   onJumpHandled,
 }, ref) {
@@ -88,6 +91,9 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
 
   // Apply Monaco decorations for validation problems
   useValidationDecorations(editorMounted, problems ?? []);
+
+  // Apply Monaco decorations for search term highlighting
+  useSearchHighlight(editorMounted, searchHighlightTerms ?? null);
 
   // Handle pending jump from problems panel click
   const onJumpHandledRef = useRef(onJumpHandled);

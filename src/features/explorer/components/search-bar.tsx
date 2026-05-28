@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useShallow } from "zustand/shallow";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -15,15 +16,43 @@ interface SearchBarProps {
 }
 
 export function SearchBar({ onSearchExecute }: SearchBarProps) {
-  const { searchMode, searchQuery, setSearchMode, setSearchQuery } =
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { searchMode, searchQuery, setSearchMode, setSearchQuery, clearSearchResults } =
     useExplorerStore(
       useShallow((state) => ({
         searchMode: state.searchMode,
         searchQuery: state.searchQuery,
         setSearchMode: state.setSearchMode,
         setSearchQuery: state.setSearchQuery,
+        clearSearchResults: state.clearSearchResults,
       }))
     );
+
+  // Keyboard shortcuts: Cmd+F (filename), Cmd+Shift+F (content), Escape (clear)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Do not intercept when Monaco editor has focus
+      if (document.activeElement?.closest(".monaco-editor")) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        if (e.shiftKey) {
+          // Cmd+Shift+F -> Content mode
+          e.preventDefault();
+          setSearchMode("content");
+          inputRef.current?.focus();
+        } else {
+          // Cmd+F -> Filename mode
+          e.preventDefault();
+          setSearchMode("filename");
+          inputRef.current?.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [setSearchMode]);
 
   const placeholder =
     searchMode === "filename" ? "Search files..." : "Search file contents...";
@@ -36,6 +65,7 @@ export function SearchBar({ onSearchExecute }: SearchBarProps) {
       <div className="relative flex-1">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
+          ref={inputRef}
           role="searchbox"
           aria-label="Search files"
           placeholder={placeholder}
@@ -44,6 +74,13 @@ export function SearchBar({ onSearchExecute }: SearchBarProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter" && searchMode === "content") {
               onSearchExecute();
+            }
+            if (e.key === "Escape") {
+              setSearchQuery("");
+              if (searchMode === "content") {
+                clearSearchResults();
+              }
+              inputRef.current?.blur();
             }
           }}
           className={`h-8 text-sm pl-8 ${hasQuery ? "pr-8" : ""}`}

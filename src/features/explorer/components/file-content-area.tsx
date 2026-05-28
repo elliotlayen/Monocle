@@ -28,6 +28,7 @@ export function FileContentArea() {
     setProblemsPanelHeight,
     jumpToProblem,
     clearPendingJump,
+    activeSearchTerms,
   } = useExplorerStore(
     useShallow((state) => ({
       tabs: state.tabs,
@@ -42,6 +43,7 @@ export function FileContentArea() {
       setProblemsPanelHeight: state.setProblemsPanelHeight,
       jumpToProblem: state.jumpToProblem,
       clearPendingJump: state.clearPendingJump,
+      activeSearchTerms: state.activeSearchTerms,
     }))
   );
 
@@ -196,6 +198,7 @@ export function FileContentArea() {
           savedViewState={activeTab.monacoViewState}
           onViewStateChange={handleViewStateChange}
           problems={activeTab.problems}
+          searchHighlightTerms={activeSearchTerms}
           pendingJump={pendingJump}
           onJumpHandled={clearPendingJump}
         />

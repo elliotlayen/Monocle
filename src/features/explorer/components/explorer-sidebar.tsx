@@ -9,7 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useExplorerStore } from "../store";
+import { useExplorerStore, parseSearchTermsFrontend } from "../store";
 import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
 import { useSearch } from "../hooks/use-search";
 import { FolderTree } from "./folder-tree";
@@ -37,6 +37,7 @@ export function ExplorerSidebar() {
     searchProgress,
     searchQuery,
     openFile,
+    setActiveSearchTerms,
   } = useExplorerStore(
     useShallow((state) => ({
       sidebarOpen: state.sidebarOpen,
@@ -57,6 +58,7 @@ export function ExplorerSidebar() {
       searchProgress: state.searchProgress,
       searchQuery: state.searchQuery,
       openFile: state.openFile,
+      setActiveSearchTerms: state.setActiveSearchTerms,
     }))
   );
 
@@ -149,9 +151,10 @@ export function ExplorerSidebar() {
   // Wire file click from search results
   const handleFileClick = useCallback(
     (filePath: string) => {
+      setActiveSearchTerms(parseSearchTermsFrontend(searchQuery));
       openFile(filePath);
     },
-    [openFile]
+    [openFile, setActiveSearchTerms, searchQuery]
   );
 
   // Determine what to show in the body area
