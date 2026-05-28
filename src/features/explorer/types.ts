@@ -107,3 +107,43 @@ export interface ScanSummary {
 }
 
 export type ScanStatus = "idle" | "scanning" | "completed" | "cancelled";
+
+// Content search types
+
+export type SearchMode = "filename" | "content";
+
+export type SearchScope = "folder" | "source" | "all";
+
+export type SearchStatus = "idle" | "searching" | "completed" | "cancelled";
+
+export interface SearchResultFile {
+  filePath: string;
+  fileName: string;
+  parentFolder: string;
+  matchCount: number;
+}
+
+export interface SearchErrorFile {
+  filePath: string;
+  fileName: string;
+  parentFolder: string;
+  errorMessage: string;
+}
+
+export interface SearchProgressPayload {
+  filesScanned: number;
+  totalFiles: number;
+  matchesFound: number;
+  filesMatched: number;
+  operationId: string;
+}
+
+export interface SearchSummary {
+  query: string;
+  scopeLabel: string;
+  filePattern: string;
+  totalFilesScanned: number;
+  totalFilesMatched: number;
+  totalMatches: number;
+  cancelled: boolean;
+}

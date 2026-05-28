@@ -12,6 +12,7 @@ import type {
   DirEntry,
   FileContent,
   ScanSummary,
+  SearchSummary,
 } from "@/features/explorer/types";
 
 // Centralized error handling wrapper
@@ -73,4 +74,20 @@ export const tauri = {
     }),
   cancelScan: (operationId: string) =>
     invokeCommand<void>("cancel_scan_cmd", { operationId }),
+
+  // Content search commands
+  contentSearch: (
+    query: string,
+    folderPaths: string,
+    filePattern: string,
+    scopeLabel: string,
+    operationId: string
+  ) =>
+    invokeCommand<SearchSummary>("content_search_cmd", {
+      query,
+      folderPaths,
+      filePattern,
+      scopeLabel,
+      operationId,
+    }),
 };

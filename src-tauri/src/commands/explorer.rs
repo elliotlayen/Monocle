@@ -172,6 +172,308 @@ pub fn toggle_favorite_cmd(
     state.toggle_favorite(&source_id, &client_name)
 }
 
+// -- Content search types and commands --
+
+/// Parse a search query into individual terms.
+///
+/// Space-separated words become individual lowercase terms.
+/// Quoted substrings (using double quotes) are preserved as single terms.
+/// Unclosed quotes treat the remainder as a single term.
+/// Empty quotes are skipped.
+pub fn parse_search_terms(query: &str) -> Vec<String> {
+    let mut terms = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for ch in query.chars() {
+        match ch {
+            '"' => {
+                if in_quotes {
+                    // End of quoted section
+                    let trimmed = current.trim().to_string();
+                    if !trimmed.is_empty() {
+                        terms.push(trimmed.to_lowercase());
+                    }
+                    current.clear();
+                    in_quotes = false;
+                } else {
+                    // Start of quoted section -- flush current token first
+                    let trimmed = current.trim().to_string();
+                    if !trimmed.is_empty() {
+                        terms.push(trimmed.to_lowercase());
+                    }
+                    current.clear();
+                    in_quotes = true;
+                }
+            }
+            ' ' if !in_quotes => {
+                let trimmed = current.trim().to_string();
+                if !trimmed.is_empty() {
+                    terms.push(trimmed.to_lowercase());
+                }
+                current.clear();
+            }
+            _ => {
+                current.push(ch);
+            }
+        }
+    }
+
+    // Handle remaining content (including unclosed quotes)
+    let trimmed = current.trim().to_string();
+    if !trimmed.is_empty() {
+        terms.push(trimmed.to_lowercase());
+    }
+
+    terms
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResultPayload {
+    pub file_path: String,
+    pub file_name: String,
+    pub parent_folder: String,
+    pub match_count: u32,
+    pub operation_id: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchProgressPayload {
+    pub files_scanned: u32,
+    pub total_files: u32,
+    pub matches_found: u32,
+    pub files_matched: u32,
+    pub operation_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchSummaryResult {
+    pub query: String,
+    pub scope_label: String,
+    pub file_pattern: String,
+    pub total_files_scanned: u32,
+    pub total_files_matched: u32,
+    pub total_matches: u32,
+    pub cancelled: bool,
+}
+
+#[tauri::command]
+pub async fn content_search_cmd(
+    app: AppHandle,
+    query: String,
+    folder_paths: String,
+    file_pattern: String,
+    scope_label: String,
+    operation_id: String,
+    explorer_state: State<'_, ExplorerState>,
+) -> Result<SearchSummaryResult, String> {
+    let terms = parse_search_terms(&query);
+    if terms.is_empty() {
+        return Err("Search query is empty".to_string());
+    }
+
+    let paths: Vec<String> = serde_json::from_str(&folder_paths)
+        .map_err(|e| format!("Invalid folder_paths JSON: {}", e))?;
+
+    let pattern = Pattern::new(&file_pattern)
+        .map_err(|e| format!("Invalid file pattern '{}': {}", file_pattern, e))?;
+
+    let cancel_token = CancellationToken::new();
+    let token_clone = cancel_token.clone();
+
+    {
+        let mut listings = explorer_state
+            .active_listings
+            .lock()
+            .map_err(|e| e.to_string())?;
+        listings.insert(operation_id.clone(), cancel_token);
+    }
+
+    let op_id = operation_id.clone();
+    let query_clone = query.clone();
+    let file_pattern_clone = file_pattern.clone();
+    let scope_label_clone = scope_label.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        // Phase 1: Collect matching files across all folder paths
+        let mut matching_files: Vec<PathBuf> = Vec::new();
+
+        for folder_path in &paths {
+            if token_clone.is_cancelled() {
+                break;
+            }
+
+            // Validate path exists before walking
+            match std::fs::metadata(folder_path) {
+                Ok(m) if m.is_dir() => {}
+                Ok(_) => continue, // Not a directory, skip
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    // Unreachable path -- skip
+                    continue;
+                }
+                Err(_) => continue,
+            }
+
+            let files: Vec<PathBuf> = WalkDir::new(folder_path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| !e.file_type().is_dir())
+                .filter(|e| {
+                    e.file_name()
+                        .to_str()
+                        .map(|n| pattern.matches(n))
+                        .unwrap_or(false)
+                })
+                .map(|e| e.into_path())
+                .collect();
+
+            matching_files.extend(files);
+        }
+
+        let total_files = matching_files.len().min(u32::MAX as usize) as u32;
+        let mut files_scanned: u32 = 0;
+        let mut total_matches: u32 = 0;
+        let mut files_matched: u32 = 0;
+        let mut cancelled = false;
+        let mut last_emit_time = std::time::Instant::now();
+        let mut consecutive_read_failures: u32 = 0;
+
+        // Phase 2: Search each file
+        for (idx, file_path) in matching_files.iter().enumerate() {
+            if token_clone.is_cancelled() {
+                cancelled = true;
+                break;
+            }
+
+            let file_name = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            let parent_folder = file_path
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            // Skip files that exceed size limit
+            match std::fs::metadata(file_path) {
+                Ok(m) if m.len() > MAX_SCAN_FILE_SIZE => {
+                    files_scanned = files_scanned.saturating_add(1);
+                    consecutive_read_failures = 0;
+                    continue;
+                }
+                Err(_) => {
+                    consecutive_read_failures = consecutive_read_failures.saturating_add(1);
+                    if consecutive_read_failures >= 10 {
+                        // Network share may be unreachable
+                        cancelled = true;
+                        break;
+                    }
+                    files_scanned = files_scanned.saturating_add(1);
+                    continue;
+                }
+                _ => {
+                    consecutive_read_failures = 0;
+                }
+            }
+
+            // Read and decode file
+            let raw_bytes = match std::fs::read(file_path) {
+                Ok(bytes) => {
+                    consecutive_read_failures = 0;
+                    bytes
+                }
+                Err(_) => {
+                    consecutive_read_failures = consecutive_read_failures.saturating_add(1);
+                    if consecutive_read_failures >= 10 {
+                        cancelled = true;
+                        break;
+                    }
+
+                    // Emit error result
+                    let error_payload = SearchResultPayload {
+                        file_path: file_path.to_string_lossy().to_string(),
+                        file_name: format!("ERROR: Failed to read file"),
+                        parent_folder: parent_folder.clone(),
+                        match_count: 0,
+                        operation_id: operation_id.clone(),
+                    };
+                    let _ = app.emit("search-result", error_payload);
+
+                    files_scanned = files_scanned.saturating_add(1);
+                    continue;
+                }
+            };
+
+            let decode_result = detect_and_decode(&raw_bytes);
+            let content_lower = decode_result.content.to_lowercase();
+
+            // AND logic: all terms must be present
+            let all_present = terms.iter().all(|term| content_lower.contains(term.as_str()));
+
+            if all_present {
+                // Count total matches across all terms
+                let match_count: u32 = terms
+                    .iter()
+                    .map(|term| content_lower.matches(term.as_str()).count() as u32)
+                    .sum();
+
+                total_matches = total_matches.saturating_add(match_count);
+                files_matched = files_matched.saturating_add(1);
+
+                let result_payload = SearchResultPayload {
+                    file_path: file_path.to_string_lossy().to_string(),
+                    file_name: file_name.clone(),
+                    parent_folder: parent_folder.clone(),
+                    match_count,
+                    operation_id: operation_id.clone(),
+                };
+                let _ = app.emit("search-result", result_payload);
+            }
+
+            files_scanned = files_scanned.saturating_add(1);
+
+            // Throttle progress events at 50ms intervals
+            let is_last = idx == matching_files.len() - 1;
+            let elapsed = last_emit_time.elapsed();
+            if elapsed >= Duration::from_millis(50) || is_last {
+                let progress_payload = SearchProgressPayload {
+                    files_scanned,
+                    total_files,
+                    matches_found: total_matches,
+                    files_matched,
+                    operation_id: operation_id.clone(),
+                };
+                let _ = app.emit("search-progress", progress_payload);
+                last_emit_time = std::time::Instant::now();
+            }
+        }
+
+        SearchSummaryResult {
+            query: query_clone,
+            scope_label: scope_label_clone,
+            file_pattern: file_pattern_clone,
+            total_files_scanned: files_scanned,
+            total_files_matched: files_matched,
+            total_matches,
+            cancelled,
+        }
+    })
+    .await
+    .map_err(|e| format!("Search task failed: {}", e))?;
+
+    // Clean up active listing
+    if let Ok(mut listings) = explorer_state.active_listings.lock() {
+        listings.remove(&op_id);
+    }
+
+    Ok(result)
+}
+
 // -- Bulk scan types and commands --
 
 #[derive(Clone, Serialize)]
@@ -417,6 +719,70 @@ pub fn cancel_scan_cmd(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_search_terms_basic() {
+        let result = parse_search_terms("foo bar");
+        assert_eq!(result, vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn test_parse_search_terms_quoted() {
+        let result = parse_search_terms(r#"foo "bar baz" qux"#);
+        assert_eq!(result, vec!["foo", "bar baz", "qux"]);
+    }
+
+    #[test]
+    fn test_parse_search_terms_empty() {
+        let result = parse_search_terms("");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_search_terms_unclosed_quote() {
+        let result = parse_search_terms(r#"foo "bar baz"#);
+        assert_eq!(result, vec!["foo", "bar baz"]);
+    }
+
+    #[test]
+    fn test_parse_search_terms_empty_quotes() {
+        let result = parse_search_terms(r#"foo "" bar"#);
+        assert_eq!(result, vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn test_parse_search_terms_case_normalization() {
+        let result = parse_search_terms("FOO Bar BAZ");
+        assert_eq!(result, vec!["foo", "bar", "baz"]);
+    }
+
+    #[test]
+    fn test_parse_search_terms_consecutive_spaces() {
+        let result = parse_search_terms("  foo   bar  ");
+        assert_eq!(result, vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn test_search_summary_result_serialization() {
+        let summary = SearchSummaryResult {
+            query: "test query".to_string(),
+            scope_label: "All Sources".to_string(),
+            file_pattern: "*.xml".to_string(),
+            total_files_scanned: 100,
+            total_files_matched: 5,
+            total_matches: 12,
+            cancelled: false,
+        };
+
+        let json = serde_json::to_value(&summary).unwrap();
+        assert_eq!(json["query"], "test query");
+        assert_eq!(json["scopeLabel"], "All Sources");
+        assert_eq!(json["filePattern"], "*.xml");
+        assert_eq!(json["totalFilesScanned"], 100);
+        assert_eq!(json["totalFilesMatched"], 5);
+        assert_eq!(json["totalMatches"], 12);
+        assert_eq!(json["cancelled"], false);
+    }
 
     #[test]
     fn test_glob_pattern_matching() {

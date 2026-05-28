@@ -41,9 +41,19 @@ export function useTauriEvent<T>(
 }
 
 // Event hubs (add as needed when backend emits events)
-import type { ScanProgressPayload } from "@/features/explorer/types";
+import type {
+  ScanProgressPayload,
+  SearchResultFile,
+  SearchProgressPayload,
+} from "@/features/explorer/types";
 export const scanProgressHub =
   createEventHub<ScanProgressPayload>("scan-progress");
+
+// Search event hubs
+export const searchResultHub =
+  createEventHub<SearchResultFile>("search-result");
+export const searchProgressHub =
+  createEventHub<SearchProgressPayload>("search-progress");
 
 // Menu event hubs for cross-component communication
 export const menuToggleSidebarHub = createEventHub<void>("menu:toggle-sidebar");

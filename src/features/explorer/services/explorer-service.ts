@@ -1,5 +1,5 @@
 import { tauri } from "@/services/tauri";
-import type { DirEntry, FileContent, ScanSummary } from "../types";
+import type { DirEntry, FileContent, ScanSummary, SearchSummary } from "../types";
 import type { AppSettings } from "@/features/settings/services/settings-service";
 
 export const explorerService = {
@@ -27,4 +27,13 @@ export const explorerService = {
 
   cancelScan: (operationId: string): Promise<void> =>
     tauri.cancelScan(operationId),
+
+  contentSearch: (
+    query: string,
+    folderPaths: string,
+    filePattern: string,
+    scopeLabel: string,
+    operationId: string
+  ): Promise<SearchSummary> =>
+    tauri.contentSearch(query, folderPaths, filePattern, scopeLabel, operationId),
 };
