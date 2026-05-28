@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Single-File Validation** - Illegal character detection, problem badges in tree, problems panel, inline source highlighting (completed 2026-05-26)
 - [x] **Phase 5: Bulk Validation & Reporting** - Folder-wide validation scans with streaming progress and multi-format report export (completed 2026-05-27)
 - [x] **Phase 6: Search** - Filename filtering, XML content search, configurable search scope (completed 2026-05-28)
+- [ ] **Phase 06.1: Explorer UX Polish** - XML formatting, tree view syntax colors, segmented control fixes, sidebar toggle, date wiring, issues-only filter (INSERTED)
 - [ ] **Phase 7: File Comparison** - Side-by-side and inline diff for any two files
 - [ ] **Phase 8: Analytics Dashboard** - Client dashboard, error heatmap, timeline view, file size anomaly detection
 - [ ] **Phase 9: Folder Watching & Notifications** - Polling-based folder monitoring with desktop and in-app notifications
@@ -195,6 +196,26 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 06.1: Explorer UX polish - XML formatting, tree view syntax colors, segmented control fixes, sidebar toggle, date filter, issues-only indicator (INSERTED)
+
+**Goal:** Users see a polished, consistent explorer UI with readable XML formatting, proper syntax colors, working date display and sort, and the ability to filter the tree to files with validation issues
+**Requirements**: UX-01, UX-02, UX-03, UX-04, UX-05, UX-06
+**Depends on:** Phase 6
+**Plans:** 3 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 06.1-01-PLAN.md -- XML formatter utility with tests, tree view element tag syntax colors, SidebarToggle extraction to shared component
+- [ ] 06.1-02-PLAN.md -- Segmented control standardization (Tree/Source + Filename/Content), wire formatDateFolder to tree nodes, connect dateSortOrder to sort logic
+
+**Wave 2**
+
+- [ ] 06.1-03-PLAN.md -- XML format toggle in source view, issues-only filter toggle in sidebar, visual verification checkpoint
+
+**UI hint**: yes
+
 ### Phase 7: File Comparison
 
 **Goal**: Users can compare any two XML files to see exactly what changed between them
@@ -279,7 +300,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 06.1 -> 7 -> 8 -> 9 -> 10
 
 Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), so they could theoretically begin once their dependencies complete. The linear ordering above is the default; parallelization may be applied during planning.
 
@@ -291,6 +312,7 @@ Note: Phases 6 and 7 depend on Phase 2 and Phase 3 respectively (not Phase 5), s
 | 4. Single-File Validation | 2/2 | Complete   | 2026-05-26 |
 | 5. Bulk Validation & Reporting | 2/2 | Complete    | 2026-05-27 |
 | 6. Search | 3/3 | Complete    | 2026-05-28 |
+| 06.1. Explorer UX Polish | 0/3 | Not started | - |
 | 7. File Comparison | 0/? | Not started | - |
 | 8. Analytics Dashboard | 0/? | Not started | - |
 | 9. Folder Watching & Notifications | 0/? | Not started | - |
