@@ -135,7 +135,9 @@ function buildChildNodes(
     let isFavorite: boolean | undefined;
     if (entry.isDir) {
       const source = folderSources.find((s) =>
-        entry.path.startsWith(s.path)
+        entry.path === s.path ||
+        entry.path.startsWith(s.path + "/") ||
+        entry.path.startsWith(s.path + "\\")
       );
       if (source) {
         isFavorite = source.favorites.includes(entry.path);
@@ -405,7 +407,12 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       if (source) {
         // Update isFavorite on all directory nodes belonging to this source
         for (const [id, node] of nextNodes) {
-          if (node.isDir && id.startsWith(source.path)) {
+          if (
+            node.isDir &&
+            (id === source.path ||
+              id.startsWith(source.path + "/") ||
+              id.startsWith(source.path + "\\"))
+          ) {
             const shouldBeFav = source.favorites.includes(node.path);
             if (node.isFavorite !== shouldBeFav) {
               const updated = { ...node, isFavorite: shouldBeFav };
