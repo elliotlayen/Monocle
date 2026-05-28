@@ -16,9 +16,9 @@ export function createEventHub<T>(eventName: string) {
       unlisten = await listen<T>(eventName, (event) => {
         subscribers.forEach((cb) => cb(event.payload));
       });
-    } catch {
+    } catch (err) {
       listening = false;
-      throw;
+      throw err;
     }
   };
 
