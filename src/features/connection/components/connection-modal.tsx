@@ -120,7 +120,7 @@ export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Connect to Server</DialogTitle>
+            <DialogTitle>Schema Browser</DialogTitle>
           </DialogHeader>
           <ServerConnectionForm
             values={formData}

@@ -46,7 +46,7 @@ export function HomeScreen({
         >
           <span className="flex items-center gap-3">
             <Server className="w-5 h-5" />
-            Connect to Server
+            Schema Browser
           </span>
           <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             {modKey}+N
