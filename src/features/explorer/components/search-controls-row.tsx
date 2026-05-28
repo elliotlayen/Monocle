@@ -6,7 +6,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useExplorerStore } from "../store";
 
@@ -14,16 +13,12 @@ interface SearchControlsRowProps {
   selectedNodePath: string | null;
   selectedNodeName: string | null;
   selectedSourceLabel: string | null;
-  isSearching: boolean;
-  onSearch: () => void;
 }
 
 export function SearchControlsRow({
   selectedNodePath,
   selectedNodeName,
   selectedSourceLabel,
-  isSearching,
-  onSearch,
 }: SearchControlsRowProps) {
   const { searchScope, setSearchScope, searchFilePattern, setSearchFilePattern, searchStatus } =
     useExplorerStore(
@@ -46,12 +41,8 @@ export function SearchControlsRow({
     ? `Source: ${selectedSourceLabel}`
     : "This source";
 
-  const searchDisabled =
-    (!selectedNodePath && searchScope !== "all") || isSearching;
-
   return (
-    <div className="flex flex-col gap-2 px-3 pb-2">
-      {/* Row 1: Scope dropdown (full width) */}
+    <div className="flex flex-col gap-2 px-3 pt-2 pb-2">
       <Select
         value={searchScope}
         onValueChange={(value) =>
@@ -72,24 +63,12 @@ export function SearchControlsRow({
         </SelectContent>
       </Select>
 
-      {/* Row 2: File pattern + Search Files button */}
-      <div className="flex items-center gap-2">
-        <Input
-          className="h-8 text-xs flex-1 min-w-0"
-          value={searchFilePattern}
-          onChange={(e) => setSearchFilePattern(e.target.value)}
-          placeholder="*.xml"
-        />
-        <Button
-          variant="default"
-          size="sm"
-          className="h-8 px-3 text-xs font-semibold flex-shrink-0"
-          disabled={searchDisabled}
-          onClick={onSearch}
-        >
-          Search Files
-        </Button>
-      </div>
+      <Input
+        className="h-8 text-xs w-full"
+        value={searchFilePattern}
+        onChange={(e) => setSearchFilePattern(e.target.value)}
+        placeholder="*.xml"
+      />
     </div>
   );
 }

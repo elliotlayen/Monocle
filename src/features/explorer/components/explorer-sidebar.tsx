@@ -231,8 +231,6 @@ export function ExplorerSidebar() {
             selectedNodePath={selectedNodePath}
             selectedNodeName={selectedNodeName}
             selectedSourceLabel={selectedSourceLabel}
-            isSearching={searchStatus === "searching"}
-            onSearch={handleSearch}
           />
         )}
 
