@@ -102,7 +102,7 @@ export function FolderTreeNode({
   const isSource = node.type === "source";
   const isLoading = node.loadState === "loading";
   const isError = node.loadState === "error";
-  const isDirectChild = depth === 1;
+
 
   const rowPadding = isSource ? "py-1.5" : "py-1";
 
@@ -237,7 +237,7 @@ export function FolderTreeNode({
   };
 
   const renderStar = () => {
-    if (!node.isDir || !isDirectChild) return null;
+    if (!node.isDir || isSource) return null;
 
     return (
       <button
@@ -326,7 +326,7 @@ export function FolderTreeNode({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  ) : node.isDir && isDirectChild ? (
+  ) : node.isDir && !isSource ? (
     <ContextMenu>
       <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
       <ContextMenuContent>
@@ -336,17 +336,6 @@ export function FolderTreeNode({
           {node.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={() => requestScan(node.path, scanFilePattern)}
-        >
-          Scan for Issues...
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  ) : node.isDir && !isSource ? (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
-      <ContextMenuContent>
         <ContextMenuItem
           onClick={() => requestScan(node.path, scanFilePattern)}
         >
