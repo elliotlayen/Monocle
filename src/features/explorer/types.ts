@@ -119,6 +119,7 @@ export interface SearchResultFile {
   fileName: string;
   parentFolder: string;
   matchCount: number;
+  operationId: string;
 }
 
 export interface SearchErrorFile {

@@ -33,16 +33,11 @@ export function useSearch() {
   );
 
   const handleResult = useCallback(
-    (payload: SearchResultFile & { operationId?: string }) => {
+    (payload: SearchResultFile) => {
       const currentOpId = useExplorerStore.getState().searchOperationId;
-      if (payload.operationId && payload.operationId !== currentOpId) return;
+      if (payload.operationId !== currentOpId) return;
 
-      appendSearchResult({
-        filePath: payload.filePath,
-        fileName: payload.fileName,
-        parentFolder: payload.parentFolder,
-        matchCount: payload.matchCount,
-      });
+      appendSearchResult(payload);
     },
     [appendSearchResult]
   );
