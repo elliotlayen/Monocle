@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useFileActions } from "../hooks/use-file-actions";
 import { useExplorerStore } from "../store";
+import { formatDateFolder } from "../utils/date-format";
 import type { TreeNode } from "../types";
 
 interface FolderTreeNodeProps {
@@ -153,15 +154,23 @@ export function FolderTreeNode({
   };
 
   const renderName = () => {
+    const dateInfo = !isSource && node.isDir ? formatDateFolder(node.name) : null;
     return (
-      <span
-        className={cn(
-          "text-sm truncate",
-          isSource && "font-semibold"
+      <>
+        <span
+          className={cn(
+            "text-sm truncate",
+            isSource && "font-semibold"
+          )}
+        >
+          {node.name}
+        </span>
+        {dateInfo?.formatted && (
+          <span className="text-xs text-muted-foreground ml-1">
+            ({dateInfo.formatted})
+          </span>
         )}
-      >
-        {node.name}
-      </span>
+      </>
     );
   };
 

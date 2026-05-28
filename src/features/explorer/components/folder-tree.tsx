@@ -12,6 +12,7 @@ export function FolderTree() {
     treeNodes,
     expandedIds,
     filterText,
+    dateSortOrder,
     expandNode,
     collapseNode,
     cancelLoad,
@@ -26,6 +27,7 @@ export function FolderTree() {
       treeNodes: state.treeNodes,
       expandedIds: state.expandedIds,
       filterText: state.filterText,
+      dateSortOrder: state.dateSortOrder,
       expandNode: state.expandNode,
       collapseNode: state.collapseNode,
       cancelLoad: state.cancelLoad,
@@ -76,6 +78,12 @@ export function FolderTree() {
       .map((child) => treeNodes.get(child.id) ?? child)
       .sort((a, b) => {
         if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        // Apply dateSortOrder to 8-digit date-pattern folder names (YYYYMMDD)
+        if (a.isDir && b.isDir && /^\d{8}$/.test(a.name) && /^\d{8}$/.test(b.name)) {
+          return dateSortOrder === "newest"
+            ? b.name.localeCompare(a.name)
+            : a.name.localeCompare(b.name);
+        }
         return a.name.localeCompare(b.name);
       });
 
