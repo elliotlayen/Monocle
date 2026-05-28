@@ -8,7 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { useScanExport } from "../hooks/use-scan-export";
 import type { ScanSummary } from "../types";
 
@@ -54,9 +53,9 @@ export function ScanResultsHeader({
 
       {/* Filter toggle (D-14) */}
       <Button
-        variant="ghost"
+        variant={showIssuesOnly ? "default" : "ghost"}
         size="sm"
-        className={cn("h-7 px-2", showIssuesOnly && "bg-accent")}
+        className="h-7 px-2"
         onClick={onToggleFilter}
       >
         <Filter className="h-3.5 w-3.5 mr-1" />

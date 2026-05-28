@@ -1,27 +1,29 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { AlertTriangle, ArrowUpDown, Calendar, PanelLeftClose } from "lucide-react";
+import { ArrowUpDown, CalendarIcon, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { useExplorerStore, parseSearchTermsFrontend } from "../store";
-import type { DateFilterPreset } from "../store";
 import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
 import { useSearch } from "../hooks/use-search";
 import { FolderTree } from "./folder-tree";
 import { SearchBar } from "./search-bar";
 import { SearchResults } from "./search-results";
+import type { DateRange } from "react-day-picker";
 
 export function ExplorerSidebar() {
   const {
@@ -31,10 +33,8 @@ export function ExplorerSidebar() {
     setSidebarWidth,
     dateSortOrder,
     toggleDateSort,
-    dateFilterPreset,
-    setDateFilterPreset,
-    showIssuesOnly,
-    toggleIssuesOnly,
+    dateRange,
+    setDateRange,
     loadSources,
     searchMode,
     searchStatus,
@@ -54,10 +54,8 @@ export function ExplorerSidebar() {
       setSidebarWidth: state.setSidebarWidth,
       dateSortOrder: state.dateSortOrder,
       toggleDateSort: state.toggleDateSort,
-      dateFilterPreset: state.dateFilterPreset,
-      setDateFilterPreset: state.setDateFilterPreset,
-      showIssuesOnly: state.showIssuesOnly,
-      toggleIssuesOnly: state.toggleIssuesOnly,
+      dateRange: state.dateRange,
+      setDateRange: state.setDateRange,
       loadSources: state.loadSources,
       searchMode: state.searchMode,
       searchStatus: state.searchStatus,
@@ -71,6 +69,9 @@ export function ExplorerSidebar() {
       setActiveSearchTerms: state.setActiveSearchTerms,
     }))
   );
+
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const hasDateFilter = dateRange?.from != null;
 
   // Subscribe to search events (searchResultHub, searchProgressHub)
   const { cancelContentSearch, clearSearchResults } = useSearch();
@@ -121,13 +122,6 @@ export function ExplorerSidebar() {
     [openFile, setActiveSearchTerms, searchQuery]
   );
 
-  const dateFilterLabels: Record<DateFilterPreset, string> = {
-    all: "All dates",
-    "7d": "Last 7 days",
-    "30d": "Last 30 days",
-    "90d": "Last 90 days",
-  };
-
   // Determine what to show in the body area
   const showSearchResults =
     searchMode === "content" &&
@@ -175,62 +169,55 @@ export function ExplorerSidebar() {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <DropdownMenu>
+              <Dialog open={dateDialogOpen} onOpenChange={setDateDialogOpen}>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
+                      <DialogTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
                           className={cn(
                             "h-7 w-7",
-                            dateFilterPreset !== "all" && "bg-accent"
+                            hasDateFilter && "bg-accent"
                           )}
                         >
-                          <Calendar className="h-4 w-4" />
+                          <CalendarIcon className="h-4 w-4" />
                         </Button>
-                      </DropdownMenuTrigger>
+                      </DialogTrigger>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Date filter: {dateFilterLabels[dateFilterPreset]}</p>
+                      <p>{hasDateFilter ? "Date filter active" : "Filter by date range"}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <DropdownMenuContent align="end">
-                  {(Object.entries(dateFilterLabels) as [DateFilterPreset, string][]).map(
-                    ([value, label]) => (
-                      <DropdownMenuCheckboxItem
-                        key={value}
-                        checked={dateFilterPreset === value}
-                        onCheckedChange={() => setDateFilterPreset(value)}
+                <DialogContent className="sm:max-w-fit">
+                  <DialogHeader>
+                    <DialogTitle>Filter by date range</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-3">
+                    <Calendar
+                      mode="range"
+                      selected={dateRange?.from ? dateRange as DateRange : undefined}
+                      onSelect={(range: DateRange | undefined) => setDateRange(range ?? null)}
+                      numberOfMonths={2}
+                    />
+                    {hasDateFilter && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => {
+                          setDateRange(null);
+                          setDateDialogOpen(false);
+                        }}
                       >
-                        {label}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-7 w-7",
-                        showIssuesOnly && "bg-accent"
-                      )}
-                      onClick={toggleIssuesOnly}
-                    >
-                      <AlertTriangle className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{showIssuesOnly ? "Show all files" : "Show issues only"}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                        Clear filter
+                      </Button>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Button
                 variant="ghost"
                 size="icon"

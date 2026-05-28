@@ -46,7 +46,63 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
         </span>
       </div>
 
-      {/* Tree/Source toggle -- only for XML files */}
+      {/* Format XML toggle -- visible for XML files, disabled in tree view */}
+      {tab.isXml && onToggleFormat && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-7 w-7",
+                  isFormatted && tab.viewMode === "source" && "bg-accent",
+                  tab.viewMode !== "source" && "opacity-40 cursor-not-allowed"
+                )}
+                onClick={tab.viewMode === "source" ? onToggleFormat : undefined}
+                disabled={tab.viewMode !== "source"}
+              >
+                <WrapText className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{tab.viewMode !== "source" ? "Format XML (source view only)" : isFormatted ? "Show raw XML" : "Format XML (line numbers refer to original)"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
+      {/* Expand/Collapse all -- only when tree view is active */}
+      {onExpandAll && onCollapseAll && (
+        <div className="flex items-center gap-0.5">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onExpandAll}>
+                  <ChevronsUpDown className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Expand all</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onCollapseAll}>
+                  <ChevronsDownUp className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Collapse all</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
+
+      {/* Tree/Source toggle -- only for XML files, placed on the right */}
       {tab.isXml && (
         <div
           className="flex items-center h-7 rounded-md bg-muted border p-0.5"
@@ -96,57 +152,6 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
             <Code className="h-3.5 w-3.5" />
             Source
           </button>
-        </div>
-      )}
-
-      {/* Format XML toggle -- only in source view for XML files */}
-      {tab.isXml && tab.viewMode === "source" && onToggleFormat && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-7 w-7", isFormatted && "bg-accent")}
-                onClick={onToggleFormat}
-              >
-                <WrapText className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{isFormatted ? "Show raw XML" : "Format XML (line numbers refer to original)"}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-
-      {/* Expand/Collapse all -- only when tree view is active */}
-      {onExpandAll && onCollapseAll && (
-        <div className="flex items-center gap-0.5">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onExpandAll}>
-                  <ChevronsUpDown className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Expand all</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onCollapseAll}>
-                  <ChevronsDownUp className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Collapse all</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
       )}
 

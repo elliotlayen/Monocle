@@ -6,7 +6,6 @@ import { filterTreeNodes } from "../utils/tree-filter";
 import { formatDateFolder } from "../utils/date-format";
 import { FolderTreeNode, FolderTreeSourceNode } from "./folder-tree-node";
 import type { TreeNode } from "../types";
-import type { DateFilterPreset } from "../store";
 
 export function FolderTree() {
   const {
@@ -15,10 +14,7 @@ export function FolderTree() {
     expandedIds,
     filterText,
     dateSortOrder,
-    dateFilterPreset,
-    showIssuesOnly,
-    validationCache,
-    folderBadgeCache,
+    dateRange,
     expandNode,
     collapseNode,
     cancelLoad,
@@ -34,10 +30,7 @@ export function FolderTree() {
       expandedIds: state.expandedIds,
       filterText: state.filterText,
       dateSortOrder: state.dateSortOrder,
-      dateFilterPreset: state.dateFilterPreset,
-      showIssuesOnly: state.showIssuesOnly,
-      validationCache: state.validationCache,
-      folderBadgeCache: state.folderBadgeCache,
+      dateRange: state.dateRange,
       expandNode: state.expandNode,
       collapseNode: state.collapseNode,
       cancelLoad: state.cancelLoad,
@@ -63,13 +56,9 @@ export function FolderTree() {
   // Apply filter
   const visibleRoots = useMemo(() => {
     const hasTextFilter = filterText.trim().length > 0;
-    if (!hasTextFilter && !showIssuesOnly) return rootNodes;
-    return filterTreeNodes(rootNodes, filterText, {
-      showIssuesOnly,
-      validationCache,
-      folderBadgeCache,
-    });
-  }, [rootNodes, filterText, showIssuesOnly, validationCache, folderBadgeCache]);
+    if (!hasTextFilter) return rootNodes;
+    return filterTreeNodes(rootNodes, filterText);
+  }, [rootNodes, filterText]);
 
   const selectedFolderPath = searchMode === "content" ? lastInteractedFolderPath : null;
   const showCheckboxes = searchMode === "content";
@@ -85,42 +74,34 @@ export function FolderTree() {
     [searchCheckedPaths]
   );
 
-  const filterByDatePreset = useCallback(
+  const filterByDateRange = useCallback(
     (nodes: TreeNode[]): TreeNode[] => {
-      if (dateFilterPreset === "all") return nodes;
+      if (!dateRange?.from) return nodes;
 
-      const daysMap: Record<Exclude<DateFilterPreset, "all">, number> = {
-        "7d": 7,
-        "30d": 30,
-        "90d": 90,
-      };
-      const days = daysMap[dateFilterPreset];
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      cutoff.setHours(0, 0, 0, 0);
+      const from = new Date(dateRange.from);
+      from.setHours(0, 0, 0, 0);
+      const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
+      to.setHours(23, 59, 59, 999);
 
       return nodes.filter((child) => {
-        // Non-directory nodes always pass through
         if (!child.isDir) return true;
-        // Non-date-pattern folders always pass through
         const dateInfo = formatDateFolder(child.name);
         if (!dateInfo.formatted) return true;
-        // Parse the YYYYMMDD name into a Date
         const year = parseInt(child.name.slice(0, 4), 10);
         const month = parseInt(child.name.slice(4, 6), 10);
         const day = parseInt(child.name.slice(6, 8), 10);
         const folderDate = new Date(year, month - 1, day);
-        return folderDate >= cutoff;
+        return folderDate >= from && folderDate <= to;
       });
     },
-    [dateFilterPreset]
+    [dateRange]
   );
 
   const renderChildren = (node: TreeNode, depth: number, sourceId: string) => {
     const current = treeNodes.get(node.id) ?? node;
     if (!expandedIds.has(current.id) || !current.children) return null;
 
-    const sortedChildren = filterByDatePreset(
+    const sortedChildren = filterByDateRange(
       current.children
         .map((child) => treeNodes.get(child.id) ?? child)
         .sort((a, b) => {

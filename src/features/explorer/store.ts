@@ -24,7 +24,7 @@ import { disambiguateTabNames } from "./utils/tab-disambiguator";
 import { parseXml } from "./utils/xml-parser";
 import { computeAggregateBadges } from "./utils/badge-aggregation";
 
-export type DateFilterPreset = "all" | "7d" | "30d" | "90d";
+export type DateRange = { from?: Date; to?: Date } | null;
 
 interface ExplorerStore {
   // State
@@ -34,8 +34,7 @@ interface ExplorerStore {
   activeOperations: Map<string, string>;
   filterText: string;
   dateSortOrder: "newest" | "oldest";
-  dateFilterPreset: DateFilterPreset;
-  showIssuesOnly: boolean;
+  dateRange: DateRange;
   sidebarOpen: boolean;
   sidebarWidth: number;
   tabs: FileTab[];
@@ -83,8 +82,7 @@ interface ExplorerStore {
   cancelLoad: (nodeId: string) => Promise<void>;
   setFilterText: (text: string) => void;
   toggleDateSort: () => void;
-  setDateFilterPreset: (preset: DateFilterPreset) => void;
-  toggleIssuesOnly: () => void;
+  setDateRange: (range: DateRange) => void;
   toggleFavorite: (sourceId: string, clientName: string) => Promise<void>;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
@@ -229,8 +227,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   activeOperations: new Map(),
   filterText: "",
   dateSortOrder: "newest",
-  dateFilterPreset: "all",
-  showIssuesOnly: false,
+  dateRange: null,
   sidebarOpen: true,
   sidebarWidth: 280,
   tabs: [],
@@ -404,10 +401,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       dateSortOrder: state.dateSortOrder === "newest" ? "oldest" : "newest",
     })),
 
-  setDateFilterPreset: (preset: DateFilterPreset) => set({ dateFilterPreset: preset }),
-
-  toggleIssuesOnly: () =>
-    set((state) => ({ showIssuesOnly: !state.showIssuesOnly })),
+  setDateRange: (range: DateRange) => set({ dateRange: range }),
 
   toggleFavorite: async (sourceId: string, folderPath: string) => {
     try {

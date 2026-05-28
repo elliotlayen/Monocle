@@ -9,13 +9,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PanelLeft } from "lucide-react";
 import { ExplorerNavBar } from "./explorer-nav-bar";
 import { ExplorerEmptyState } from "./explorer-empty-state";
 import { ExplorerSidebar } from "./explorer-sidebar";
 import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
-import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { useExplorerStore } from "../store";
 
 interface ExplorerShellProps {
@@ -58,11 +58,16 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
       <ExplorerNavBar onHome={onHome} onOpenSettings={onOpenSettings} />
       <div className="flex flex-row flex-1 overflow-hidden">
         <ExplorerSidebar />
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          <SidebarToggle
+        {!sidebarOpen && (
+          <button
+            className="flex-shrink-0 flex items-center justify-center w-8 border-r hover:bg-muted transition-colors"
             onClick={() => setSidebarOpen(true)}
-            visible={!sidebarOpen}
-          />
+            title="Open sidebar"
+          >
+            <PanelLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {hasOpenTabs ? (
             <>
               <FileTabBar />
