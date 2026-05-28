@@ -1,6 +1,5 @@
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -20,14 +19,12 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
     lastInteractedFolderPath,
     scanStatus,
     scanFilePattern,
-    setScanFilePattern,
     requestScan,
   } = useExplorerStore(
     useShallow((state) => ({
       lastInteractedFolderPath: state.lastInteractedFolderPath,
       scanStatus: state.scanStatus,
       scanFilePattern: state.scanFilePattern,
-      setScanFilePattern: state.setScanFilePattern,
       requestScan: state.requestScan,
     }))
   );
@@ -54,12 +51,6 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
       </span>
       <div className="flex-1" />
       <div className="flex items-center gap-2">
-        <Input
-          className="h-9 w-[120px] text-xs"
-          value={scanFilePattern}
-          onChange={(e) => setScanFilePattern(e.target.value)}
-          placeholder="*.xml"
-        />
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>

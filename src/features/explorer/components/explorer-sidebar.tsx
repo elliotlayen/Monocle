@@ -14,7 +14,6 @@ import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
 import { useSearch } from "../hooks/use-search";
 import { FolderTree } from "./folder-tree";
 import { SearchBar } from "./search-bar";
-import { SearchControlsRow } from "./search-controls-row";
 import { SearchResults } from "./search-results";
 
 export function ExplorerSidebar() {
@@ -167,9 +166,6 @@ export function ExplorerSidebar() {
           </div>
           <SearchBar onSearchExecute={handleSearchExecute} />
         </div>
-
-        {/* Content search file pattern (visible only in content mode) */}
-        {searchMode === "content" && <SearchControlsRow />}
 
         {/* Body: SearchResults or FolderTree (with checkboxes in content mode) */}
         {showSearchResults ? (

@@ -6,11 +6,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FolderSync, Info, Network, Palette } from "lucide-react";
+import { FolderSync, Info, Network, Palette, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GraphSettingsSection } from "@/features/settings/components/sections/graph-settings-section";
 import { AppearanceSettingsSection } from "@/features/settings/components/sections/appearance-settings-section";
 import { FolderSourcesSection } from "@/features/settings/components/sections/folder-sources-section";
+import { ExplorerSettingsSection } from "@/features/settings/components/sections/explorer-settings-section";
 import { AboutSettingsSection } from "@/features/settings/components/sections/about-settings-section";
 
 interface AppSettingsSheetProps {
@@ -18,7 +19,7 @@ interface AppSettingsSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type SettingsSectionId = "graph" | "appearance" | "sources" | "about";
+type SettingsSectionId = "graph" | "appearance" | "sources" | "explorer" | "about";
 
 const SETTINGS_SECTIONS: Array<{
   id: SettingsSectionId;
@@ -28,6 +29,7 @@ const SETTINGS_SECTIONS: Array<{
   { id: "graph", label: "Graph", icon: Network },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "sources", label: "Sources", icon: FolderSync },
+  { id: "explorer", label: "Explorer", icon: Search },
   { id: "about", label: "About", icon: Info },
 ];
 
@@ -48,6 +50,8 @@ export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) 
         return <AppearanceSettingsSection />;
       case "sources":
         return <FolderSourcesSection />;
+      case "explorer":
+        return <ExplorerSettingsSection />;
       case "about":
         return <AboutSettingsSection />;
       default:
