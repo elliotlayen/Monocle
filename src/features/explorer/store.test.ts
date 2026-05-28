@@ -15,6 +15,9 @@ vi.mock("./services/explorer-service", () => ({
       encoding: "UTF-8",
       hasBom: false,
     }),
+    bulkScan: vi.fn(),
+    cancelScan: vi.fn(),
+    contentSearch: vi.fn(),
   },
 }));
 

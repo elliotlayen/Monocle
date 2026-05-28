@@ -10,6 +10,13 @@ import type {
   ScanStatus,
   ScanProgressPayload,
   ScanSummary,
+  SearchMode,
+  SearchScope,
+  SearchStatus,
+  SearchResultFile,
+  SearchErrorFile,
+  SearchProgressPayload as SearchProgressPayloadType,
+  SearchSummary,
 } from "./types";
 import { explorerService } from "./services/explorer-service";
 import { settingsService } from "@/features/settings/services/settings-service";
@@ -53,6 +60,18 @@ interface ExplorerStore {
     filePattern: string;
   } | null;
 
+  // Search state
+  searchMode: SearchMode;
+  searchQuery: string;
+  searchScope: SearchScope;
+  searchFilePattern: string;
+  searchStatus: SearchStatus;
+  searchProgress: SearchProgressPayloadType | null;
+  searchResults: SearchResultFile[];
+  searchErrors: SearchErrorFile[];
+  searchSummary: SearchSummary | null;
+  searchOperationId: string | null;
+
   // Actions
   loadSources: () => Promise<void>;
   expandNode: (nodeId: string) => Promise<void>;
@@ -91,6 +110,17 @@ interface ExplorerStore {
   getFolderBadge: (folderPath: string) => ValidationStatus | undefined;
   confirmPendingScan: () => void;
   dismissPendingScan: () => void;
+
+  // Search actions
+  setSearchMode: (mode: SearchMode) => void;
+  setSearchQuery: (text: string) => void;
+  setSearchScope: (scope: SearchScope) => void;
+  setSearchFilePattern: (pattern: string) => void;
+  startContentSearch: (folderPaths: string[], scopeLabel: string) => Promise<void>;
+  updateSearchProgress: (payload: SearchProgressPayloadType) => void;
+  appendSearchResult: (payload: SearchResultFile) => void;
+  cancelContentSearch: () => Promise<void>;
+  clearSearchResults: () => void;
 }
 
 function buildChildNodes(
@@ -170,6 +200,18 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   folderBadgeCache: new Map(),
   lastInteractedFolderPath: null,
   pendingScanRequest: null,
+
+  // Search initial state
+  searchMode: "filename",
+  searchQuery: "",
+  searchScope: "folder",
+  searchFilePattern: "*.xml",
+  searchStatus: "idle",
+  searchProgress: null,
+  searchResults: [],
+  searchErrors: [],
+  searchSummary: null,
+  searchOperationId: null,
 
   loadSources: async () => {
     try {
@@ -810,5 +852,150 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   dismissPendingScan: () => {
     set({ pendingScanRequest: null });
+  },
+
+  // Search actions
+
+  setSearchMode: (mode: SearchMode) => {
+    const { searchMode: currentMode, searchResults, searchQuery } = get();
+    if (currentMode === "content" && mode === "filename" && searchResults.length > 0) {
+      // Switching from content to filename with results: clear search state, sync query to filterText
+      set({
+        searchMode: mode,
+        searchResults: [],
+        searchErrors: [],
+        searchSummary: null,
+        searchStatus: "idle",
+        filterText: searchQuery,
+      });
+    } else if (mode === "filename") {
+      // Switching to filename: sync query to filterText
+      set({ searchMode: mode, filterText: searchQuery });
+    } else {
+      set({ searchMode: mode });
+    }
+  },
+
+  setSearchQuery: (text: string) => {
+    const { searchMode } = get();
+    if (searchMode === "filename") {
+      set({ searchQuery: text, filterText: text });
+    } else {
+      set({ searchQuery: text });
+    }
+  },
+
+  setSearchScope: (scope: SearchScope) => {
+    set({ searchScope: scope });
+  },
+
+  setSearchFilePattern: (pattern: string) => {
+    set({ searchFilePattern: pattern });
+  },
+
+  startContentSearch: async (folderPaths: string[], scopeLabel: string) => {
+    const { searchQuery, searchFilePattern } = get();
+    const operationId = crypto.randomUUID();
+
+    set({
+      searchStatus: "searching",
+      searchOperationId: operationId,
+      searchResults: [],
+      searchErrors: [],
+      searchProgress: null,
+      searchSummary: null,
+    });
+
+    try {
+      const result = await explorerService.contentSearch(
+        searchQuery,
+        JSON.stringify(folderPaths),
+        searchFilePattern,
+        scopeLabel,
+        operationId
+      );
+
+      set({
+        searchStatus: result.cancelled ? "cancelled" : "completed",
+        searchSummary: result,
+        searchOperationId: null,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isNetworkError =
+        message.toLowerCase().includes("unreachable") ||
+        message.toLowerCase().includes("network");
+
+      set({
+        searchStatus: "idle",
+        searchOperationId: null,
+      });
+
+      if (isNetworkError) {
+        const filesScanned = get().searchProgress?.filesScanned ?? 0;
+        showToast({
+          type: "error",
+          title: "Network share unreachable",
+          message: `Search stopped after ${filesScanned} files.`,
+          duration: 5000,
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Search failed",
+          message: "An error occurred while searching",
+          duration: 5000,
+        });
+      }
+    }
+  },
+
+  updateSearchProgress: (payload: SearchProgressPayloadType) => {
+    const { searchOperationId } = get();
+    if (payload.operationId !== searchOperationId) return;
+    set({ searchProgress: payload });
+  },
+
+  appendSearchResult: (payload: SearchResultFile) => {
+    if (payload.fileName.startsWith("ERROR:")) {
+      // Parse as error file
+      const errorFile: SearchErrorFile = {
+        filePath: payload.filePath,
+        fileName: payload.fileName,
+        parentFolder: payload.parentFolder,
+        errorMessage: payload.fileName.substring("ERROR:".length).trim(),
+      };
+      set((state) => ({
+        searchErrors: [...state.searchErrors, errorFile],
+      }));
+    } else {
+      // Append and maintain alphabetical sort by fileName
+      set((state) => {
+        const updated = [...state.searchResults, payload];
+        updated.sort((a, b) => a.fileName.localeCompare(b.fileName));
+        return { searchResults: updated };
+      });
+    }
+  },
+
+  cancelContentSearch: async () => {
+    const { searchOperationId } = get();
+    if (searchOperationId) {
+      try {
+        await explorerService.cancelScan(searchOperationId);
+      } catch {
+        // Best-effort cancel
+      }
+    }
+  },
+
+  clearSearchResults: () => {
+    set({
+      searchResults: [],
+      searchErrors: [],
+      searchSummary: null,
+      searchProgress: null,
+      searchStatus: "idle",
+    });
   },
 }));
