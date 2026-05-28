@@ -208,7 +208,7 @@ Plans:
 **Wave 1**
 
 - [ ] 06.1-01-PLAN.md -- XML formatter utility with tests, tree view element tag syntax colors, SidebarToggle extraction to shared component
-- [ ] 06.1-02-PLAN.md -- Segmented control standardization (Tree/Source + Filename/Content), wire formatDateFolder to tree nodes, connect dateSortOrder to sort logic
+- [ ] 06.1-02-PLAN.md -- Segmented control standardization (Tree/Source + Filename/Content), wire formatDateFolder to tree nodes, connect dateSortOrder to sort logic, date filter preset dropdown
 
 **Wave 2**
 
