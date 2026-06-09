@@ -1,13 +1,16 @@
 use crate::state::{AppSettings, AppState};
 use crate::validation::validator::ValidationProblem;
 use crate::validation::{detect_and_decode, validate_characters};
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 use glob::Pattern;
+use ignore::WalkBuilder;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader};
-use std::path::Path;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, State};
 use tokio_util::sync::CancellationToken;
 use walkdir::WalkDir;
@@ -19,6 +22,7 @@ const PROGRESS_FILE_BATCH: u32 = 200;
 const PROGRESS_MIN_INTERVAL: Duration = Duration::from_millis(150);
 const SEARCH_RESULT_BATCH_SIZE: usize = 50;
 const SEARCH_RESULT_BATCH_INTERVAL: Duration = Duration::from_millis(150);
+const MAX_SEARCH_WORKERS: usize = 8;
 
 pub struct ExplorerState {
     pub active_listings: Mutex<HashMap<String, CancellationToken>>,
@@ -233,14 +237,43 @@ pub fn parse_search_terms(query: &str) -> Vec<String> {
     terms
 }
 
-fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Result<Option<u32>> {
+struct SearchMatcher {
+    terms: Vec<String>,
+    ascii_matcher: Option<AhoCorasick>,
+}
+
+fn build_search_matcher(terms: &[String]) -> SearchMatcher {
+    let ascii_matcher = if !terms.is_empty() && terms.iter().all(|term| term.is_ascii()) {
+        AhoCorasickBuilder::new()
+            .ascii_case_insensitive(true)
+            .build(terms)
+            .ok()
+    } else {
+        None
+    };
+
+    SearchMatcher {
+        terms: terms.to_vec(),
+        ascii_matcher,
+    }
+}
+
+fn search_file_content(
+    file_path: &Path,
+    matcher: &SearchMatcher,
+    cancel_token: Option<&CancellationToken>,
+) -> std::io::Result<Option<u32>> {
     let file = std::fs::File::open(file_path)?;
     let mut reader = BufReader::new(file);
     let mut buffer = Vec::new();
-    let mut found_terms = vec![false; terms.len()];
+    let mut found_terms = vec![false; matcher.terms.len()];
     let mut match_count: u32 = 0;
 
     loop {
+        if cancel_token.is_some_and(CancellationToken::is_cancelled) {
+            break;
+        }
+
         buffer.clear();
         let read = reader.read_until(b'\n', &mut buffer)?;
         if read == 0 {
@@ -254,12 +287,20 @@ fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Resu
             buffer.pop();
         }
 
-        let line = String::from_utf8_lossy(&buffer).to_lowercase();
-        for (idx, term) in terms.iter().enumerate() {
-            let count = line.matches(term.as_str()).count().min(u32::MAX as usize) as u32;
-            if count > 0 {
+        if let Some(ascii_matcher) = &matcher.ascii_matcher {
+            for matched in ascii_matcher.find_overlapping_iter(&buffer) {
+                let idx = matched.pattern().as_usize();
                 found_terms[idx] = true;
-                match_count = match_count.saturating_add(count);
+                match_count = match_count.saturating_add(1);
+            }
+        } else {
+            let line = String::from_utf8_lossy(&buffer).to_lowercase();
+            for (idx, term) in matcher.terms.iter().enumerate() {
+                let count = line.matches(term.as_str()).count().min(u32::MAX as usize) as u32;
+                if count > 0 {
+                    found_terms[idx] = true;
+                    match_count = match_count.saturating_add(count);
+                }
             }
         }
     }
@@ -269,6 +310,12 @@ fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Resu
     } else {
         Ok(None)
     }
+}
+
+#[cfg(test)]
+fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Result<Option<u32>> {
+    let matcher = build_search_matcher(terms);
+    search_file_content(file_path, &matcher, None)
 }
 
 #[derive(Clone, Serialize)]
@@ -320,6 +367,344 @@ pub struct SearchSummaryResult {
     pub cancelled: bool,
 }
 
+struct SearchFileCandidate {
+    file_path: PathBuf,
+    file_name: String,
+    parent_folder: String,
+}
+
+enum SearchScanOutcome {
+    Skipped,
+    NoMatch,
+    Matched(SearchResultPayload, u32),
+    Error(SearchErrorPayload),
+}
+
+fn search_worker_count(candidate_count: usize) -> usize {
+    if candidate_count == 0 {
+        return 0;
+    }
+
+    std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(4)
+        .min(MAX_SEARCH_WORKERS)
+        .min(candidate_count)
+        .max(1)
+}
+
+fn collect_search_candidates(
+    paths: &[String],
+    pattern: &Pattern,
+    cancel_token: &CancellationToken,
+) -> (VecDeque<SearchFileCandidate>, bool) {
+    let mut candidates = VecDeque::new();
+    let mut cancelled = false;
+
+    'folders: for folder_path in paths {
+        if cancel_token.is_cancelled() {
+            cancelled = true;
+            break;
+        }
+
+        match std::fs::metadata(folder_path) {
+            Ok(m) if m.is_dir() => {}
+            Ok(_) => continue,
+            Err(_) => continue,
+        }
+
+        let mut builder = WalkBuilder::new(folder_path);
+        builder
+            .hidden(false)
+            .parents(false)
+            .ignore(false)
+            .git_ignore(false)
+            .git_global(false)
+            .git_exclude(false)
+            .follow_links(false);
+
+        for entry_result in builder.build() {
+            if cancel_token.is_cancelled() {
+                cancelled = true;
+                break 'folders;
+            }
+
+            let entry = match entry_result {
+                Ok(entry) => entry,
+                Err(_) => continue,
+            };
+
+            if entry
+                .file_type()
+                .map(|file_type| file_type.is_dir())
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            if !entry
+                .file_name()
+                .to_str()
+                .map(|name| pattern.matches(name))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            let file_path = entry.path().to_path_buf();
+            let file_name = file_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("")
+                .to_string();
+            let parent_folder = file_path
+                .parent()
+                .map(|parent| parent.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            candidates.push_back(SearchFileCandidate {
+                file_path,
+                file_name,
+                parent_folder,
+            });
+        }
+    }
+
+    (candidates, cancelled)
+}
+
+fn scan_search_candidate(
+    candidate: SearchFileCandidate,
+    matcher: &SearchMatcher,
+    operation_id: &str,
+    cancel_token: &CancellationToken,
+) -> Option<SearchScanOutcome> {
+    if cancel_token.is_cancelled() {
+        return None;
+    }
+
+    let file_path_string = candidate.file_path.to_string_lossy().to_string();
+    match std::fs::metadata(&candidate.file_path) {
+        Ok(metadata) if metadata.len() > MAX_SCAN_FILE_SIZE => Some(SearchScanOutcome::Skipped),
+        Err(_) => Some(SearchScanOutcome::Error(SearchErrorPayload {
+            file_path: file_path_string,
+            file_name: candidate.file_name,
+            parent_folder: candidate.parent_folder,
+            error_message: "Failed to read file".to_string(),
+        })),
+        _ => match search_file_content(&candidate.file_path, matcher, Some(cancel_token)) {
+            Ok(Some(match_count)) => Some(SearchScanOutcome::Matched(
+                SearchResultPayload {
+                    file_path: file_path_string,
+                    file_name: candidate.file_name,
+                    parent_folder: candidate.parent_folder,
+                    match_count,
+                    operation_id: operation_id.to_string(),
+                },
+                match_count,
+            )),
+            Ok(None) => Some(SearchScanOutcome::NoMatch),
+            Err(_) => Some(SearchScanOutcome::Error(SearchErrorPayload {
+                file_path: file_path_string,
+                file_name: candidate.file_name,
+                parent_folder: candidate.parent_folder,
+                error_message: "Failed to read file".to_string(),
+            })),
+        },
+    }
+}
+
+fn flush_search_batches(
+    app: &AppHandle,
+    operation_id: &str,
+    force: bool,
+    pending_results: &mut Vec<SearchResultPayload>,
+    pending_errors: &mut Vec<SearchErrorPayload>,
+    last_batch_emit_time: &mut Instant,
+) {
+    let has_payload = !pending_results.is_empty() || !pending_errors.is_empty();
+    if !has_payload {
+        return;
+    }
+
+    let batch_full =
+        pending_results.len().saturating_add(pending_errors.len()) >= SEARCH_RESULT_BATCH_SIZE;
+    if !force && !batch_full && last_batch_emit_time.elapsed() < SEARCH_RESULT_BATCH_INTERVAL {
+        return;
+    }
+
+    let payload = SearchResultsBatchPayload {
+        operation_id: operation_id.to_string(),
+        results: std::mem::take(pending_results),
+        errors: std::mem::take(pending_errors),
+    };
+    let _ = app.emit("search-results-batch", payload);
+    *last_batch_emit_time = Instant::now();
+}
+
+fn emit_search_progress(
+    app: &AppHandle,
+    operation_id: &str,
+    force: bool,
+    files_scanned: u32,
+    total_matches: u32,
+    files_matched: u32,
+    last_emit_time: &mut Instant,
+) {
+    let batch_ready = files_scanned % PROGRESS_FILE_BATCH == 0;
+    if !force && !batch_ready && last_emit_time.elapsed() < PROGRESS_MIN_INTERVAL {
+        return;
+    }
+
+    let progress_payload = SearchProgressPayload {
+        files_scanned,
+        total_files: None,
+        matches_found: total_matches,
+        files_matched,
+        operation_id: operation_id.to_string(),
+    };
+    let _ = app.emit("search-progress", progress_payload);
+    *last_emit_time = Instant::now();
+}
+
+fn content_search_worker(
+    app: AppHandle,
+    paths: Vec<String>,
+    pattern: Pattern,
+    terms: Vec<String>,
+    query: String,
+    file_pattern: String,
+    scope_label: String,
+    operation_id: String,
+    cancel_token: CancellationToken,
+) -> SearchSummaryResult {
+    let (candidates, mut cancelled) = collect_search_candidates(&paths, &pattern, &cancel_token);
+    let worker_count = search_worker_count(candidates.len());
+    let matcher = Arc::new(build_search_matcher(&terms));
+    let queue = Arc::new(Mutex::new(candidates));
+    let (tx, rx) = mpsc::channel::<SearchScanOutcome>();
+    let mut handles = Vec::with_capacity(worker_count);
+
+    for _ in 0..worker_count {
+        let queue = Arc::clone(&queue);
+        let tx = tx.clone();
+        let matcher = Arc::clone(&matcher);
+        let operation_id = operation_id.clone();
+        let cancel_token = cancel_token.clone();
+
+        handles.push(thread::spawn(move || loop {
+            if cancel_token.is_cancelled() {
+                break;
+            }
+
+            let candidate = match queue.lock() {
+                Ok(mut queue) => queue.pop_front(),
+                Err(_) => None,
+            };
+
+            let Some(candidate) = candidate else {
+                break;
+            };
+
+            if let Some(outcome) =
+                scan_search_candidate(candidate, &matcher, &operation_id, &cancel_token)
+            {
+                if tx.send(outcome).is_err() {
+                    break;
+                }
+            }
+        }));
+    }
+    drop(tx);
+
+    let mut files_scanned: u32 = 0;
+    let mut total_matches: u32 = 0;
+    let mut files_matched: u32 = 0;
+    let mut consecutive_read_failures: u32 = 0;
+    let mut last_emit_time = Instant::now();
+    let mut last_batch_emit_time = Instant::now();
+    let mut pending_results: Vec<SearchResultPayload> = Vec::new();
+    let mut pending_errors: Vec<SearchErrorPayload> = Vec::new();
+
+    for outcome in rx {
+        files_scanned = files_scanned.saturating_add(1);
+
+        match outcome {
+            SearchScanOutcome::Skipped | SearchScanOutcome::NoMatch => {
+                consecutive_read_failures = 0;
+            }
+            SearchScanOutcome::Matched(payload, match_count) => {
+                consecutive_read_failures = 0;
+                total_matches = total_matches.saturating_add(match_count);
+                files_matched = files_matched.saturating_add(1);
+                pending_results.push(payload);
+            }
+            SearchScanOutcome::Error(payload) => {
+                consecutive_read_failures = consecutive_read_failures.saturating_add(1);
+                pending_errors.push(payload);
+                if consecutive_read_failures >= 10 {
+                    cancelled = true;
+                    cancel_token.cancel();
+                }
+            }
+        }
+
+        flush_search_batches(
+            &app,
+            &operation_id,
+            false,
+            &mut pending_results,
+            &mut pending_errors,
+            &mut last_batch_emit_time,
+        );
+        emit_search_progress(
+            &app,
+            &operation_id,
+            false,
+            files_scanned,
+            total_matches,
+            files_matched,
+            &mut last_emit_time,
+        );
+    }
+
+    for handle in handles {
+        let _ = handle.join();
+    }
+
+    if cancel_token.is_cancelled() {
+        cancelled = true;
+    }
+
+    flush_search_batches(
+        &app,
+        &operation_id,
+        true,
+        &mut pending_results,
+        &mut pending_errors,
+        &mut last_batch_emit_time,
+    );
+    emit_search_progress(
+        &app,
+        &operation_id,
+        true,
+        files_scanned,
+        total_matches,
+        files_matched,
+        &mut last_emit_time,
+    );
+
+    SearchSummaryResult {
+        query,
+        scope_label,
+        file_pattern,
+        total_files_scanned: files_scanned,
+        total_files_matched: files_matched,
+        total_matches,
+        cancelled,
+    }
+}
+
 #[tauri::command]
 pub async fn content_search_cmd(
     app: AppHandle,
@@ -353,221 +738,19 @@ pub async fn content_search_cmd(
     }
 
     let op_id = operation_id.clone();
-    let query_clone = query.clone();
-    let file_pattern_clone = file_pattern.clone();
-    let scope_label_clone = scope_label.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        let mut files_scanned: u32 = 0;
-        let mut total_matches: u32 = 0;
-        let mut files_matched: u32 = 0;
-        let mut cancelled = false;
-        let mut last_emit_time = std::time::Instant::now();
-        let mut last_batch_emit_time = std::time::Instant::now();
-        let mut consecutive_read_failures: u32 = 0;
-        let mut pending_results: Vec<SearchResultPayload> = Vec::new();
-        let mut pending_errors: Vec<SearchErrorPayload> = Vec::new();
-
-        let flush_search_batches =
-            |force: bool,
-             pending_results: &mut Vec<SearchResultPayload>,
-             pending_errors: &mut Vec<SearchErrorPayload>,
-             last_batch_emit_time: &mut std::time::Instant| {
-                let has_payload = !pending_results.is_empty() || !pending_errors.is_empty();
-                if !has_payload {
-                    return;
-                }
-                let batch_full = pending_results.len().saturating_add(pending_errors.len())
-                    >= SEARCH_RESULT_BATCH_SIZE;
-                if !force
-                    && !batch_full
-                    && last_batch_emit_time.elapsed() < SEARCH_RESULT_BATCH_INTERVAL
-                {
-                    return;
-                }
-
-                let payload = SearchResultsBatchPayload {
-                    operation_id: operation_id.clone(),
-                    results: std::mem::take(pending_results),
-                    errors: std::mem::take(pending_errors),
-                };
-                let _ = app.emit("search-results-batch", payload);
-                *last_batch_emit_time = std::time::Instant::now();
-            };
-
-        let emit_progress = |force: bool,
-                             files_scanned: u32,
-                             total_matches: u32,
-                             files_matched: u32,
-                             last_emit_time: &mut std::time::Instant| {
-            let batch_ready = files_scanned % PROGRESS_FILE_BATCH == 0;
-            if !force && !batch_ready && last_emit_time.elapsed() < PROGRESS_MIN_INTERVAL {
-                return;
-            }
-            let progress_payload = SearchProgressPayload {
-                files_scanned,
-                total_files: None,
-                matches_found: total_matches,
-                files_matched,
-                operation_id: operation_id.clone(),
-            };
-            let _ = app.emit("search-progress", progress_payload);
-            *last_emit_time = std::time::Instant::now();
-        };
-
-        'folders: for folder_path in &paths {
-            if token_clone.is_cancelled() {
-                cancelled = true;
-                break;
-            }
-
-            match std::fs::metadata(folder_path) {
-                Ok(m) if m.is_dir() => {}
-                Ok(_) => continue,
-                Err(_) => continue,
-            }
-
-            for entry_result in WalkDir::new(folder_path).into_iter() {
-                if token_clone.is_cancelled() {
-                    cancelled = true;
-                    break 'folders;
-                }
-
-                let entry = match entry_result {
-                    Ok(entry) => entry,
-                    Err(_) => continue,
-                };
-
-                if entry.file_type().is_dir() {
-                    continue;
-                }
-
-                if !entry
-                    .file_name()
-                    .to_str()
-                    .map(|n| pattern.matches(n))
-                    .unwrap_or(false)
-                {
-                    continue;
-                }
-
-                let file_path = entry.path();
-                let file_name = file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                let parent_folder = file_path
-                    .parent()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
-                match std::fs::metadata(file_path) {
-                    Ok(m) if m.len() > MAX_SCAN_FILE_SIZE => {
-                        files_scanned = files_scanned.saturating_add(1);
-                        consecutive_read_failures = 0;
-                        emit_progress(
-                            false,
-                            files_scanned,
-                            total_matches,
-                            files_matched,
-                            &mut last_emit_time,
-                        );
-                        continue;
-                    }
-                    Err(_) => {
-                        consecutive_read_failures = consecutive_read_failures.saturating_add(1);
-                        files_scanned = files_scanned.saturating_add(1);
-                        if consecutive_read_failures >= 10 {
-                            cancelled = true;
-                            break 'folders;
-                        }
-                        emit_progress(
-                            false,
-                            files_scanned,
-                            total_matches,
-                            files_matched,
-                            &mut last_emit_time,
-                        );
-                        continue;
-                    }
-                    _ => {
-                        consecutive_read_failures = 0;
-                    }
-                }
-
-                match search_file_line_by_line(file_path, &terms) {
-                    Ok(Some(match_count)) => {
-                        consecutive_read_failures = 0;
-                        total_matches = total_matches.saturating_add(match_count);
-                        files_matched = files_matched.saturating_add(1);
-                        pending_results.push(SearchResultPayload {
-                            file_path: file_path.to_string_lossy().to_string(),
-                            file_name,
-                            parent_folder,
-                            match_count,
-                            operation_id: operation_id.clone(),
-                        });
-                    }
-                    Ok(None) => {
-                        consecutive_read_failures = 0;
-                    }
-                    Err(_) => {
-                        consecutive_read_failures = consecutive_read_failures.saturating_add(1);
-                        pending_errors.push(SearchErrorPayload {
-                            file_path: file_path.to_string_lossy().to_string(),
-                            file_name,
-                            parent_folder,
-                            error_message: "Failed to read file".to_string(),
-                        });
-                        if consecutive_read_failures >= 10 {
-                            cancelled = true;
-                            break 'folders;
-                        }
-                    }
-                }
-
-                files_scanned = files_scanned.saturating_add(1);
-                flush_search_batches(
-                    false,
-                    &mut pending_results,
-                    &mut pending_errors,
-                    &mut last_batch_emit_time,
-                );
-                emit_progress(
-                    false,
-                    files_scanned,
-                    total_matches,
-                    files_matched,
-                    &mut last_emit_time,
-                );
-            }
-        }
-
-        flush_search_batches(
-            true,
-            &mut pending_results,
-            &mut pending_errors,
-            &mut last_batch_emit_time,
-        );
-        emit_progress(
-            true,
-            files_scanned,
-            total_matches,
-            files_matched,
-            &mut last_emit_time,
-        );
-
-        SearchSummaryResult {
-            query: query_clone,
-            scope_label: scope_label_clone,
-            file_pattern: file_pattern_clone,
-            total_files_scanned: files_scanned,
-            total_files_matched: files_matched,
-            total_matches,
-            cancelled,
-        }
+        content_search_worker(
+            app,
+            paths,
+            pattern,
+            terms,
+            query,
+            file_pattern,
+            scope_label,
+            operation_id,
+            token_clone,
+        )
     })
     .await
     .map_err(|e| format!("Search task failed: {}", e))?;
@@ -1021,6 +1204,65 @@ mod tests {
         let missing_terms = vec!["alpha".to_string(), "delta".to_string()];
         let missing = search_file_line_by_line(&file_path, &missing_terms).unwrap();
         assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn test_search_file_content_uses_ascii_fast_path_case_insensitively() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("sample.xml");
+        std::fs::write(&file_path, "CONFIG value\nconfig VALUE\n").unwrap();
+
+        let matcher = build_search_matcher(&["config".to_string(), "value".to_string()]);
+        assert!(matcher.ascii_matcher.is_some());
+
+        let result = search_file_content(&file_path, &matcher, None).unwrap();
+        assert_eq!(result, Some(4));
+    }
+
+    #[test]
+    fn test_search_file_content_falls_back_for_unicode_terms() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("sample.xml");
+        std::fs::write(&file_path, "Café\nCAFÉ\n").unwrap();
+
+        let matcher = build_search_matcher(&["café".to_string()]);
+        assert!(matcher.ascii_matcher.is_none());
+
+        let result = search_file_content(&file_path, &matcher, None).unwrap();
+        assert_eq!(result, Some(2));
+    }
+
+    #[test]
+    fn test_search_file_content_honors_cancellation() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("sample.xml");
+        std::fs::write(&file_path, "alpha beta\n").unwrap();
+
+        let matcher = build_search_matcher(&["alpha".to_string()]);
+        let token = CancellationToken::new();
+        token.cancel();
+
+        let result = search_file_content(&file_path, &matcher, Some(&token)).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_scan_search_candidate_skips_oversized_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("large.xml");
+        let file = std::fs::File::create(&file_path).unwrap();
+        file.set_len(MAX_SCAN_FILE_SIZE + 1).unwrap();
+
+        let candidate = SearchFileCandidate {
+            file_path,
+            file_name: "large.xml".to_string(),
+            parent_folder: temp_dir.path().to_string_lossy().to_string(),
+        };
+        let matcher = build_search_matcher(&["alpha".to_string()]);
+        let token = CancellationToken::new();
+
+        let result = scan_search_candidate(candidate, &matcher, "op", &token);
+        assert!(matches!(result, Some(SearchScanOutcome::Skipped)));
     }
 
     #[test]

@@ -14,6 +14,7 @@ export interface TreeNode {
   id: string;
   path: string;
   name: string;
+  parentId?: string;
   type: TreeNodeType;
   children: TreeNode[] | null;
   loadState: LoadState;

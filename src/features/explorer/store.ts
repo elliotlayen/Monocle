@@ -71,9 +71,12 @@ interface ExplorerStore {
   searchProgress: SearchProgressPayloadType | null;
   searchResults: SearchResultFile[];
   searchErrors: SearchErrorFile[];
+  searchResultPathSet: Set<string>;
+  searchErrorPathSet: Set<string>;
   searchSummary: SearchSummary | null;
   searchOperationId: string | null;
   activeSearchTerms: string[] | null;
+  filenameSearchIndex: Map<string, string>;
 
   // Actions
   loadSources: () => Promise<void>;
@@ -133,7 +136,7 @@ interface ExplorerStore {
 
 function buildChildNodes(
   entries: DirEntry[],
-  _parentNode: TreeNode,
+  parentNode: TreeNode,
   folderSources: FolderSource[]
 ): TreeNode[] {
   return entries.map((entry) => {
@@ -155,6 +158,7 @@ function buildChildNodes(
       id: entry.path,
       path: entry.path,
       name: entry.name,
+      parentId: parentNode.id,
       type: nodeType,
       children: null,
       loadState: "idle" as const,
@@ -174,6 +178,32 @@ function buildSourceNode(source: FolderSource): TreeNode {
     loadState: "idle",
     isDir: true,
   };
+}
+
+function buildFilenameSearchIndex(
+  treeNodes: Map<string, TreeNode>
+): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const [id, node] of treeNodes) {
+    index.set(id, node.name.toLowerCase());
+  }
+  return index;
+}
+
+function sortSearchResults(results: SearchResultFile[]): SearchResultFile[] {
+  return [...results].sort((a, b) => {
+    const folderCompare = a.parentFolder.localeCompare(b.parentFolder);
+    if (folderCompare !== 0) return folderCompare;
+    return a.fileName.localeCompare(b.fileName);
+  });
+}
+
+function sortSearchErrors(errors: SearchErrorFile[]): SearchErrorFile[] {
+  return [...errors].sort((a, b) => {
+    const folderCompare = a.parentFolder.localeCompare(b.parentFolder);
+    if (folderCompare !== 0) return folderCompare;
+    return a.fileName.localeCompare(b.fileName);
+  });
 }
 
 function recomputeTabNames(tabs: FileTab[]): FileTab[] {
@@ -261,9 +291,12 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   searchProgress: null,
   searchResults: [],
   searchErrors: [],
+  searchResultPathSet: new Set<string>(),
+  searchErrorPathSet: new Set<string>(),
   searchSummary: null,
   searchOperationId: null,
   activeSearchTerms: null,
+  filenameSearchIndex: new Map<string, string>(),
 
   loadSources: async () => {
     try {
@@ -279,6 +312,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set({
         folderSources: sources,
         treeNodes,
+        filenameSearchIndex: buildFilenameSearchIndex(treeNodes),
         expandedIds: new Set(),
         activeOperations: new Map(),
         sidebarWidth,
@@ -336,6 +370,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
       set({
         treeNodes: currentNodes,
+        filenameSearchIndex: buildFilenameSearchIndex(currentNodes),
         expandedIds: currentExpanded,
         activeOperations: currentOps,
       });
@@ -352,7 +387,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const currentOps = new Map(get().activeOperations);
       currentOps.delete(nodeId);
 
-      set({ treeNodes: currentNodes, activeOperations: currentOps });
+      set({
+        treeNodes: currentNodes,
+        filenameSearchIndex: buildFilenameSearchIndex(currentNodes),
+        activeOperations: currentOps,
+      });
     }
   },
 
@@ -392,6 +431,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
     set({
       treeNodes: nextNodes,
+      filenameSearchIndex: buildFilenameSearchIndex(nextNodes),
       expandedIds: nextExpanded,
       activeOperations: nextOps,
     });
@@ -444,7 +484,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         }
       }
 
-      set({ folderSources: updatedSources, treeNodes: nextNodes });
+      set({
+        folderSources: updatedSources,
+        treeNodes: nextNodes,
+        filenameSearchIndex: buildFilenameSearchIndex(nextNodes),
+      });
     } catch {
       // Silently handle toggle failure
     }
@@ -473,7 +517,12 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         treeNodes.set(source.id, buildSourceNode(source));
       }
 
-      set({ treeNodes, expandedIds: new Set(), activeOperations: new Map() });
+      set({
+        treeNodes,
+        filenameSearchIndex: buildFilenameSearchIndex(treeNodes),
+        expandedIds: new Set(),
+        activeOperations: new Map(),
+      });
     } catch {
       // Silently handle save failure
     }
@@ -882,6 +931,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         searchMode: mode,
         searchResults: [],
         searchErrors: [],
+        searchResultPathSet: new Set<string>(),
+        searchErrorPathSet: new Set<string>(),
         searchSummary: null,
         searchStatus: "idle",
         activeSearchTerms: null,
@@ -936,6 +987,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       searchOperationId: operationId,
       searchResults: [],
       searchErrors: [],
+      searchResultPathSet: new Set<string>(),
+      searchErrorPathSet: new Set<string>(),
       searchProgress: null,
       searchSummary: null,
     });
@@ -949,11 +1002,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         operationId
       );
 
-      set({
+      set((state) => ({
         searchStatus: result.cancelled ? "cancelled" : "completed",
         searchSummary: result,
         searchOperationId: null,
-      });
+        searchResults: sortSearchResults(state.searchResults),
+        searchErrors: sortSearchErrors(state.searchErrors),
+      }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       const isNetworkError =
@@ -994,7 +1049,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     if (results.length === 0 && errors.length === 0) return;
 
     set((state) => {
-      const seenResultPaths = new Set(state.searchResults.map((r) => r.filePath));
+      const seenResultPaths = new Set(state.searchResultPathSet);
       const nextResults = [...state.searchResults];
       for (const result of results) {
         if (seenResultPaths.has(result.filePath)) continue;
@@ -1002,7 +1057,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         nextResults.push(result);
       }
 
-      const seenErrorPaths = new Set(state.searchErrors.map((r) => r.filePath));
+      const seenErrorPaths = new Set(state.searchErrorPathSet);
       const nextErrors = [...state.searchErrors];
       for (const error of errors) {
         if (seenErrorPaths.has(error.filePath)) continue;
@@ -1010,16 +1065,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         nextErrors.push(error);
       }
 
-      nextResults.sort((a, b) => {
-        const folderCompare = a.parentFolder.localeCompare(b.parentFolder);
-        if (folderCompare !== 0) return folderCompare;
-        return a.fileName.localeCompare(b.fileName);
-      });
-      nextErrors.sort((a, b) => a.fileName.localeCompare(b.fileName));
-
       return {
         searchResults: nextResults,
         searchErrors: nextErrors,
+        searchResultPathSet: seenResultPaths,
+        searchErrorPathSet: seenErrorPaths,
       };
     });
   },
@@ -1039,6 +1089,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     set({
       searchResults: [],
       searchErrors: [],
+      searchResultPathSet: new Set<string>(),
+      searchErrorPathSet: new Set<string>(),
       searchSummary: null,
       searchProgress: null,
       searchStatus: "idle",

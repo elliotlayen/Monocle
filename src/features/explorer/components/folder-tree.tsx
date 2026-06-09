@@ -3,7 +3,6 @@ import { useShallow } from "zustand/shallow";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useExplorerStore } from "../store";
-import { filterTreeNodes } from "../utils/tree-filter";
 import { formatDateFolder } from "../utils/date-format";
 import { FolderTreeNode, FolderTreeSourceNode } from "./folder-tree-node";
 import type { TreeNode } from "../types";
@@ -12,6 +11,7 @@ export function FolderTree() {
   const {
     folderSources,
     treeNodes,
+    filenameSearchIndex,
     expandedIds,
     filterText,
     dateSortOrder,
@@ -28,6 +28,7 @@ export function FolderTree() {
     useShallow((state) => ({
       folderSources: state.folderSources,
       treeNodes: state.treeNodes,
+      filenameSearchIndex: state.filenameSearchIndex,
       expandedIds: state.expandedIds,
       filterText: state.filterText,
       dateSortOrder: state.dateSortOrder,
@@ -65,12 +66,41 @@ export function FolderTree() {
       .filter((n): n is TreeNode => n !== undefined);
   }, [folderSources, treeNodes]);
 
-  // Apply filter
+  const visibleNodeIds = useMemo(() => {
+    const lowerFilter = filterText.trim().toLowerCase();
+    if (!lowerFilter) return null;
+
+    const ids = new Set<string>();
+    const addAncestors = (node: TreeNode) => {
+      let current: TreeNode | undefined = node;
+      while (current) {
+        ids.add(current.id);
+        current = current.parentId ? treeNodes.get(current.parentId) : undefined;
+      }
+    };
+    const addLoadedDescendants = (node: TreeNode) => {
+      for (const child of node.children ?? []) {
+        const current = treeNodes.get(child.id) ?? child;
+        ids.add(current.id);
+        if (current.children) addLoadedDescendants(current);
+      }
+    };
+
+    for (const [id, lowerName] of filenameSearchIndex) {
+      if (!lowerName.includes(lowerFilter)) continue;
+      const node = treeNodes.get(id);
+      if (!node) continue;
+      addAncestors(node);
+      if (node.isDir) addLoadedDescendants(node);
+    }
+
+    return ids;
+  }, [filenameSearchIndex, filterText, treeNodes]);
+
   const visibleRoots = useMemo(() => {
-    const hasTextFilter = filterText.trim().length > 0;
-    if (!hasTextFilter) return rootNodes;
-    return filterTreeNodes(rootNodes, filterText);
-  }, [rootNodes, filterText]);
+    if (!visibleNodeIds) return rootNodes;
+    return rootNodes.filter((root) => visibleNodeIds.has(root.id));
+  }, [rootNodes, visibleNodeIds]);
 
   const selectedFolderPath = searchMode === "content" ? lastInteractedFolderPath : null;
   const showCheckboxes = searchMode === "content";
@@ -116,6 +146,7 @@ export function FolderTree() {
     const sortedChildren = filterByDateRange(
       current.children
         .map((child) => treeNodes.get(child.id) ?? child)
+        .filter((child) => !visibleNodeIds || visibleNodeIds.has(child.id))
         .sort((a, b) => {
           if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
           // Apply dateSortOrder to 8-digit date-pattern folder names (YYYYMMDD)

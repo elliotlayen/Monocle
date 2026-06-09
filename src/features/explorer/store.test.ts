@@ -267,6 +267,8 @@ describe("explorer store - scan and search performance state", () => {
     useExplorerStore.setState({
       searchResults: [],
       searchErrors: [],
+      searchResultPathSet: new Set<string>(),
+      searchErrorPathSet: new Set<string>(),
       searchProgress: null,
       searchOperationId: "search-op",
       scanProgress: null,
@@ -284,7 +286,7 @@ describe("explorer store - scan and search performance state", () => {
     });
   });
 
-  it("appends search result batches with dedupe and stable sorting", () => {
+  it("appends search result batches with incremental dedupe", () => {
     useExplorerStore.getState().appendSearchResults(
       [
         {
@@ -327,10 +329,86 @@ describe("explorer store - scan and search performance state", () => {
 
     const state = useExplorerStore.getState();
     expect(state.searchResults.map((r) => r.filePath)).toEqual([
+      "/b/z.xml",
+      "/a/m.xml",
+    ]);
+    expect(state.searchResultPathSet).toEqual(new Set(["/b/z.xml", "/a/m.xml"]));
+    expect(state.searchErrors).toHaveLength(1);
+    expect(state.searchErrorPathSet).toEqual(new Set(["/errors/bad.xml"]));
+  });
+
+  it("sorts search results once the content search completes", async () => {
+    const { explorerService } = await import("./services/explorer-service");
+    vi.mocked(explorerService.contentSearch).mockImplementationOnce(async () => {
+      useExplorerStore.getState().appendSearchResults(
+        [
+          {
+            filePath: "/b/z.xml",
+            fileName: "z.xml",
+            parentFolder: "/b",
+            matchCount: 1,
+            operationId: "search-op",
+          },
+          {
+            filePath: "/a/m.xml",
+            fileName: "m.xml",
+            parentFolder: "/a",
+            matchCount: 2,
+            operationId: "search-op",
+          },
+        ],
+        []
+      );
+
+      return {
+        query: "alpha",
+        scopeLabel: "scope",
+        filePattern: "*.xml",
+        totalFilesScanned: 2,
+        totalFilesMatched: 2,
+        totalMatches: 3,
+        cancelled: false,
+      };
+    });
+
+    await useExplorerStore.getState().startContentSearch(["/root"], "scope");
+
+    const state = useExplorerStore.getState();
+    expect(state.searchResults.map((r) => r.filePath)).toEqual([
       "/a/m.xml",
       "/b/z.xml",
     ]);
-    expect(state.searchErrors).toHaveLength(1);
+    expect(state.searchStatus).toBe("completed");
+  });
+
+  it("clears search result dedupe state", () => {
+    useExplorerStore.getState().appendSearchResults(
+      [
+        {
+          filePath: "/a/m.xml",
+          fileName: "m.xml",
+          parentFolder: "/a",
+          matchCount: 1,
+          operationId: "search-op",
+        },
+      ],
+      [
+        {
+          filePath: "/errors/bad.xml",
+          fileName: "bad.xml",
+          parentFolder: "/errors",
+          errorMessage: "Failed to read file",
+        },
+      ]
+    );
+
+    useExplorerStore.getState().clearSearchResults();
+
+    const state = useExplorerStore.getState();
+    expect(state.searchResults).toEqual([]);
+    expect(state.searchErrors).toEqual([]);
+    expect(state.searchResultPathSet.size).toBe(0);
+    expect(state.searchErrorPathSet.size).toBe(0);
   });
 
   it("updates scan progress without mutating validation cache", () => {
@@ -354,5 +432,50 @@ describe("explorer store - scan and search performance state", () => {
     expect(state.scanProgress?.filesProcessed).toBe(10);
     expect(state.validationCache).toBe(before);
     expect(state.validationCache.has("/new.xml")).toBe(false);
+  });
+
+  it("indexes loaded filenames with parent ids when expanding folders", async () => {
+    const { explorerService } = await import("./services/explorer-service");
+    vi.mocked(explorerService.listDirectory).mockResolvedValueOnce([
+      { name: "Config.xml", isDir: false, path: "/root/Config.xml" },
+      { name: "Nested", isDir: true, path: "/root/Nested" },
+    ]);
+
+    useExplorerStore.setState({
+      folderSources: [
+        {
+          id: "source-1",
+          path: "/root",
+          label: "Root",
+          tag: "local",
+          favorites: [],
+        },
+      ],
+      treeNodes: new Map([
+        [
+          "source-1",
+          {
+            id: "source-1",
+            path: "/root",
+            name: "Root",
+            type: "source",
+            children: null,
+            loadState: "idle",
+            isDir: true,
+          },
+        ],
+      ]),
+      filenameSearchIndex: new Map([["source-1", "root"]]),
+      expandedIds: new Set(),
+      activeOperations: new Map(),
+    });
+
+    await useExplorerStore.getState().expandNode("source-1");
+
+    const state = useExplorerStore.getState();
+    expect(state.treeNodes.get("/root/Config.xml")?.parentId).toBe("source-1");
+    expect(state.treeNodes.get("/root/Nested")?.parentId).toBe("source-1");
+    expect(state.filenameSearchIndex.get("/root/Config.xml")).toBe("config.xml");
+    expect(state.filenameSearchIndex.get("/root/Nested")).toBe("nested");
   });
 });
