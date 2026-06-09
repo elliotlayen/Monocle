@@ -32,7 +32,8 @@ function ensureStyles(): void {
  */
 export function useSearchHighlight(
   editorInstance: editor.IStandaloneCodeEditor | null,
-  searchTerms: string[] | null
+  searchTerms: string[] | null,
+  content: string
 ): void {
   const collectionRef = useRef<editor.IEditorDecorationsCollection | null>(
     null
@@ -106,5 +107,5 @@ export function useSearchHighlight(
         collectionRef.current = null;
       }
     };
-  }, [editorInstance, searchTerms]);
+  }, [editorInstance, searchTerms, content]);
 }

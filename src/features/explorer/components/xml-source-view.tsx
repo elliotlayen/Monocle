@@ -93,7 +93,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
   useValidationDecorations(editorMounted, problems ?? []);
 
   // Apply Monaco decorations for search term highlighting
-  useSearchHighlight(editorMounted, searchHighlightTerms ?? null);
+  useSearchHighlight(editorMounted, searchHighlightTerms ?? null, content);
 
   // Handle pending jump from problems panel click
   const onJumpHandledRef = useRef(onJumpHandled);
