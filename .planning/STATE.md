@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-22)
 Phase: 7
 Plan: Not started
 Status: Executing Phase 06.1
-Last activity: 2026-05-28
+Last activity: 2026-06-09 - Completed quick task 260609-erl: Fix search highlights disappearing after Format XML toggle
 
 Progress: [###-------] 30%
 
@@ -81,6 +81,12 @@ None yet.
 - Network I/O patterns over VPN-accessed SMB shares need real-world validation in early phases
 - tokio::fs::read_dir hang on UNC paths (tokio#5473) -- workaround needs testing on Windows
 - ~~react-arborist async lazy loading with Tauri IPC needs prototyping~~ Resolved: explorer tree is custom-built, not react-arborist
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260609-erl | Fix search highlights disappearing after Format XML toggle | 2026-06-09 | cdc5126 | [260609-erl-fix-search-highlights-disappearing-after](./quick/260609-erl-fix-search-highlights-disappearing-after/) |
 
 ## Deferred Items
 
