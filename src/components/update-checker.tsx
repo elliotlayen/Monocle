@@ -112,7 +112,7 @@ export function UpdateChecker({
           if (contentLength > 0 && toastIdRef.current) {
             const percent = Math.round((downloaded / contentLength) * 100);
             updateToast(toastIdRef.current, {
-              message: `Downloading... ${percent}%`,
+              message: "Downloading...",
               progress: { current: percent, total: 100 },
             });
           }
