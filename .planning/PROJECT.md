@@ -109,6 +109,7 @@ Root Folder (Inbound or Outbound)/
 | Multiple configurable folder sources | Users may have personal folders of test XML files beyond the standard inbound/outbound | -- Pending |
 | Sidebar + content layout | Matches VS Code mental model that's familiar; consistent with schema browser sidebar pattern | -- Pending |
 | Feature name: "Integration Explorer" | Matches department terminology for these files | -- Pending |
+| Streaming + batched events over eager loading | Network shares over VPN make per-file event emission a bottleneck; batch results (50/emit), stream line-by-line, virtual scroll UI | Adopted |
 
 ## Evolution
 

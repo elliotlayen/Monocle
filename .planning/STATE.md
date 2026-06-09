@@ -65,6 +65,7 @@ Recent decisions affecting current work:
 
 - [Roadmap]: 10 phases derived from 26 requirements at fine granularity; browsing foundation first, validation second, search third, analytics/comparison fourth, monitoring last
 - [Roadmap]: Research recommends quick-xml, encoding_rs, react-arborist, recharts; all I/O patterns (async + timeout + streaming) established in Phase 1-2
+- [Performance]: Search uses streaming walk+search (no pre-count), batched result events (50/batch, 150ms throttle), and virtual scrolling UI (@tanstack/react-virtual)
 
 ### Roadmap Evolution
 
@@ -79,7 +80,7 @@ None yet.
 
 - Network I/O patterns over VPN-accessed SMB shares need real-world validation in early phases
 - tokio::fs::read_dir hang on UNC paths (tokio#5473) -- workaround needs testing on Windows
-- react-arborist async lazy loading with Tauri IPC needs prototyping
+- ~~react-arborist async lazy loading with Tauri IPC needs prototyping~~ Resolved: explorer tree is custom-built, not react-arborist
 
 ## Deferred Items
 

@@ -150,10 +150,13 @@ src-tauri/src/
     connections.rs    - Connection history CRUD commands
     databases.rs      - Database listing commands
     settings.rs       - Settings persistence commands
+    explorer.rs       - Explorer file browsing, content search, bulk scan commands
   db/
     connection.rs     - Tiberius connection management
     queries.rs        - SQL queries for metadata
     schema_loader.rs  - Parses results into SchemaGraph
+  validation/
+    validator.rs      - XML validation (illegal chars, encoding, BOM detection)
   types/
     schema.rs         - Rust type definitions mirroring frontend types
 ```
@@ -244,6 +247,31 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - Connection passwords are not stored - only connection metadata
 - The app uses React Flow's dagre layout for automatic positioning
 - Monaco Editor provides SQL syntax highlighting and intellisense (replaces prism-react-renderer)
+
+## Performance Patterns
+
+### Batched Tauri Events
+
+Search and scan commands emit results in batches, not per-file:
+
+- **Search results**: Batched via `searchResultsBatchHub` in `src/services/events.ts`. Rust emits every 50 files or 150ms (whichever comes first). Frontend `appendSearchResults` in the store accepts `SearchResultFile[]` and `SearchErrorFile[]` arrays.
+- **Scan progress**: Throttled to emit every 200 files or 150ms minimum. `totalFiles` may be `null` in streaming mode (unknown count).
+- Never emit one event per file — it saturates the IPC bridge over VPN.
+
+### Streaming Search (Rust)
+
+`content_search_cmd` in `src-tauri/src/commands/explorer.rs` walks and searches incrementally:
+
+- No pre-count phase — `totalFiles` is `null`, progress shows files scanned so far.
+- `search_file_line_by_line()` uses `BufReader` for line-by-line streaming instead of loading full file content into memory.
+- AND-logic: all search terms must appear in a file to match.
+
+### Virtual Scrolling
+
+`search-results.tsx` uses `@tanstack/react-virtual` for large result sets:
+
+- Collapsible folder groups with deferred file expansion.
+- Never render all search results at once — only visible rows are in the DOM.
 
 ## Release Workflow
 
