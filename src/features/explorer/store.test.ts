@@ -261,3 +261,98 @@ describe("explorer store - tab management", () => {
     });
   });
 });
+
+describe("explorer store - scan and search performance state", () => {
+  beforeEach(() => {
+    useExplorerStore.setState({
+      searchResults: [],
+      searchErrors: [],
+      searchProgress: null,
+      searchOperationId: "search-op",
+      scanProgress: null,
+      scanOperationId: "scan-op",
+      validationCache: new Map([
+        [
+          "/existing.xml",
+          {
+            problems: [],
+            encoding: "UTF-8",
+            hasBom: false,
+          },
+        ],
+      ]),
+    });
+  });
+
+  it("appends search result batches with dedupe and stable sorting", () => {
+    useExplorerStore.getState().appendSearchResults(
+      [
+        {
+          filePath: "/b/z.xml",
+          fileName: "z.xml",
+          parentFolder: "/b",
+          matchCount: 1,
+          operationId: "search-op",
+        },
+        {
+          filePath: "/a/m.xml",
+          fileName: "m.xml",
+          parentFolder: "/a",
+          matchCount: 2,
+          operationId: "search-op",
+        },
+      ],
+      [
+        {
+          filePath: "/errors/bad.xml",
+          fileName: "bad.xml",
+          parentFolder: "/errors",
+          errorMessage: "Failed to read file",
+        },
+      ]
+    );
+
+    useExplorerStore.getState().appendSearchResults(
+      [
+        {
+          filePath: "/a/m.xml",
+          fileName: "m.xml",
+          parentFolder: "/a",
+          matchCount: 2,
+          operationId: "search-op",
+        },
+      ],
+      []
+    );
+
+    const state = useExplorerStore.getState();
+    expect(state.searchResults.map((r) => r.filePath)).toEqual([
+      "/a/m.xml",
+      "/b/z.xml",
+    ]);
+    expect(state.searchErrors).toHaveLength(1);
+  });
+
+  it("updates scan progress without mutating validation cache", () => {
+    const before = useExplorerStore.getState().validationCache;
+
+    useExplorerStore.getState().updateScanProgress({
+      operationId: "scan-op",
+      filePath: "/new.xml",
+      fileName: "new.xml",
+      status: "error",
+      errorCount: 1,
+      warningCount: 0,
+      filesProcessed: 10,
+      totalFiles: null,
+      totalErrors: 1,
+      totalWarnings: 0,
+      totalClean: 9,
+    });
+
+    const state = useExplorerStore.getState();
+    expect(state.scanProgress?.filesProcessed).toBe(10);
+    expect(state.validationCache).toBe(before);
+    expect(state.validationCache.has("/new.xml")).toBe(false);
+  });
+});

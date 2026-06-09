@@ -33,9 +33,11 @@ export function ScanProgressPanel() {
   }
 
   const filesProcessed = scanProgress?.filesProcessed ?? 0;
-  const totalFiles = scanProgress?.totalFiles ?? 0;
+  const totalFiles = scanProgress?.totalFiles ?? null;
   const percentage =
-    totalFiles > 0 ? Math.round((filesProcessed / totalFiles) * 100) : 0;
+    totalFiles != null && totalFiles > 0
+      ? Math.round((filesProcessed / totalFiles) * 100)
+      : null;
 
   return (
     <div className="border-t bg-muted/50 px-4 py-3 flex flex-col gap-2">
@@ -54,11 +56,13 @@ export function ScanProgressPanel() {
         </Button>
       </div>
 
-      <Progress value={percentage} className="h-2" />
+      <Progress value={percentage ?? undefined} className="h-2" />
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          {filesProcessed} of {totalFiles} files ({percentage}%)
+          {totalFiles == null
+            ? `${filesProcessed} files scanned`
+            : `${filesProcessed} of ${totalFiles} files (${percentage}%)`}
         </span>
         <div className="flex items-center gap-3">
           {(scanProgress?.totalErrors ?? 0) > 0 && (

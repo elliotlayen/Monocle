@@ -2,7 +2,6 @@
 ///
 /// Scans transcoded UTF-8 content for invalid XML characters, unescaped entities,
 /// null bytes, control characters, and other byte-level issues per XML 1.0 spec.
-
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -74,26 +73,21 @@ pub fn validate_characters(
 
     let mut line: u32 = 1;
     let mut column: u32 = 1;
-    let chars: Vec<char> = content.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
+    let mut chars = content.chars().peekable();
 
-    while i < len {
-        let c = chars[i];
-
+    while let Some(c) = chars.next() {
         match c {
             '\n' => {
                 line += 1;
                 column = 1;
-                i += 1;
                 continue;
             }
             '\r' => {
-                if i + 1 < len && chars[i + 1] == '\n' {
+                if chars.peek() == Some(&'\n') {
                     // \r\n -- normal Windows line ending, skip both
+                    chars.next();
                     line += 1;
                     column = 1;
-                    i += 2;
                     continue;
                 } else {
                     // Bare CR without LF -- warning
@@ -101,20 +95,19 @@ pub fn validate_characters(
                         line,
                         column,
                         end_column: column + 1,
-                        message: "Bare carriage return without line feed (unusual line ending)".to_string(),
+                        message: "Bare carriage return without line feed (unusual line ending)"
+                            .to_string(),
                         severity: "warning".to_string(),
                         code: "bare-cr".to_string(),
                     });
                     line += 1;
                     column = 1;
-                    i += 1;
                     continue;
                 }
             }
             '\t' => {
                 // Tab is valid in XML (0x09) -- just advance column
                 column += 1;
-                i += 1;
                 continue;
             }
             _ => {}
@@ -148,14 +141,14 @@ pub fn validate_characters(
                 line,
                 column,
                 end_column: column + 1,
-                message: "Non-UTF-8 byte could not be transcoded (replaced with U+FFFD)".to_string(),
+                message: "Non-UTF-8 byte could not be transcoded (replaced with U+FFFD)"
+                    .to_string(),
                 severity: "error".to_string(),
                 code: "non-utf8-byte".to_string(),
             });
         }
 
         column += 1;
-        i += 1;
     }
 
     problems
@@ -187,7 +180,10 @@ mod tests {
         // 0x01, 0x08, 0x0B, 0x0C, 0x1F
         let input = "A\x01B\x08C\x0BD\x0CE\x1FF";
         let result = validate_characters(input, false, "UTF-8", false);
-        let controls: Vec<_> = result.iter().filter(|p| p.code == "invalid-control-char").collect();
+        let controls: Vec<_> = result
+            .iter()
+            .filter(|p| p.code == "invalid-control-char")
+            .collect();
         assert_eq!(controls.len(), 5);
         assert!(controls[0].message.contains("0x01"));
         assert!(controls[1].message.contains("0x08"));
@@ -198,7 +194,12 @@ mod tests {
 
     #[test]
     fn xml_structural_chars_not_flagged() {
-        let result = validate_characters("<root attr=\"a&amp;b\">text &lt; 5</root>", false, "UTF-8", false);
+        let result = validate_characters(
+            "<root attr=\"a&amp;b\">text &lt; 5</root>",
+            false,
+            "UTF-8",
+            false,
+        );
         assert!(result.is_empty());
     }
 
@@ -208,7 +209,10 @@ mod tests {
         let crs: Vec<_> = result.iter().filter(|p| p.code == "bare-cr").collect();
         assert_eq!(crs.len(), 1);
         assert_eq!(crs[0].severity, "warning");
-        assert_eq!(crs[0].message, "Bare carriage return without line feed (unusual line ending)");
+        assert_eq!(
+            crs[0].message,
+            "Bare carriage return without line feed (unusual line ending)"
+        );
     }
 
     #[test]
@@ -232,20 +236,32 @@ mod tests {
     #[test]
     fn non_utf8_encoding_produces_warning() {
         let result = validate_characters("content", false, "windows-1252", false);
-        let encs: Vec<_> = result.iter().filter(|p| p.code == "non-utf8-encoding").collect();
+        let encs: Vec<_> = result
+            .iter()
+            .filter(|p| p.code == "non-utf8-encoding")
+            .collect();
         assert_eq!(encs.len(), 1);
         assert_eq!(encs[0].severity, "warning");
-        assert_eq!(encs[0].message, "File encoded as windows-1252 (transcoded to UTF-8)");
+        assert_eq!(
+            encs[0].message,
+            "File encoded as windows-1252 (transcoded to UTF-8)"
+        );
     }
 
     #[test]
     fn fffd_with_decode_errors() {
         let content = "Hello \u{FFFD} World";
         let result = validate_characters(content, true, "UTF-8", false);
-        let ffrds: Vec<_> = result.iter().filter(|p| p.code == "non-utf8-byte").collect();
+        let ffrds: Vec<_> = result
+            .iter()
+            .filter(|p| p.code == "non-utf8-byte")
+            .collect();
         assert_eq!(ffrds.len(), 1);
         assert_eq!(ffrds[0].severity, "error");
-        assert_eq!(ffrds[0].message, "Non-UTF-8 byte could not be transcoded (replaced with U+FFFD)");
+        assert_eq!(
+            ffrds[0].message,
+            "Non-UTF-8 byte could not be transcoded (replaced with U+FFFD)"
+        );
     }
 
     #[test]
@@ -253,7 +269,10 @@ mod tests {
         // U+FFFD in content that was NOT caused by decode errors should not be flagged
         let content = "Hello \u{FFFD} World";
         let result = validate_characters(content, false, "UTF-8", false);
-        let ffrds: Vec<_> = result.iter().filter(|p| p.code == "non-utf8-byte").collect();
+        let ffrds: Vec<_> = result
+            .iter()
+            .filter(|p| p.code == "non-utf8-byte")
+            .collect();
         assert!(ffrds.is_empty());
     }
 

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useShallow } from "zustand/shallow";
 import {
   ChevronUp,
@@ -8,7 +9,6 @@ import {
   TriangleAlert,
   CircleCheck,
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useExplorerStore } from "../store";
 import { ScanResultsHeader } from "./scan-results-header";
 import { ScanFileRow } from "./scan-file-row";
@@ -101,6 +101,7 @@ export function ScanResultsTab() {
   const [sortField, setSortField] = useState<SortField>("status");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showIssuesOnly, setShowIssuesOnly] = useState(false);
+  const scrollParentRef = useRef<HTMLDivElement | null>(null);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -119,6 +120,14 @@ export function ScanResultsTab() {
     }
     return sortFiles(files, sortField, sortDirection);
   }, [scanResult, showIssuesOnly, sortField, sortDirection]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredAndSorted.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 36,
+    overscan: 10,
+    getItemKey: (index) => filteredAndSorted[index]?.filePath ?? index,
+  });
 
   if (!scanResult) return null;
 
@@ -198,25 +207,44 @@ export function ScanResultsTab() {
       </div>
 
       {/* File list */}
-      <ScrollArea className="flex-1">
-        <div role="table" aria-label="Scan results">
-          {filteredAndSorted.map((file) => (
-            <ScanFileRow
-              key={file.filePath}
-              file={file}
-              scanRoot={scanResult.folderPath}
-              onFileClick={handleFileClick}
-            />
-          ))}
+      <div ref={scrollParentRef} className="flex-1 overflow-auto">
+        <div
+          className="relative"
+          role="table"
+          aria-label="Scan results"
+          style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const file = filteredAndSorted[virtualRow.index];
+            if (!file) return null;
+
+            return (
+              <div
+                key={virtualRow.key}
+                ref={rowVirtualizer.measureElement}
+                data-index={virtualRow.index}
+                className="absolute left-0 top-0 w-full"
+                style={{
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <ScanFileRow
+                  file={file}
+                  scanRoot={scanResult.folderPath}
+                  onFileClick={handleFileClick}
+                />
+              </div>
+            );
+          })}
           {filteredAndSorted.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               {showIssuesOnly
                 ? "No issues found -- all files are clean"
-                : "No files in scan results"}
+              : "No files in scan results"}
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

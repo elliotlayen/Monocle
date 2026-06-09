@@ -2,24 +2,24 @@ import { useCallback } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   useTauriEvent,
-  searchResultHub,
+  searchResultsBatchHub,
   searchProgressHub,
 } from "@/services/events";
 import { useExplorerStore } from "../store";
-import type { SearchResultFile, SearchProgressPayload } from "../types";
+import type { SearchProgressPayload, SearchResultsBatchPayload } from "../types";
 
 export function useSearch() {
   const {
     cancelContentSearch,
     clearSearchResults,
     updateSearchProgress,
-    appendSearchResult,
+    appendSearchResults,
   } = useExplorerStore(
     useShallow((state) => ({
       cancelContentSearch: state.cancelContentSearch,
       clearSearchResults: state.clearSearchResults,
       updateSearchProgress: state.updateSearchProgress,
-      appendSearchResult: state.appendSearchResult,
+      appendSearchResults: state.appendSearchResults,
     }))
   );
 
@@ -32,18 +32,18 @@ export function useSearch() {
     [updateSearchProgress]
   );
 
-  const handleResult = useCallback(
-    (payload: SearchResultFile) => {
+  const handleResultsBatch = useCallback(
+    (payload: SearchResultsBatchPayload) => {
       const currentOpId = useExplorerStore.getState().searchOperationId;
       if (payload.operationId !== currentOpId) return;
 
-      appendSearchResult(payload);
+      appendSearchResults(payload.results, payload.errors);
     },
-    [appendSearchResult]
+    [appendSearchResults]
   );
 
   useTauriEvent(searchProgressHub.subscribe, handleProgress);
-  useTauriEvent(searchResultHub.subscribe, handleResult);
+  useTauriEvent(searchResultsBatchHub.subscribe, handleResultsBatch);
 
   return {
     cancelContentSearch,

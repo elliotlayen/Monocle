@@ -1,4 +1,5 @@
 import { FileText, AlertCircle } from "lucide-react";
+import { memo } from "react";
 import type { SearchResultFile, SearchErrorFile } from "../types";
 
 interface SearchResultRowProps {
@@ -7,7 +8,7 @@ interface SearchResultRowProps {
   isError?: boolean;
 }
 
-export function SearchResultRow({ file, onClick, isError }: SearchResultRowProps) {
+function SearchResultRowComponent({ file, onClick, isError }: SearchResultRowProps) {
   if (isError) {
     const errorFile = file as SearchErrorFile;
     return (
@@ -45,3 +46,5 @@ export function SearchResultRow({ file, onClick, isError }: SearchResultRowProps
     </div>
   );
 }
+
+export const SearchResultRow = memo(SearchResultRowComponent);

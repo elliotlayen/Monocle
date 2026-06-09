@@ -51,15 +51,15 @@ export function useTauriEvent<T>(
 // Event hubs (add as needed when backend emits events)
 import type {
   ScanProgressPayload,
-  SearchResultFile,
   SearchProgressPayload,
+  SearchResultsBatchPayload,
 } from "@/features/explorer/types";
 export const scanProgressHub =
   createEventHub<ScanProgressPayload>("scan-progress");
 
 // Search event hubs
-export const searchResultHub =
-  createEventHub<SearchResultFile>("search-result");
+export const searchResultsBatchHub =
+  createEventHub<SearchResultsBatchPayload>("search-results-batch");
 export const searchProgressHub =
   createEventHub<SearchProgressPayload>("search-progress");
 

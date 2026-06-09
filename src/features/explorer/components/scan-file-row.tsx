@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -15,15 +15,18 @@ export interface ScanFileRowProps {
   onFileClick: (filePath: string) => void;
 }
 
-export function ScanFileRow({ file, onFileClick }: ScanFileRowProps) {
+function ScanFileRowComponent({ file, onFileClick }: ScanFileRowProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const errorCount = file.problems.filter(
-    (p) => p.severity === "error"
-  ).length;
-  const warningCount = file.problems.filter(
-    (p) => p.severity === "warning"
-  ).length;
+  const { errorCount, warningCount } = useMemo(() => {
+    let errors = 0;
+    let warnings = 0;
+    for (const problem of file.problems) {
+      if (problem.severity === "error") errors += 1;
+      if (problem.severity === "warning") warnings += 1;
+    }
+    return { errorCount: errors, warningCount: warnings };
+  }, [file.problems]);
 
   const hasProblems = file.problems.length > 0;
 
@@ -123,3 +126,5 @@ export function ScanFileRow({ file, onFileClick }: ScanFileRowProps) {
     </div>
   );
 }
+
+export const ScanFileRow = memo(ScanFileRowComponent);

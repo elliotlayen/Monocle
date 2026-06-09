@@ -1,7 +1,13 @@
-import { useMemo } from "react";
-import { X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
@@ -9,7 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SearchProgress } from "./search-progress";
-import { SearchResultGroup } from "./search-result-group";
+import { SearchResultRow } from "./search-result-row";
 import type {
   SearchResultFile,
   SearchErrorFile,
@@ -31,6 +37,27 @@ interface SearchResultsProps {
   onFileClick: (filePath: string) => void;
 }
 
+type SearchVirtualRow =
+  | {
+      type: "group";
+      key: string;
+      folderPath: string;
+      label: string;
+      fileCount: number;
+      isError: boolean;
+      expanded: boolean;
+    }
+  | {
+      type: "result";
+      key: string;
+      file: SearchResultFile;
+    }
+  | {
+      type: "error";
+      key: string;
+      file: SearchErrorFile;
+    };
+
 export function SearchResults({
   results,
   errors,
@@ -43,6 +70,11 @@ export function SearchResults({
   onClear,
   onFileClick,
 }: SearchResultsProps) {
+  const [expandedOverrides, setExpandedOverrides] = useState<
+    Map<string, boolean>
+  >(new Map());
+  const scrollParentRef = useRef<HTMLDivElement | null>(null);
+
   // Group results by parentFolder
   const groupedResults = useMemo(() => {
     const groups = new Map<string, SearchResultFile[]>();
@@ -56,6 +88,74 @@ export function SearchResults({
     }
     return groups;
   }, [results]);
+
+  const virtualRows = useMemo<SearchVirtualRow[]>(() => {
+    const rows: SearchVirtualRow[] = [];
+    for (const [folderPath, files] of groupedResults.entries()) {
+      const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
+      const expanded = expandedOverrides.get(folderPath) ?? true;
+      rows.push({
+        type: "group",
+        key: `group:${folderPath}`,
+        folderPath,
+        label: folderName,
+        fileCount: files.length,
+        isError: false,
+        expanded,
+      });
+      if (expanded) {
+        for (const file of files) {
+          rows.push({
+            type: "result",
+            key: `result:${file.filePath}`,
+            file,
+          });
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      const folderPath = "errors";
+      const expanded = expandedOverrides.get(folderPath) ?? false;
+      rows.push({
+        type: "group",
+        key: "group:errors",
+        folderPath,
+        label: `Errors (${errors.length} ${errors.length === 1 ? "file" : "files"})`,
+        fileCount: errors.length,
+        isError: true,
+        expanded,
+      });
+      if (expanded) {
+        for (const file of errors) {
+          rows.push({
+            type: "error",
+            key: `error:${file.filePath}`,
+            file,
+          });
+        }
+      }
+    }
+
+    return rows;
+  }, [groupedResults, errors, expandedOverrides]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualRows.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 28,
+    overscan: 8,
+    getItemKey: (index) => virtualRows[index]?.key ?? index,
+  });
+
+  const toggleGroup = (folderPath: string) => {
+    setExpandedOverrides((prev) => {
+      const next = new Map(prev);
+      const defaultExpanded = folderPath !== "errors";
+      next.set(folderPath, !(prev.get(folderPath) ?? defaultExpanded));
+      return next;
+    });
+  };
 
   // Summary header stats
   const summaryText = (() => {
@@ -124,34 +224,75 @@ export function SearchResults({
 
       {/* Grouped results */}
       {(results.length > 0 || errors.length > 0) && (
-        <ScrollArea className="flex-1">
-          <div className="py-1">
-            {/* Normal result groups */}
-            {Array.from(groupedResults.entries()).map(
-              ([folderPath, files]) => (
-                <SearchResultGroup
-                  key={folderPath}
-                  folderPath={folderPath}
-                  files={files}
-                  defaultExpanded
-                  onFileClick={onFileClick}
-                />
-              )
-            )}
+        <div ref={scrollParentRef} className="flex-1 overflow-auto">
+          <div
+            className="relative py-1"
+            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const row = virtualRows[virtualRow.index];
+              if (!row) return null;
 
-            {/* Error group (rendered last, collapsed by default) */}
-            {errors.length > 0 && (
-              <SearchResultGroup
-                folderPath="errors"
-                files={[]}
-                errorFiles={errors}
-                defaultExpanded={false}
-                onFileClick={onFileClick}
-                isError
-              />
-            )}
+              return (
+                <div
+                  key={virtualRow.key}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="absolute left-0 top-0 w-full"
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {row.type === "group" ? (
+                    <div
+                      className="flex items-center gap-2 px-4 py-1 cursor-pointer hover:bg-accent/50"
+                      onClick={() => toggleGroup(row.folderPath)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          toggleGroup(row.folderPath);
+                        }
+                      }}
+                      aria-expanded={row.expanded}
+                    >
+                      {row.expanded ? (
+                        <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                      )}
+                      {row.isError ? (
+                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-destructive" />
+                      ) : (
+                        <Folder className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                      )}
+                      <span
+                        className={`text-xs font-semibold truncate ${
+                          row.isError ? "text-destructive" : ""
+                        }`}
+                      >
+                        {row.label}
+                      </span>
+                      <span className="flex-1" />
+                      {!row.isError && (
+                        <span className="text-xs text-muted-foreground">
+                          {row.fileCount}{" "}
+                          {row.fileCount === 1 ? "file" : "files"}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <SearchResultRow
+                      file={row.file}
+                      onClick={() => onFileClick(row.file.filePath)}
+                      isError={row.type === "error"}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </ScrollArea>
+        </div>
       )}
     </div>
   );

@@ -122,7 +122,10 @@ interface ExplorerStore {
   setSearchFilePattern: (pattern: string) => void;
   startContentSearch: (folderPaths: string[], scopeLabel: string) => Promise<void>;
   updateSearchProgress: (payload: SearchProgressPayloadType) => void;
-  appendSearchResult: (payload: SearchResultFile) => void;
+  appendSearchResults: (
+    results: SearchResultFile[],
+    errors: SearchErrorFile[]
+  ) => void;
   cancelContentSearch: () => Promise<void>;
   clearSearchResults: () => void;
   setActiveSearchTerms: (terms: string[] | null) => void;
@@ -809,48 +812,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   updateScanProgress: (payload: ScanProgressPayload) => {
     const { scanOperationId } = get();
     if (payload.operationId !== scanOperationId) return;
-    // Update validation cache entry for the scanned file
-    const nextCache = new Map(get().validationCache);
-    nextCache.set(payload.filePath, {
-      problems: [], // Minimal entry; full problems come with ScanSummary
-      encoding: "",
-      hasBom: false,
-    });
-
-    // Set a synthetic problem entry based on status so getValidationStatus works
-    if (payload.status === "error") {
-      nextCache.set(payload.filePath, {
-        problems: [
-          {
-            line: 0,
-            column: 0,
-            endColumn: 0,
-            message: "Has errors (details available after scan completes)",
-            severity: "error",
-            code: "scan-preview",
-          },
-        ],
-        encoding: "",
-        hasBom: false,
-      });
-    } else if (payload.status === "warning") {
-      nextCache.set(payload.filePath, {
-        problems: [
-          {
-            line: 0,
-            column: 0,
-            endColumn: 0,
-            message: "Has warnings (details available after scan completes)",
-            severity: "warning",
-            code: "scan-preview",
-          },
-        ],
-        encoding: "",
-        hasBom: false,
-      });
-    }
-
-    set({ scanProgress: payload, validationCache: nextCache });
+    set({ scanProgress: payload });
   },
 
   cancelScan: async () => {
@@ -1028,26 +990,38 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     set({ searchProgress: payload });
   },
 
-  appendSearchResult: (payload: SearchResultFile) => {
-    if (payload.fileName.startsWith("ERROR:")) {
-      // Parse as error file
-      const errorFile: SearchErrorFile = {
-        filePath: payload.filePath,
-        fileName: payload.fileName,
-        parentFolder: payload.parentFolder,
-        errorMessage: payload.fileName.substring("ERROR:".length).trim(),
-      };
-      set((state) => ({
-        searchErrors: [...state.searchErrors, errorFile],
-      }));
-    } else {
-      set((state) => {
-        if (state.searchResults.some((r) => r.filePath === payload.filePath)) return state;
-        const updated = [...state.searchResults, payload];
-        updated.sort((a, b) => a.fileName.localeCompare(b.fileName));
-        return { searchResults: updated };
+  appendSearchResults: (results, errors) => {
+    if (results.length === 0 && errors.length === 0) return;
+
+    set((state) => {
+      const seenResultPaths = new Set(state.searchResults.map((r) => r.filePath));
+      const nextResults = [...state.searchResults];
+      for (const result of results) {
+        if (seenResultPaths.has(result.filePath)) continue;
+        seenResultPaths.add(result.filePath);
+        nextResults.push(result);
+      }
+
+      const seenErrorPaths = new Set(state.searchErrors.map((r) => r.filePath));
+      const nextErrors = [...state.searchErrors];
+      for (const error of errors) {
+        if (seenErrorPaths.has(error.filePath)) continue;
+        seenErrorPaths.add(error.filePath);
+        nextErrors.push(error);
+      }
+
+      nextResults.sort((a, b) => {
+        const folderCompare = a.parentFolder.localeCompare(b.parentFolder);
+        if (folderCompare !== 0) return folderCompare;
+        return a.fileName.localeCompare(b.fileName);
       });
-    }
+      nextErrors.sort((a, b) => a.fileName.localeCompare(b.fileName));
+
+      return {
+        searchResults: nextResults,
+        searchErrors: nextErrors,
+      };
+    });
   },
 
   cancelContentSearch: async () => {

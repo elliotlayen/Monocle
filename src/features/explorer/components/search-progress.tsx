@@ -9,7 +9,11 @@ interface SearchProgressProps {
 
 export function SearchProgress({ progress, onCancel }: SearchProgressProps) {
   const filesScanned = progress?.filesScanned ?? 0;
-  const totalFiles = progress?.totalFiles ?? 0;
+  const totalFiles = progress?.totalFiles ?? null;
+  const progressText =
+    totalFiles == null
+      ? `Searching... ${filesScanned} files scanned`
+      : `Searching... ${filesScanned} of ${totalFiles} files`;
 
   return (
     <div
@@ -19,7 +23,7 @@ export function SearchProgress({ progress, onCancel }: SearchProgressProps) {
     >
       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       <span className="text-xs text-muted-foreground flex-1">
-        Searching... {filesScanned} of {totalFiles} files
+        {progressText}
       </span>
       <Button
         variant="outline"

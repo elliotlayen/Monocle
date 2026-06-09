@@ -78,7 +78,7 @@ export interface ScanProgressPayload {
   errorCount: number;
   warningCount: number;
   filesProcessed: number;
-  totalFiles: number;
+  totalFiles: number | null;
   totalErrors: number;
   totalWarnings: number;
   totalClean: number;
@@ -132,10 +132,16 @@ export interface SearchErrorFile {
 
 export interface SearchProgressPayload {
   filesScanned: number;
-  totalFiles: number;
+  totalFiles: number | null;
   matchesFound: number;
   filesMatched: number;
   operationId: string;
+}
+
+export interface SearchResultsBatchPayload {
+  operationId: string;
+  results: SearchResultFile[];
+  errors: SearchErrorFile[];
 }
 
 export interface SearchSummary {

@@ -1,10 +1,11 @@
 use crate::state::{AppSettings, AppState};
-use crate::validation::{detect_and_decode, validate_characters};
 use crate::validation::validator::ValidationProblem;
+use crate::validation::{detect_and_decode, validate_characters};
 use glob::Pattern;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
@@ -14,6 +15,10 @@ use walkdir::WalkDir;
 /// Maximum file size to read during bulk scan (50 MB).
 /// Files larger than this are silently skipped to prevent unbounded memory consumption.
 const MAX_SCAN_FILE_SIZE: u64 = 50 * 1024 * 1024;
+const PROGRESS_FILE_BATCH: u32 = 200;
+const PROGRESS_MIN_INTERVAL: Duration = Duration::from_millis(150);
+const SEARCH_RESULT_BATCH_SIZE: usize = 50;
+const SEARCH_RESULT_BATCH_INTERVAL: Duration = Duration::from_millis(150);
 
 pub struct ExplorerState {
     pub active_listings: Mutex<HashMap<String, CancellationToken>>,
@@ -228,6 +233,44 @@ pub fn parse_search_terms(query: &str) -> Vec<String> {
     terms
 }
 
+fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Result<Option<u32>> {
+    let file = std::fs::File::open(file_path)?;
+    let mut reader = BufReader::new(file);
+    let mut buffer = Vec::new();
+    let mut found_terms = vec![false; terms.len()];
+    let mut match_count: u32 = 0;
+
+    loop {
+        buffer.clear();
+        let read = reader.read_until(b'\n', &mut buffer)?;
+        if read == 0 {
+            break;
+        }
+
+        if buffer.last() == Some(&b'\n') {
+            buffer.pop();
+        }
+        if buffer.last() == Some(&b'\r') {
+            buffer.pop();
+        }
+
+        let line = String::from_utf8_lossy(&buffer).to_lowercase();
+        for (idx, term) in terms.iter().enumerate() {
+            let count = line.matches(term.as_str()).count().min(u32::MAX as usize) as u32;
+            if count > 0 {
+                found_terms[idx] = true;
+                match_count = match_count.saturating_add(count);
+            }
+        }
+    }
+
+    if found_terms.into_iter().all(|found| found) {
+        Ok(Some(match_count))
+    } else {
+        Ok(None)
+    }
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResultPayload {
@@ -240,9 +283,26 @@ pub struct SearchResultPayload {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SearchErrorPayload {
+    pub file_path: String,
+    pub file_name: String,
+    pub parent_folder: String,
+    pub error_message: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResultsBatchPayload {
+    pub operation_id: String,
+    pub results: Vec<SearchResultPayload>,
+    pub errors: Vec<SearchErrorPayload>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SearchProgressPayload {
     pub files_scanned: u32,
-    pub total_files: u32,
+    pub total_files: Option<u32>,
     pub matches_found: u32,
     pub files_matched: u32,
     pub operation_id: String,
@@ -298,160 +358,206 @@ pub async fn content_search_cmd(
     let scope_label_clone = scope_label.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        // Phase 1: Collect matching files across all folder paths
-        let mut matching_files: Vec<PathBuf> = Vec::new();
-
-        for folder_path in &paths {
-            if token_clone.is_cancelled() {
-                break;
-            }
-
-            // Validate path exists before walking
-            match std::fs::metadata(folder_path) {
-                Ok(m) if m.is_dir() => {}
-                Ok(_) => continue, // Not a directory, skip
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    // Unreachable path -- skip
-                    continue;
-                }
-                Err(_) => continue,
-            }
-
-            let files: Vec<PathBuf> = WalkDir::new(folder_path)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| !e.file_type().is_dir())
-                .filter(|e| {
-                    e.file_name()
-                        .to_str()
-                        .map(|n| pattern.matches(n))
-                        .unwrap_or(false)
-                })
-                .map(|e| e.into_path())
-                .collect();
-
-            matching_files.extend(files);
-        }
-
-        let total_files = matching_files.len().min(u32::MAX as usize) as u32;
         let mut files_scanned: u32 = 0;
         let mut total_matches: u32 = 0;
         let mut files_matched: u32 = 0;
         let mut cancelled = false;
         let mut last_emit_time = std::time::Instant::now();
+        let mut last_batch_emit_time = std::time::Instant::now();
         let mut consecutive_read_failures: u32 = 0;
+        let mut pending_results: Vec<SearchResultPayload> = Vec::new();
+        let mut pending_errors: Vec<SearchErrorPayload> = Vec::new();
 
-        // Phase 2: Search each file
-        for (idx, file_path) in matching_files.iter().enumerate() {
+        let flush_search_batches =
+            |force: bool,
+             pending_results: &mut Vec<SearchResultPayload>,
+             pending_errors: &mut Vec<SearchErrorPayload>,
+             last_batch_emit_time: &mut std::time::Instant| {
+                let has_payload = !pending_results.is_empty() || !pending_errors.is_empty();
+                if !has_payload {
+                    return;
+                }
+                let batch_full = pending_results.len().saturating_add(pending_errors.len())
+                    >= SEARCH_RESULT_BATCH_SIZE;
+                if !force
+                    && !batch_full
+                    && last_batch_emit_time.elapsed() < SEARCH_RESULT_BATCH_INTERVAL
+                {
+                    return;
+                }
+
+                let payload = SearchResultsBatchPayload {
+                    operation_id: operation_id.clone(),
+                    results: std::mem::take(pending_results),
+                    errors: std::mem::take(pending_errors),
+                };
+                let _ = app.emit("search-results-batch", payload);
+                *last_batch_emit_time = std::time::Instant::now();
+            };
+
+        let emit_progress = |force: bool,
+                             files_scanned: u32,
+                             total_matches: u32,
+                             files_matched: u32,
+                             last_emit_time: &mut std::time::Instant| {
+            let batch_ready = files_scanned % PROGRESS_FILE_BATCH == 0;
+            if !force && !batch_ready && last_emit_time.elapsed() < PROGRESS_MIN_INTERVAL {
+                return;
+            }
+            let progress_payload = SearchProgressPayload {
+                files_scanned,
+                total_files: None,
+                matches_found: total_matches,
+                files_matched,
+                operation_id: operation_id.clone(),
+            };
+            let _ = app.emit("search-progress", progress_payload);
+            *last_emit_time = std::time::Instant::now();
+        };
+
+        'folders: for folder_path in &paths {
             if token_clone.is_cancelled() {
                 cancelled = true;
                 break;
             }
 
-            let file_name = file_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("")
-                .to_string();
-
-            let parent_folder = file_path
-                .parent()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default();
-
-            // Skip files that exceed size limit
-            match std::fs::metadata(file_path) {
-                Ok(m) if m.len() > MAX_SCAN_FILE_SIZE => {
-                    files_scanned = files_scanned.saturating_add(1);
-                    consecutive_read_failures = 0;
-                    continue;
-                }
-                Err(_) => {
-                    consecutive_read_failures = consecutive_read_failures.saturating_add(1);
-                    if consecutive_read_failures >= 10 {
-                        // Network share may be unreachable
-                        cancelled = true;
-                        break;
-                    }
-                    files_scanned = files_scanned.saturating_add(1);
-                    continue;
-                }
-                _ => {
-                    consecutive_read_failures = 0;
-                }
+            match std::fs::metadata(folder_path) {
+                Ok(m) if m.is_dir() => {}
+                Ok(_) => continue,
+                Err(_) => continue,
             }
 
-            // Read and decode file
-            let raw_bytes = match std::fs::read(file_path) {
-                Ok(bytes) => {
-                    consecutive_read_failures = 0;
-                    bytes
+            for entry_result in WalkDir::new(folder_path).into_iter() {
+                if token_clone.is_cancelled() {
+                    cancelled = true;
+                    break 'folders;
                 }
-                Err(_) => {
-                    consecutive_read_failures = consecutive_read_failures.saturating_add(1);
-                    if consecutive_read_failures >= 10 {
-                        cancelled = true;
-                        break;
-                    }
 
-                    // Emit error result
-                    let error_payload = SearchResultPayload {
-                        file_path: file_path.to_string_lossy().to_string(),
-                        file_name: format!("ERROR: Failed to read file"),
-                        parent_folder: parent_folder.clone(),
-                        match_count: 0,
-                        operation_id: operation_id.clone(),
-                    };
-                    let _ = app.emit("search-result", error_payload);
-
-                    files_scanned = files_scanned.saturating_add(1);
-                    continue;
-                }
-            };
-
-            let decode_result = detect_and_decode(&raw_bytes);
-            let content_lower = decode_result.content.to_lowercase();
-
-            // AND logic: all terms must be present
-            let all_present = terms.iter().all(|term| content_lower.contains(term.as_str()));
-
-            if all_present {
-                // Count total matches across all terms
-                let match_count: u32 = terms
-                    .iter()
-                    .map(|term| content_lower.matches(term.as_str()).count() as u32)
-                    .sum();
-
-                total_matches = total_matches.saturating_add(match_count);
-                files_matched = files_matched.saturating_add(1);
-
-                let result_payload = SearchResultPayload {
-                    file_path: file_path.to_string_lossy().to_string(),
-                    file_name: file_name.clone(),
-                    parent_folder: parent_folder.clone(),
-                    match_count,
-                    operation_id: operation_id.clone(),
+                let entry = match entry_result {
+                    Ok(entry) => entry,
+                    Err(_) => continue,
                 };
-                let _ = app.emit("search-result", result_payload);
-            }
 
-            files_scanned = files_scanned.saturating_add(1);
+                if entry.file_type().is_dir() {
+                    continue;
+                }
 
-            // Throttle progress events at 50ms intervals
-            let is_last = idx == matching_files.len() - 1;
-            let elapsed = last_emit_time.elapsed();
-            if elapsed >= Duration::from_millis(50) || is_last {
-                let progress_payload = SearchProgressPayload {
+                if !entry
+                    .file_name()
+                    .to_str()
+                    .map(|n| pattern.matches(n))
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+
+                let file_path = entry.path();
+                let file_name = file_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                let parent_folder = file_path
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                match std::fs::metadata(file_path) {
+                    Ok(m) if m.len() > MAX_SCAN_FILE_SIZE => {
+                        files_scanned = files_scanned.saturating_add(1);
+                        consecutive_read_failures = 0;
+                        emit_progress(
+                            false,
+                            files_scanned,
+                            total_matches,
+                            files_matched,
+                            &mut last_emit_time,
+                        );
+                        continue;
+                    }
+                    Err(_) => {
+                        consecutive_read_failures = consecutive_read_failures.saturating_add(1);
+                        files_scanned = files_scanned.saturating_add(1);
+                        if consecutive_read_failures >= 10 {
+                            cancelled = true;
+                            break 'folders;
+                        }
+                        emit_progress(
+                            false,
+                            files_scanned,
+                            total_matches,
+                            files_matched,
+                            &mut last_emit_time,
+                        );
+                        continue;
+                    }
+                    _ => {
+                        consecutive_read_failures = 0;
+                    }
+                }
+
+                match search_file_line_by_line(file_path, &terms) {
+                    Ok(Some(match_count)) => {
+                        consecutive_read_failures = 0;
+                        total_matches = total_matches.saturating_add(match_count);
+                        files_matched = files_matched.saturating_add(1);
+                        pending_results.push(SearchResultPayload {
+                            file_path: file_path.to_string_lossy().to_string(),
+                            file_name,
+                            parent_folder,
+                            match_count,
+                            operation_id: operation_id.clone(),
+                        });
+                    }
+                    Ok(None) => {
+                        consecutive_read_failures = 0;
+                    }
+                    Err(_) => {
+                        consecutive_read_failures = consecutive_read_failures.saturating_add(1);
+                        pending_errors.push(SearchErrorPayload {
+                            file_path: file_path.to_string_lossy().to_string(),
+                            file_name,
+                            parent_folder,
+                            error_message: "Failed to read file".to_string(),
+                        });
+                        if consecutive_read_failures >= 10 {
+                            cancelled = true;
+                            break 'folders;
+                        }
+                    }
+                }
+
+                files_scanned = files_scanned.saturating_add(1);
+                flush_search_batches(
+                    false,
+                    &mut pending_results,
+                    &mut pending_errors,
+                    &mut last_batch_emit_time,
+                );
+                emit_progress(
+                    false,
                     files_scanned,
-                    total_files,
-                    matches_found: total_matches,
+                    total_matches,
                     files_matched,
-                    operation_id: operation_id.clone(),
-                };
-                let _ = app.emit("search-progress", progress_payload);
-                last_emit_time = std::time::Instant::now();
+                    &mut last_emit_time,
+                );
             }
         }
+
+        flush_search_batches(
+            true,
+            &mut pending_results,
+            &mut pending_errors,
+            &mut last_batch_emit_time,
+        );
+        emit_progress(
+            true,
+            files_scanned,
+            total_matches,
+            files_matched,
+            &mut last_emit_time,
+        );
 
         SearchSummaryResult {
             query: query_clone,
@@ -486,7 +592,7 @@ pub struct ScanProgressPayload {
     pub error_count: u32,
     pub warning_count: u32,
     pub files_processed: u32,
-    pub total_files: u32,
+    pub total_files: Option<u32>,
     pub total_errors: u32,
     pub total_warnings: u32,
     pub total_clean: u32,
@@ -519,6 +625,90 @@ pub struct ScanSummary {
     pub cancelled: bool,
 }
 
+fn validate_file_for_scan(
+    file_path: &Path,
+    folder_root: &str,
+) -> std::io::Result<Option<ScanFileResult>> {
+    let metadata = std::fs::metadata(file_path)?;
+    if metadata.len() > MAX_SCAN_FILE_SIZE {
+        return Ok(None);
+    }
+
+    let raw_bytes = std::fs::read(file_path)?;
+    let has_bom = raw_bytes.starts_with(&[0xEF, 0xBB, 0xBF])
+        || raw_bytes.starts_with(&[0xFF, 0xFE])
+        || raw_bytes.starts_with(&[0xFE, 0xFF]);
+
+    let (problems, encoding, has_bom) = if !has_bom {
+        match std::str::from_utf8(&raw_bytes) {
+            Ok(content) => (
+                validate_characters(content, false, "UTF-8", false),
+                "UTF-8".to_string(),
+                false,
+            ),
+            Err(_) => {
+                let decode_result = detect_and_decode(&raw_bytes);
+                let problems = validate_characters(
+                    &decode_result.content,
+                    decode_result.had_errors,
+                    &decode_result.encoding_name,
+                    decode_result.has_bom,
+                );
+                (problems, decode_result.encoding_name, decode_result.has_bom)
+            }
+        }
+    } else {
+        let decode_result = detect_and_decode(&raw_bytes);
+        let problems = validate_characters(
+            &decode_result.content,
+            decode_result.had_errors,
+            &decode_result.encoding_name,
+            decode_result.has_bom,
+        );
+        (problems, decode_result.encoding_name, decode_result.has_bom)
+    };
+
+    let file_error_count = problems
+        .iter()
+        .filter(|p| p.severity == "error")
+        .count()
+        .min(u32::MAX as usize) as u32;
+    let file_warning_count = problems
+        .iter()
+        .filter(|p| p.severity == "warning")
+        .count()
+        .min(u32::MAX as usize) as u32;
+
+    let status = if file_error_count > 0 {
+        "error"
+    } else if file_warning_count > 0 {
+        "warning"
+    } else {
+        "clean"
+    };
+
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    let relative_path = file_path
+        .strip_prefix(folder_root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| file_path.to_string_lossy().to_string());
+
+    Ok(Some(ScanFileResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        file_name,
+        relative_path,
+        status: status.to_string(),
+        problems,
+        encoding,
+        has_bom,
+    }))
+}
+
 #[tauri::command]
 pub async fn bulk_scan_cmd(
     app: AppHandle,
@@ -547,21 +737,7 @@ pub async fn bulk_scan_cmd(
     let file_pattern_clone = file_pattern.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        // Phase 1: Collect matching files
-        let matching_files: Vec<PathBuf> = WalkDir::new(&folder_path_clone)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| !e.file_type().is_dir())
-            .filter(|e| {
-                e.file_name()
-                    .to_str()
-                    .map(|n| pattern.matches(n))
-                    .unwrap_or(false)
-            })
-            .map(|e| e.into_path())
-            .collect();
-
-        let total_files = matching_files.len().min(u32::MAX as usize) as u32;
+        let mut total_files: u32 = 0;
         let mut files_processed: u32 = 0;
         let mut total_errors: u32 = 0;
         let mut total_warnings: u32 = 0;
@@ -572,12 +748,24 @@ pub async fn bulk_scan_cmd(
         let mut file_results: Vec<ScanFileResult> = Vec::new();
         let mut cancelled = false;
         let mut last_emit_time = std::time::Instant::now();
+        let mut last_progress_file_path = Path::new(&folder_path_clone).to_path_buf();
+        let mut last_progress_status = "clean".to_string();
+        let mut last_progress_error_count: u32 = 0;
+        let mut last_progress_warning_count: u32 = 0;
 
-        // Phase 2: Validate each file
-        for (idx, file_path) in matching_files.iter().enumerate() {
-            if token_clone.is_cancelled() {
-                cancelled = true;
-                break;
+        let emit_progress = |force: bool,
+                             file_path: &Path,
+                             status: &str,
+                             error_count: u32,
+                             warning_count: u32,
+                             files_processed: u32,
+                             total_errors: u32,
+                             total_warnings: u32,
+                             total_clean: u32,
+                             last_emit_time: &mut std::time::Instant| {
+            let batch_ready = files_processed % PROGRESS_FILE_BATCH == 0;
+            if !force && !batch_ready && last_emit_time.elapsed() < PROGRESS_MIN_INTERVAL {
+                return;
             }
 
             let file_name = file_path
@@ -585,97 +773,130 @@ pub async fn bulk_scan_cmd(
                 .and_then(|n| n.to_str())
                 .unwrap_or("")
                 .to_string();
+            let payload = ScanProgressPayload {
+                operation_id: op_id.clone(),
+                file_path: file_path.to_string_lossy().to_string(),
+                file_name,
+                status: status.to_string(),
+                error_count,
+                warning_count,
+                files_processed,
+                total_files: None,
+                total_errors,
+                total_warnings,
+                total_clean,
+            };
+            let _ = app.emit("scan-progress", payload);
+            *last_emit_time = std::time::Instant::now();
+        };
 
-            let relative_path = file_path
-                .strip_prefix(&folder_path_clone)
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| file_path.to_string_lossy().to_string());
-
-            // Skip files that exceed the size limit to prevent excessive memory use
-            match std::fs::metadata(file_path) {
-                Ok(m) if m.len() > MAX_SCAN_FILE_SIZE => {
-                    files_processed += 1;
-                    continue;
-                }
-                Err(_) => {
-                    files_processed += 1;
-                    continue;
-                }
-                _ => {}
+        for entry_result in WalkDir::new(&folder_path_clone).into_iter() {
+            if token_clone.is_cancelled() {
+                cancelled = true;
+                break;
             }
 
-            // Try to read and validate the file
-            let raw_bytes = match std::fs::read(file_path) {
-                Ok(bytes) => bytes,
-                Err(_) => {
-                    // Skip unreadable files
-                    files_processed += 1;
-                    continue;
-                }
+            let entry = match entry_result {
+                Ok(entry) => entry,
+                Err(_) => continue,
             };
 
-            let decode_result = detect_and_decode(&raw_bytes);
-            let problems = validate_characters(
-                &decode_result.content,
-                decode_result.had_errors,
-                &decode_result.encoding_name,
-                decode_result.has_bom,
-            );
-
-            let file_error_count = problems.iter().filter(|p| p.severity == "error").count().min(u32::MAX as usize) as u32;
-            let file_warning_count = problems.iter().filter(|p| p.severity == "warning").count().min(u32::MAX as usize) as u32;
-
-            let status = if file_error_count > 0 {
-                "error"
-            } else if file_warning_count > 0 {
-                "warning"
-            } else {
-                "clean"
-            };
-
-            total_errors = total_errors.saturating_add(file_error_count);
-            total_warnings = total_warnings.saturating_add(file_warning_count);
-            match status {
-                "error" => error_files = error_files.saturating_add(1),
-                "warning" => warning_files = warning_files.saturating_add(1),
-                _ => {
-                    total_clean = total_clean.saturating_add(1);
-                    clean_files = clean_files.saturating_add(1);
-                }
+            if entry.file_type().is_dir() {
+                continue;
             }
 
+            if !entry
+                .file_name()
+                .to_str()
+                .map(|n| pattern.matches(n))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            total_files = total_files.saturating_add(1);
+            let file_path = entry.path();
+            last_progress_file_path = file_path.to_path_buf();
+
+            let scan_result = validate_file_for_scan(file_path, &folder_path_clone);
             files_processed = files_processed.saturating_add(1);
 
-            file_results.push(ScanFileResult {
-                file_path: file_path.to_string_lossy().to_string(),
-                file_name: file_name.clone(),
-                relative_path,
-                status: status.to_string(),
-                problems,
-                encoding: decode_result.encoding_name,
-                has_bom: decode_result.has_bom,
-            });
+            match scan_result {
+                Ok(Some(file_result)) => {
+                    let file_error_count = file_result
+                        .problems
+                        .iter()
+                        .filter(|p| p.severity == "error")
+                        .count()
+                        .min(u32::MAX as usize) as u32;
+                    let file_warning_count = file_result
+                        .problems
+                        .iter()
+                        .filter(|p| p.severity == "warning")
+                        .count()
+                        .min(u32::MAX as usize) as u32;
 
-            // Throttle event emission: emit at most every 50ms, or on last file
-            let is_last = idx == matching_files.len() - 1;
-            let elapsed = last_emit_time.elapsed();
-            if elapsed >= Duration::from_millis(50) || is_last {
-                let payload = ScanProgressPayload {
-                    operation_id: op_id.clone(),
-                    file_path: file_path.to_string_lossy().to_string(),
-                    file_name,
-                    status: status.to_string(),
-                    error_count: file_error_count,
-                    warning_count: file_warning_count,
-                    files_processed,
-                    total_files,
-                    total_errors,
-                    total_warnings,
-                    total_clean,
-                };
-                let _ = app.emit("scan-progress", payload);
-                last_emit_time = std::time::Instant::now();
+                    total_errors = total_errors.saturating_add(file_error_count);
+                    total_warnings = total_warnings.saturating_add(file_warning_count);
+                    last_progress_status = file_result.status.clone();
+                    last_progress_error_count = file_error_count;
+                    last_progress_warning_count = file_warning_count;
+                    match file_result.status.as_str() {
+                        "error" => error_files = error_files.saturating_add(1),
+                        "warning" => warning_files = warning_files.saturating_add(1),
+                        _ => {
+                            total_clean = total_clean.saturating_add(1);
+                            clean_files = clean_files.saturating_add(1);
+                        }
+                    }
+
+                    emit_progress(
+                        false,
+                        file_path,
+                        &file_result.status,
+                        file_error_count,
+                        file_warning_count,
+                        files_processed,
+                        total_errors,
+                        total_warnings,
+                        total_clean,
+                        &mut last_emit_time,
+                    );
+                    file_results.push(file_result);
+                }
+                Ok(None) | Err(_) => {
+                    last_progress_status = "clean".to_string();
+                    last_progress_error_count = 0;
+                    last_progress_warning_count = 0;
+                    emit_progress(
+                        false,
+                        file_path,
+                        "clean",
+                        0,
+                        0,
+                        files_processed,
+                        total_errors,
+                        total_warnings,
+                        total_clean,
+                        &mut last_emit_time,
+                    );
+                }
             }
+        }
+
+        if files_processed > 0 {
+            emit_progress(
+                true,
+                &last_progress_file_path,
+                &last_progress_status,
+                last_progress_error_count,
+                last_progress_warning_count,
+                files_processed,
+                total_errors,
+                total_warnings,
+                total_clean,
+                &mut last_emit_time,
+            );
         }
 
         ScanSummary {
@@ -788,6 +1009,39 @@ mod tests {
     }
 
     #[test]
+    fn test_search_file_line_by_line_requires_all_terms_and_counts() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("sample.xml");
+        std::fs::write(&file_path, "Alpha beta\nbeta gamma\nalpha beta\n").unwrap();
+
+        let terms = vec!["alpha".to_string(), "beta".to_string()];
+        let result = search_file_line_by_line(&file_path, &terms).unwrap();
+        assert_eq!(result, Some(5));
+
+        let missing_terms = vec!["alpha".to_string(), "delta".to_string()];
+        let missing = search_file_line_by_line(&file_path, &missing_terms).unwrap();
+        assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn test_validate_file_for_scan_utf8_fast_path_matches_existing_validation() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("bad.xml");
+        let content = "line1\nline2\u{0000}\n";
+        std::fs::write(&file_path, content).unwrap();
+
+        let result = validate_file_for_scan(&file_path, temp_dir.path().to_str().unwrap())
+            .unwrap()
+            .unwrap();
+        let expected = validate_characters(content, false, "UTF-8", false);
+
+        assert_eq!(result.status, "error");
+        assert_eq!(result.encoding, "UTF-8");
+        assert_eq!(result.has_bom, false);
+        assert_eq!(result.problems, expected);
+    }
+
+    #[test]
     fn test_glob_pattern_matching() {
         let xml_pattern = Pattern::new("*.xml").unwrap();
         assert!(xml_pattern.matches("file.xml"));
@@ -873,7 +1127,7 @@ mod tests {
             error_count: 2,
             warning_count: 1,
             files_processed: 5,
-            total_files: 10,
+            total_files: Some(10),
             total_errors: 8,
             total_warnings: 3,
             total_clean: 2,
