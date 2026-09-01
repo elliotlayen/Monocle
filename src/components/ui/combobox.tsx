@@ -207,7 +207,7 @@ export function Combobox({
             <div
               ref={dropdownRef}
               style={dropdownStyle}
-              className="rounded-md border bg-popover text-popover-foreground shadow-md pointer-events-auto"
+              className="rounded-md border bg-popover/95 backdrop-blur-xl text-popover-foreground shadow-[var(--panel-shadow)] pointer-events-auto"
             >
               {filteredOptions.length > 0 ? (
                 <ul className="max-h-60 overflow-auto py-1">
@@ -215,7 +215,7 @@ export function Combobox({
                     <li
                       key={option.value}
                       className={cn(
-                        "relative flex cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                        "relative flex cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground",
                         value === option.value && "bg-accent/50"
                       )}
                       onMouseDown={(e) => {
@@ -241,7 +241,7 @@ export function Combobox({
                   ))}
                 </ul>
               ) : (
-                <div className="py-3 text-center text-sm text-muted-foreground">
+                <div className="py-3 text-center text-xs text-muted-foreground">
                   No options found
                 </div>
               )}
