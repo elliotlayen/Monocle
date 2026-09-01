@@ -51,11 +51,12 @@ import {
 } from "./node-width";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
 import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
-import { DetailPopover } from "./detail-popover";
+import { DetailInspector } from "./detail-inspector";
+import { DetailDrawer } from "./detail-drawer";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { useDetailPopover } from "../hooks/use-detail-popover";
+import { useDetailView } from "../hooks/use-detail-view";
 import type { DetailSidebarData } from "./detail-content";
 import {
   menuToggleSidebarHub,
@@ -768,12 +769,11 @@ function SchemaGraphInner({
     };
   } | null>(null);
   const {
-    open: popoverOpen,
-    data: popoverData,
-    anchorRect,
-    openPopover,
-    closePopover,
-  } = useDetailPopover();
+    open: detailOpen,
+    data: detailData,
+    openDetail,
+    closeDetail,
+  } = useDetailView();
   const {
     selectedEdgeIds,
     toggleEdgeSelection,
@@ -789,6 +789,7 @@ function SchemaGraphInner({
     focusExpandThreshold,
     edgeLabelMode,
     showMiniMap,
+    detailViewMode,
     nodePositions: storedNodePositions,
     updateNodePosition,
     removeTable,
@@ -817,6 +818,7 @@ function SchemaGraphInner({
       focusExpandThreshold: state.focusExpandThreshold,
       edgeLabelMode: state.edgeLabelMode,
       showMiniMap: state.showMiniMap,
+      detailViewMode: state.detailViewMode,
       nodePositions: state.nodePositions,
       updateNodePosition: state.updateNodePosition,
       removeTable: state.removeTable,
@@ -1069,53 +1071,52 @@ function SchemaGraphInner({
   );
 
   const handleNodeClick = useCallback(
-    (data: DetailSidebarData, event: React.MouseEvent) => {
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      openPopover(data, rect);
+    (data: DetailSidebarData) => {
+      openDetail(data);
     },
-    [openPopover]
+    [openDetail]
   );
 
   const handleTableClick = useCallback(
-    (table: TableNodeType, event: React.MouseEvent) => {
-      handleNodeClick({ type: "table", data: table }, event);
+    (table: TableNodeType, _event: React.MouseEvent) => {
+      handleNodeClick({ type: "table", data: table });
     },
     [handleNodeClick]
   );
 
   const handleViewClick = useCallback(
-    (view: ViewNodeType, event: React.MouseEvent) => {
-      handleNodeClick({ type: "view", data: view }, event);
+    (view: ViewNodeType, _event: React.MouseEvent) => {
+      handleNodeClick({ type: "view", data: view });
     },
     [handleNodeClick]
   );
 
   const handleTriggerClick = useCallback(
-    (trigger: Trigger, event: React.MouseEvent) => {
-      handleNodeClick({ type: "trigger", data: trigger }, event);
+    (trigger: Trigger, _event: React.MouseEvent) => {
+      handleNodeClick({ type: "trigger", data: trigger });
     },
     [handleNodeClick]
   );
 
   const handleProcedureClick = useCallback(
-    (procedure: StoredProcedure, event: React.MouseEvent) => {
-      handleNodeClick({ type: "storedProcedure", data: procedure }, event);
+    (procedure: StoredProcedure, _event: React.MouseEvent) => {
+      handleNodeClick({ type: "storedProcedure", data: procedure });
     },
     [handleNodeClick]
   );
 
   const handleFunctionClick = useCallback(
-    (fn: ScalarFunction, event: React.MouseEvent) => {
-      handleNodeClick({ type: "scalarFunction", data: fn }, event);
+    (fn: ScalarFunction, _event: React.MouseEvent) => {
+      handleNodeClick({ type: "scalarFunction", data: fn });
     },
     [handleNodeClick]
   );
 
   const handleSidebarItemClick = useCallback(
-    (data: DetailSidebarData, rect: DOMRect) => {
-      openPopover(data, rect);
+    (data: DetailSidebarData) => {
+      openDetail(data);
     },
-    [openPopover]
+    [openDetail]
   );
 
   const handleEditFromPopover = useCallback(
@@ -1888,13 +1889,21 @@ function SchemaGraphInner({
     <TooltipProvider delayDuration={200}>
     <div className="w-full h-full relative flex">
       <SchemaBrowserSidebar onItemClick={handleSidebarItemClick} />
-      <DetailPopover
-        open={popoverOpen}
-        data={popoverData}
-        anchorRect={anchorRect}
-        onClose={closePopover}
-        onEdit={canvasMode ? handleEditFromPopover : undefined}
-      />
+      {detailViewMode === "drawer" ? (
+        <DetailDrawer
+          open={detailOpen}
+          data={detailData}
+          onClose={closeDetail}
+          onEdit={canvasMode ? handleEditFromPopover : undefined}
+        />
+      ) : (
+        <DetailInspector
+          open={detailOpen}
+          data={detailData}
+          onClose={closeDetail}
+          onEdit={canvasMode ? handleEditFromPopover : undefined}
+        />
+      )}
       {/* The floating sidebar overlays the canvas; no layout push, so the
           React Flow viewport stays stable when it toggles. */}
       <main className="flex-1 h-full">

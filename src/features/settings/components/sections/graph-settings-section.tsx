@@ -1,5 +1,8 @@
 import { useSchemaStore } from "@/features/schema-graph/store";
-import type { EdgeLabelMode } from "@/features/settings/services/settings-service";
+import type {
+  DetailViewMode,
+  EdgeLabelMode,
+} from "@/features/settings/services/settings-service";
 import { useShallow } from "zustand/shallow";
 import {
   Select,
@@ -33,6 +36,8 @@ export function GraphSettingsSection() {
     setEdgeLabelMode,
     showMiniMap,
     setShowMiniMap,
+    detailViewMode,
+    setDetailViewMode,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
@@ -47,6 +52,8 @@ export function GraphSettingsSection() {
       setEdgeLabelMode: state.setEdgeLabelMode,
       showMiniMap: state.showMiniMap,
       setShowMiniMap: state.setShowMiniMap,
+      detailViewMode: state.detailViewMode,
+      setDetailViewMode: state.setDetailViewMode,
     }))
   );
 
@@ -167,6 +174,25 @@ export function GraphSettingsSection() {
         </Select>
         <p className="text-xs text-muted-foreground">
           Show or hide the graph overview minimap.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Object Details</label>
+        <Select
+          value={detailViewMode}
+          onValueChange={(value) => setDetailViewMode(value as DetailViewMode)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="inspector">Inspector panel</SelectItem>
+            <SelectItem value="drawer">Bottom panel</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Where object details open when you click a node or sidebar item.
         </p>
       </div>
     </div>

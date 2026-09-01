@@ -34,7 +34,7 @@ const FORCE_EXPAND_MIN_QUERY = 2;
 const DEFAULT_EXPANDED_CATEGORIES = new Set<ObjectType>(["tables"]);
 
 interface SchemaBrowserSidebarProps {
-  onItemClick: (data: DetailSidebarData, rect: DOMRect) => void;
+  onItemClick: (data: DetailSidebarData) => void;
 }
 
 function SchemaBrowserSidebarComponent({
@@ -240,8 +240,8 @@ function SchemaBrowserSidebarComponent({
   }, [allExpanded, tree]);
 
   const handleItemClick = useCallback(
-    (item: SidebarItem, element: HTMLElement) => {
-      onItemClick(item.data, element.getBoundingClientRect());
+    (item: SidebarItem, _element: HTMLElement) => {
+      onItemClick(item.data);
     },
     [onItemClick]
   );

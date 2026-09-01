@@ -1,5 +1,3 @@
-import { TbCircleDashedLetterN } from "react-icons/tb";
-import { IoMdKey } from "react-icons/io";
 import {
   TableNode,
   ViewNode,
@@ -10,6 +8,8 @@ import {
   ProcedureParameter,
 } from "../types";
 import { cn } from "@/lib/utils";
+import { OBJECT_COLORS } from "@/constants/edge-colors";
+import type { ObjectType } from "../store";
 import { SqlCodeBlock } from "./sql-code-block";
 
 export type DetailSidebarData =
@@ -18,6 +18,61 @@ export type DetailSidebarData =
   | { type: "trigger"; data: Trigger }
   | { type: "storedProcedure"; data: StoredProcedure }
   | { type: "scalarFunction"; data: ScalarFunction };
+
+export const DETAIL_OBJECT_TYPE: Record<DetailSidebarData["type"], ObjectType> =
+  {
+    table: "tables",
+    view: "views",
+    trigger: "triggers",
+    storedProcedure: "storedProcedures",
+    scalarFunction: "scalarFunctions",
+  };
+
+/** Pin-dot badge tinted from the object color tokens. */
+export function TypeBadge({
+  objectType,
+  label,
+}: {
+  objectType: ObjectType;
+  label: string;
+}) {
+  const color = OBJECT_COLORS[objectType];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+      style={{
+        color,
+        backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+      }}
+    >
+      <span
+        aria-hidden
+        className="h-1.5 w-1.5 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      {label}
+    </span>
+  );
+}
+
+function PkGlyph() {
+  return (
+    <span className="shrink-0 text-[8px] font-bold tracking-wide text-muted-foreground">
+      PK
+    </span>
+  );
+}
+
+function NullableGlyph() {
+  return (
+    <span
+      className="shrink-0 text-[8px] font-medium text-muted-foreground/70"
+      title="Nullable"
+    >
+      N
+    </span>
+  );
+}
 
 export function getHeaderInfo(data: DetailSidebarData): {
   badge: React.ReactNode;
@@ -29,9 +84,7 @@ export function getHeaderInfo(data: DetailSidebarData): {
     case "table":
       return {
         badge: (
-          <span className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
-            Table
-          </span>
+<TypeBadge objectType="tables" label="Table" />
         ),
         schema: data.data.schema,
         name: data.data.name,
@@ -40,9 +93,7 @@ export function getHeaderInfo(data: DetailSidebarData): {
     case "view":
       return {
         badge: (
-          <span className="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs px-2 py-1 rounded">
-            View
-          </span>
+<TypeBadge objectType="views" label="View" />
         ),
         schema: data.data.schema,
         name: data.data.name,
@@ -52,9 +103,7 @@ export function getHeaderInfo(data: DetailSidebarData): {
       const trigger = data.data;
       return {
         badge: (
-          <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs px-2 py-1 rounded">
-            Trigger
-          </span>
+<TypeBadge objectType="triggers" label="Trigger" />
         ),
         schema: trigger.schema,
         name: trigger.name,
@@ -64,9 +113,7 @@ export function getHeaderInfo(data: DetailSidebarData): {
     case "storedProcedure":
       return {
         badge: (
-          <span className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-xs px-2 py-1 rounded">
-            Stored Procedure
-          </span>
+<TypeBadge objectType="storedProcedures" label="Procedure" />
         ),
         schema: data.data.schema,
         name: data.data.name,
@@ -75,9 +122,7 @@ export function getHeaderInfo(data: DetailSidebarData): {
     case "scalarFunction":
       return {
         badge: (
-          <span className="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 text-xs px-2 py-1 rounded">
-            Scalar Function
-          </span>
+<TypeBadge objectType="scalarFunctions" label="Function" />
         ),
         schema: data.data.schema,
         name: data.data.name,
@@ -90,15 +135,15 @@ export function TableDetail({ table }: { table: TableNode }) {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-medium mb-2">Columns</h4>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Columns</h4>
         <div className="border rounded-lg overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className="bg-muted sticky top-0">
               <tr>
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Name
                 </th>
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Type
                 </th>
               </tr>
@@ -111,20 +156,16 @@ export function TableDetail({ table }: { table: TableNode }) {
                     idx % 2 === 0 ? "bg-background" : "bg-muted/50"
                   )}
                 >
-                  <td className="px-3 py-2 font-mono text-foreground">
+                  <td className="px-2.5 py-1.5 text-foreground">
                     <span className="flex items-center gap-2">
                       {col.name}
-                      {col.isPrimaryKey && (
-                        <IoMdKey className="text-slate-400 w-3.5 h-3.5 shrink-0 -ml-1" />
-                      )}
+                      {col.isPrimaryKey && <PkGlyph />}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="px-2.5 py-1.5 text-muted-foreground">
                     <span className="flex items-center gap-2">
                       {col.dataType}
-                      {col.isNullable && (
-                        <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
-                      )}
+                      {col.isNullable && <NullableGlyph />}
                     </span>
                   </td>
                 </tr>
@@ -141,18 +182,18 @@ export function ViewDetail({ view }: { view: ViewNode }) {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-medium mb-2">Columns</h4>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Columns</h4>
         <div className="border rounded-lg overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className="bg-muted sticky top-0">
               <tr>
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Name
                 </th>
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Type
                 </th>
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Source
                 </th>
               </tr>
@@ -173,20 +214,18 @@ export function ViewDetail({ view }: { view: ViewNode }) {
                       idx % 2 === 0 ? "bg-background" : "bg-muted/50"
                     )}
                   >
-                    <td className="px-3 py-2 font-mono text-foreground">
+                    <td className="px-2.5 py-1.5 text-foreground">
                       {col.name}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-2.5 py-1.5 text-muted-foreground">
                       <span className="flex items-center gap-2">
                         {col.dataType}
-                        {col.isNullable && (
-                          <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
-                        )}
+                        {col.isNullable && <NullableGlyph />}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-2.5 py-1.5 text-muted-foreground">
                       {sources.length > 0 ? (
-                        <div className="flex flex-col gap-1 font-mono text-xs">
+                        <div className="flex flex-col gap-1 text-[11px]">
                           {sources.map((source, sourceIdx) => (
                             <span
                               key={`${col.name}-${source.table}-${source.column}-${sourceIdx}`}
@@ -208,7 +247,7 @@ export function ViewDetail({ view }: { view: ViewNode }) {
       </div>
 
       <div>
-        <h4 className="text-sm font-medium mb-2">Definition</h4>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Definition</h4>
         <SqlCodeBlock code={view.definition} maxHeight="300px" />
       </div>
     </div>
@@ -228,20 +267,24 @@ export function TriggerDetail({ trigger }: { trigger: Trigger }) {
         {events.map((event, idx) => (
           <span
             key={idx}
-            className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-xs px-2 py-1 rounded"
+            className="rounded-sm px-2 py-0.5 text-[10px] font-bold"
+            style={{
+              color: OBJECT_COLORS.triggers,
+              backgroundColor: `color-mix(in srgb, ${OBJECT_COLORS.triggers} 12%, transparent)`,
+            }}
           >
             {event}
           </span>
         ))}
         {trigger.isDisabled && (
-          <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs px-2 py-1 rounded">
+          <span className="rounded-sm bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
             Disabled
           </span>
         )}
       </div>
 
       <div>
-        <h4 className="text-sm font-medium mb-2">Definition</h4>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Definition</h4>
         <SqlCodeBlock code={trigger.definition} maxHeight="300px" />
       </div>
     </div>
@@ -260,18 +303,18 @@ export function StoredProcedureDetail({
     <div className="space-y-4">
       {procedure.parameters.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">Parameters</h4>
+          <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Parameters</h4>
           <div className="border rounded-lg overflow-hidden overflow-x-auto">
-            <table className="w-full text-sm min-w-max">
+            <table className="w-full min-w-max text-xs">
               <thead className="bg-muted sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                  <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Name
                   </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                  <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Type
                   </th>
-                  <th className="text-center px-3 py-2 font-medium text-muted-foreground">
+                  <th className="px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Direction
                   </th>
                 </tr>
@@ -285,15 +328,21 @@ export function StoredProcedureDetail({
                         idx % 2 === 0 ? "bg-background" : "bg-muted/50"
                       )}
                     >
-                      <td className="px-3 py-2 font-mono text-foreground">
+                      <td className="px-2.5 py-1.5 text-foreground">
                         {param.name}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">
+                      <td className="px-2.5 py-1.5 text-muted-foreground">
                         {param.dataType}
                       </td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-2.5 py-1.5 text-center">
                         {param.isOutput ? (
-                          <span className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 text-xs px-2 py-1 rounded">
+                          <span
+                            className="rounded-sm px-2 py-0.5 text-[10px] font-bold"
+                            style={{
+                              color: OBJECT_COLORS.storedProcedures,
+                              backgroundColor: `color-mix(in srgb, ${OBJECT_COLORS.storedProcedures} 12%, transparent)`,
+                            }}
+                          >
                             OUTPUT
                           </span>
                         ) : (
@@ -310,7 +359,7 @@ export function StoredProcedureDetail({
       )}
 
       <div>
-        <h4 className="text-sm font-medium mb-2">Definition</h4>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Definition</h4>
         <SqlCodeBlock code={procedure.definition} maxHeight="300px" />
       </div>
     </div>
@@ -322,15 +371,15 @@ export function ScalarFunctionDetail({ fn }: { fn: ScalarFunction }) {
     <div className="space-y-4">
       {fn.parameters.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">Parameters</h4>
+          <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Parameters</h4>
           <div className="border rounded-lg overflow-hidden overflow-x-auto">
-            <table className="w-full text-sm min-w-max">
+            <table className="w-full min-w-max text-xs">
               <thead className="bg-muted sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                  <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Name
                   </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                  <th className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Type
                   </th>
                 </tr>
@@ -343,10 +392,10 @@ export function ScalarFunctionDetail({ fn }: { fn: ScalarFunction }) {
                       idx % 2 === 0 ? "bg-background" : "bg-muted/50"
                     )}
                   >
-                    <td className="px-3 py-2 font-mono text-foreground">
+                    <td className="px-2.5 py-1.5 text-foreground">
                       {param.name}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-2.5 py-1.5 text-muted-foreground">
                       {param.dataType}
                     </td>
                   </tr>
@@ -358,7 +407,7 @@ export function ScalarFunctionDetail({ fn }: { fn: ScalarFunction }) {
       )}
 
       <div>
-        <h4 className="text-sm font-medium mb-2">Definition</h4>
+        <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Definition</h4>
         <SqlCodeBlock code={fn.definition} maxHeight="300px" />
       </div>
     </div>

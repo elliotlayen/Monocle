@@ -3,6 +3,7 @@ import type { FolderSource } from "@/features/explorer/types";
 
 export type ThemeSetting = "dark" | "light" | "system";
 export type EdgeLabelMode = "auto" | "never" | "always";
+export type DetailViewMode = "inspector" | "drawer";
 
 export interface AppSettings {
   theme?: ThemeSetting;
@@ -11,6 +12,7 @@ export interface AppSettings {
   browseThreshold?: number;
   edgeLabelMode?: EdgeLabelMode;
   showMiniMap?: boolean;
+  detailViewMode?: DetailViewMode;
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
 }
@@ -22,6 +24,7 @@ export interface SettingsUpdate {
   browseThreshold?: number;
   edgeLabelMode?: EdgeLabelMode;
   showMiniMap?: boolean;
+  detailViewMode?: DetailViewMode;
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
 }

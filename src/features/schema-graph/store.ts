@@ -16,6 +16,7 @@ import { databaseService } from "@/features/connection/services/database-service
 import {
   settingsService,
   type AppSettings,
+  type DetailViewMode,
   type EdgeLabelMode,
 } from "@/features/settings/services/settings-service";
 import type {
@@ -60,6 +61,7 @@ interface SchemaStore {
   focusExpandThreshold: number;
   edgeLabelMode: EdgeLabelMode;
   showMiniMap: boolean;
+  detailViewMode: DetailViewMode;
 
   // Canvas mode state
   mode: "connected" | "canvas" | "explorer";
@@ -112,6 +114,7 @@ interface SchemaStore {
   setFocusExpandThreshold: (threshold: number) => void;
   setEdgeLabelMode: (mode: EdgeLabelMode) => void;
   setShowMiniMap: (show: boolean) => void;
+  setDetailViewMode: (mode: DetailViewMode) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -503,6 +506,7 @@ export const createInitialSchemaState = () => ({
   focusExpandThreshold: 15,
   edgeLabelMode: "auto" as EdgeLabelMode,
   showMiniMap: true,
+  detailViewMode: "inspector" as DetailViewMode,
   focusedTableId: null,
   sidebarOpen: true,
   viewMode: "full" as const,
@@ -1020,6 +1024,12 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     if (typeof settings.showMiniMap === "boolean") {
       updates.showMiniMap = settings.showMiniMap;
     }
+    if (
+      settings.detailViewMode === "inspector" ||
+      settings.detailViewMode === "drawer"
+    ) {
+      updates.detailViewMode = settings.detailViewMode;
+    }
 
     if (Object.keys(updates).length > 0) {
       set(updates);
@@ -1045,6 +1055,13 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   setShowMiniMap: (show: boolean) => {
     set({ showMiniMap: show });
     settingsService.saveSettings({ showMiniMap: show }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setDetailViewMode: (mode: DetailViewMode) => {
+    set({ detailViewMode: mode });
+    settingsService.saveSettings({ detailViewMode: mode }).catch(() => {
       // Ignore persistence errors
     });
   },
