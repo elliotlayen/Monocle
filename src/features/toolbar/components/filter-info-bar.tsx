@@ -38,20 +38,26 @@ export function FilterInfoBar() {
   const {
     schema,
     focusedTableId,
+    viewMode,
+    focusRoots,
     objectTypeFilter,
     excludedObjectIds,
     edgeTypeFilter,
     clearFocus,
+    clearFocusRoots,
     resetObjectFilters,
     selectAllEdgeTypes,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
       focusedTableId: state.focusedTableId,
+      viewMode: state.viewMode,
+      focusRoots: state.focusRoots,
       objectTypeFilter: state.objectTypeFilter,
       excludedObjectIds: state.excludedObjectIds,
       edgeTypeFilter: state.edgeTypeFilter,
       clearFocus: state.clearFocus,
+      clearFocusRoots: state.clearFocusRoots,
       resetObjectFilters: state.resetObjectFilters,
       selectAllEdgeTypes: state.selectAllEdgeTypes,
     }))
@@ -60,15 +66,15 @@ export function FilterInfoBar() {
   const allObjectsSelected = objectTypeFilter.size === 5;
   const allEdgesSelected = edgeTypeFilter.size === EDGE_TYPE_ORDER.length;
 
-  // Determine the type of the focused object
-  const getFocusedObjectType = (): ObjectType | null => {
-    if (!focusedTableId || !schema) return null;
-    if (schema.tables.some((t) => t.id === focusedTableId)) return "tables";
-    if (schema.views.some((v) => v.id === focusedTableId)) return "views";
-    if (schema.triggers.some((t) => t.id === focusedTableId)) return "triggers";
-    if (schema.storedProcedures.some((p) => p.id === focusedTableId))
+  // Determine the type of an object by id
+  const getObjectType = (id: string | null): ObjectType | null => {
+    if (!id || !schema) return null;
+    if (schema.tables.some((t) => t.id === id)) return "tables";
+    if (schema.views.some((v) => v.id === id)) return "views";
+    if (schema.triggers.some((t) => t.id === id)) return "triggers";
+    if (schema.storedProcedures.some((p) => p.id === id))
       return "storedProcedures";
-    if (schema.scalarFunctions.some((f) => f.id === focusedTableId))
+    if (schema.scalarFunctions.some((f) => f.id === id))
       return "scalarFunctions";
     return null;
   };
@@ -117,9 +123,27 @@ export function FilterInfoBar() {
 
   const objectsLabel = getObjectsLabel();
   const edgesLabel = getEdgesLabel();
-  const focusedType = getFocusedObjectType();
+  const focusedType = getObjectType(focusedTableId);
 
-  const hasActiveFilters = focusedTableId || objectsLabel || edgesLabel;
+  // Browse mode: the selection roots take the place of the dim-focus chip.
+  const isBrowseView = viewMode === "browse";
+  const rootList = isBrowseView ? [...focusRoots] : [];
+  const browseValue =
+    rootList.length === 1 ? rootList[0] : `${rootList.length} objects`;
+  const browseRootTypes = [
+    ...new Set(
+      rootList
+        .map((id) => getObjectType(id))
+        .filter((type): type is ObjectType => type !== null)
+    ),
+  ];
+  const browseColors =
+    browseRootTypes.length > 0
+      ? browseRootTypes.map((type) => OBJECT_COLORS[type])
+      : [OBJECT_COLORS.tables];
+
+  const hasActiveFilters =
+    focusedTableId || rootList.length > 0 || objectsLabel || edgesLabel;
 
   if (!hasActiveFilters) return null;
 
@@ -132,6 +156,15 @@ export function FilterInfoBar() {
           colors={[OBJECT_COLORS[focusedType]]}
           borderMode="full-border"
           onClear={clearFocus}
+        />
+      )}
+      {rootList.length > 0 && (
+        <FilterBox
+          label="Focus"
+          value={browseValue}
+          colors={browseColors}
+          borderMode="full-border"
+          onClear={clearFocusRoots}
         />
       )}
       {objectsLabel && (

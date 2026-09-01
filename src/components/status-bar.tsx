@@ -53,6 +53,8 @@ export function StatusBar() {
     debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
+    viewMode,
+    focusRoots,
     objectTypeFilter,
     excludedObjectIds,
     edgeTypeFilter,
@@ -66,6 +68,8 @@ export function StatusBar() {
       debouncedSearchFilter: state.debouncedSearchFilter,
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
+      viewMode: state.viewMode,
+      focusRoots: state.focusRoots,
       objectTypeFilter: state.objectTypeFilter,
       excludedObjectIds: state.excludedObjectIds,
       edgeTypeFilter: state.edgeTypeFilter,
@@ -91,10 +95,12 @@ export function StatusBar() {
   const allObjectsSelected = objectTypeFilter.size === 5;
   const allEdgesSelected =
     edgeTypeFilter.size === Object.keys(EDGE_TYPE_LABELS).length;
+  const isBrowseView = viewMode === "browse";
   const hasActiveFilters =
     debouncedSearchFilter !== "" ||
     schemaFilter !== "all" ||
     focusedTableId !== null ||
+    (isBrowseView && focusRoots.size > 0) ||
     !allObjectsSelected ||
     excludedObjectIds.size > 0 ||
     !allEdgesSelected;
@@ -196,6 +202,14 @@ export function StatusBar() {
 
         {/* Selection info */}
         {focusedTableId && <span className="truncate">Focus: {focusedTableId}</span>}
+        {isBrowseView && focusRoots.size > 0 && (
+          <span className="truncate">
+            Focus:{" "}
+            {focusRoots.size === 1
+              ? [...focusRoots][0]
+              : `${focusRoots.size} objects`}
+          </span>
+        )}
         {selectedEdgeIds.size > 0 && (
           <span className="tabular-nums">
             {selectedEdgeIds.size} edge{selectedEdgeIds.size !== 1 ? "s" : ""}{" "}

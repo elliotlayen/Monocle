@@ -127,6 +127,8 @@ export function Toolbar({
     debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
+    viewMode,
+    focusRoots,
     objectTypeFilter,
     excludedObjectIds,
     edgeTypeFilter,
@@ -134,6 +136,7 @@ export function Toolbar({
     canvasIsDirty,
     setFocusedTable,
     clearFocus,
+    clearFocusRoots,
     toggleObjectType,
     toggleObjectExclusion,
     resetObjectFilters,
@@ -147,6 +150,8 @@ export function Toolbar({
       debouncedSearchFilter: state.debouncedSearchFilter,
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
+      viewMode: state.viewMode,
+      focusRoots: state.focusRoots,
       objectTypeFilter: state.objectTypeFilter,
       excludedObjectIds: state.excludedObjectIds,
       edgeTypeFilter: state.edgeTypeFilter,
@@ -154,6 +159,7 @@ export function Toolbar({
       canvasIsDirty: state.canvasIsDirty,
       setFocusedTable: state.focusObject,
       clearFocus: state.clearFocus,
+      clearFocusRoots: state.clearFocusRoots,
       toggleObjectType: state.toggleObjectType,
       toggleObjectExclusion: state.toggleObjectExclusion,
       resetObjectFilters: state.resetObjectFilters,
@@ -253,13 +259,24 @@ export function Toolbar({
   const allEdgesSelected =
     edgeTypeFilter.size === Object.keys(EDGE_TYPE_LABELS).length;
 
+  // Browse mode focuses via roots, full view via the dim-focus id; every
+  // focus indicator below reflects whichever is active.
+  const isBrowseView = viewMode === "browse";
+  const hasFocusSelection = isBrowseView
+    ? focusRoots.size > 0
+    : Boolean(focusedTableId);
+  const isObjectFocused = (id: string) =>
+    isBrowseView ? focusRoots.has(id) : focusedTableId === id;
+  const focusScrollTargetId =
+    focusedTableId ?? (isBrowseView ? ([...focusRoots][0] ?? null) : null);
+
   useEffect(() => {
     if (!isFocusOpen) {
       hasScrolledOnOpenRef.current = false;
       return;
     }
 
-    if (hasScrolledOnOpenRef.current || !focusedTableId) {
+    if (hasScrolledOnOpenRef.current || !focusScrollTargetId) {
       return;
     }
 
@@ -271,7 +288,7 @@ export function Toolbar({
         const candidates =
           container.querySelectorAll<HTMLElement>("[data-item-id]");
         const selectedElement = Array.from(candidates).find(
-          (element) => element.dataset.itemId === focusedTableId
+          (element) => element.dataset.itemId === focusScrollTargetId
         );
         if (selectedElement) {
           selectedElement.scrollIntoView({
@@ -289,7 +306,7 @@ export function Toolbar({
     };
 
     requestAnimationFrame(attemptScroll);
-  }, [focusedTableId, isFocusOpen]);
+  }, [focusScrollTargetId, isFocusOpen]);
 
   const filteredFocusRowsByType = useMemo<ObjectBuckets>(() => {
     if (!schema) return EMPTY_OBJECT_BUCKETS;
@@ -487,7 +504,7 @@ export function Toolbar({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className={cn(focusedTableId && FILTER_ACTIVE_CLASSES)}
+                        className={cn(hasFocusSelection && FILTER_ACTIVE_CLASSES)}
                       >
                         <Crosshair className="h-4 w-4" />
                       </Button>
@@ -510,12 +527,12 @@ export function Toolbar({
                   </div>
                   <div ref={scrollContainerRef} className="max-h-80 overflow-auto">
                     <div className="w-max min-w-full">
-                      {focusedTableId && (
+                      {hasFocusSelection && (
                         <button
                           className="w-max min-w-full border-b px-3 py-2 text-left text-xs hover:bg-accent"
-                          onClick={clearFocus}
+                          onClick={isBrowseView ? clearFocusRoots : clearFocus}
                         >
-                          Clear Focus
+                          {isBrowseView ? "Clear Selection" : "Clear Focus"}
                         </button>
                       )}
                       {OBJECT_TYPE_ORDER.map((type) => {
@@ -579,7 +596,7 @@ export function Toolbar({
                                     data-item-id={item.id}
                                     className={cn(
                                       "flex w-max min-w-full items-center gap-2 px-3 py-1 text-left text-xs hover:bg-accent",
-                                      focusedTableId === item.id &&
+                                      isObjectFocused(item.id) &&
                                         "bg-accent-blue/15 text-accent-blue"
                                     )}
                                     onClick={() => setFocusedTable(item.id)}
