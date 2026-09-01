@@ -1,5 +1,6 @@
 import { loader } from "@monaco-editor/react";
 import { registerSqlCompletionProvider } from "@/lib/sql-intellisense";
+import { defineMonocleThemes } from "@/lib/monaco-themes";
 
 let monacoSqlLoadPromise: Promise<void> | null = null;
 
@@ -17,6 +18,7 @@ export const ensureMonacoSqlLoaded = () => {
     import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"),
   ]).then(([localMonaco]) => {
     loader.config({ monaco: localMonaco });
+    defineMonocleThemes(localMonaco);
     registerSqlCompletionProvider(localMonaco);
   });
 

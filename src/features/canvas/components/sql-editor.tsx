@@ -4,6 +4,7 @@ import type { editor } from "monaco-editor";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { ensureMonacoSqlLoaded } from "@/lib/monaco-sql-loader";
 import { cn } from "@/lib/utils";
+import { monocleMonacoTheme } from "@/lib/monaco-themes";
 
 interface SqlEditorProps {
   id?: string;
@@ -24,7 +25,7 @@ export function SqlEditor({
 }: SqlEditorProps) {
   const [isMonacoReady, setIsMonacoReady] = useState(false);
   const resolvedTheme = useResolvedTheme();
-  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const monacoTheme = monocleMonacoTheme(resolvedTheme);
 
   useEffect(() => {
     let isCancelled = false;
@@ -59,7 +60,7 @@ export function SqlEditor({
       fontSize: 12,
       lineHeight: 20,
       fontFamily:
-        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       overviewRulerLanes: 0,
       renderLineHighlight: "none",
       contextmenu: false,

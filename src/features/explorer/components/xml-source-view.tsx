@@ -6,6 +6,7 @@ import { ensureMonacoXmlLoaded } from "@/lib/monaco-xml-loader";
 import { useValidationDecorations } from "../hooks/use-validation-decorations";
 import { useSearchHighlight } from "../hooks/use-search-highlight";
 import type { ValidationProblem } from "../types";
+import { monocleMonacoTheme } from "@/lib/monaco-themes";
 
 interface XmlSourceViewProps {
   content: string;
@@ -66,7 +67,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
     };
   }, []);
 
-  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const monacoTheme = monocleMonacoTheme(resolvedTheme);
   const scrollPositionRef = useRef(scrollPosition);
 
   useEffect(() => {
@@ -130,7 +131,7 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
       fontSize: 13,
       lineHeight: 20,
       fontFamily:
-        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       overviewRulerLanes: 2,
       renderLineHighlight: "line",
       contextmenu: false,

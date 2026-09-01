@@ -3,6 +3,7 @@ import Editor from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { ensureMonacoSqlLoaded } from "@/lib/monaco-sql-loader";
+import { monocleMonacoTheme } from "@/lib/monaco-themes";
 
 interface SqlCodeBlockProps {
   code: string;
@@ -15,7 +16,7 @@ const VERTICAL_PADDING = 24;
 export function SqlCodeBlock({ code, maxHeight = "300px" }: SqlCodeBlockProps) {
   const [isMonacoReady, setIsMonacoReady] = useState(false);
   const resolvedTheme = useResolvedTheme();
-  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const monacoTheme = monocleMonacoTheme(resolvedTheme);
 
   useEffect(() => {
     let isCancelled = false;
@@ -48,7 +49,7 @@ export function SqlCodeBlock({ code, maxHeight = "300px" }: SqlCodeBlockProps) {
       fontSize: 12,
       lineHeight: LINE_HEIGHT,
       fontFamily:
-        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+        '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       overviewRulerLanes: 0,
       renderLineHighlight: "none",
       contextmenu: false,
