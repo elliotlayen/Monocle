@@ -191,6 +191,7 @@ fn generate_relationships(tables: &[TableNode], config: &MockConfig) -> Vec<Rela
             from_column: Some(fk_col_name),
             to_column: Some("Id".to_string()),
             constraint_name: None,
+            is_disabled: false,
         });
     }
 

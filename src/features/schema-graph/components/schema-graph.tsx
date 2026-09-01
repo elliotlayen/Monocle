@@ -535,6 +535,10 @@ function buildBaseEdges(
     const targetHandle = rel.toColumn
       ? `${buildColumnHandleBase(rel.to, rel.toColumn)}-target`
       : `${buildNodeHandleBase(rel.to)}-target`;
+    const columnLabel =
+      rel.fromColumn && rel.toColumn
+        ? `${rel.fromColumn} → ${rel.toColumn}`
+        : undefined;
     edges.push({
       id: rel.id,
       type: "relationships",
@@ -545,9 +549,8 @@ function buildBaseEdges(
       sourceColumn: rel.fromColumn,
       targetColumn: rel.toColumn,
       label:
-        rel.fromColumn && rel.toColumn
-          ? `${rel.fromColumn} → ${rel.toColumn}`
-          : undefined,
+        columnLabel && rel.isDisabled ? `${columnLabel} (disabled)` : columnLabel,
+      isDisabled: rel.isDisabled,
     });
   });
 

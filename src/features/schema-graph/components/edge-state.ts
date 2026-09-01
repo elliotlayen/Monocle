@@ -12,6 +12,7 @@ export interface EdgeMeta {
   label?: string;
   sourceColumn?: string;
   targetColumn?: string;
+  isDisabled?: boolean;
 }
 
 const EDGE_STYLE: Record<
@@ -240,6 +241,7 @@ export function deriveEdgeState({
         strokeWidth,
         opacity: isDimmed ? 0.4 : 1,
         cursor: isFocusActive ? "default" : "pointer",
+        ...(edge.isDisabled ? { strokeDasharray: "6 4" } : {}),
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,

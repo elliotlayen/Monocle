@@ -213,4 +213,23 @@ describe("deriveEdgeState", () => {
 
     expect(areEdgesEquivalent(first, second)).toBe(false);
   });
+
+  it("renders disabled relationships dashed", () => {
+    const result = deriveEdgeState({
+      edges: [{ ...baseEdges[0], isDisabled: true }, baseEdges[1]],
+      edgeTypeFilter: new Set(["relationships"]),
+      renderableNodeIds: new Set(["dbo.orders", "dbo.customers", "dbo.invoices"]),
+      columnsByNodeId: columnsByNode,
+      focusedTableId: null,
+      selectedEdgeIds: new Set<string>(),
+      hoveredEdgeId: null,
+      showLabels: false,
+      showInlineLabelOnHover: false,
+    });
+
+    const disabled = result.edges.find((e) => e.id === "edge-orders-customers");
+    const enabled = result.edges.find((e) => e.id === "edge-customers-invoices");
+    expect(disabled?.style?.strokeDasharray).toBe("6 4");
+    expect(enabled?.style?.strokeDasharray).toBeUndefined();
+  });
 });

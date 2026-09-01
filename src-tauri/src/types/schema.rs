@@ -54,6 +54,8 @@ pub struct RelationshipEdge {
     pub to_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub constraint_name: Option<String>,
+    #[serde(default)]
+    pub is_disabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

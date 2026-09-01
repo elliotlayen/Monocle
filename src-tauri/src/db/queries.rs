@@ -41,7 +41,8 @@ SELECT
     c_src.name AS src_column,
     sch_ref.name AS ref_schema,
     t_ref.name AS ref_table,
-    c_ref.name AS ref_column
+    c_ref.name AS ref_column,
+    fk.is_disabled
 FROM sys.foreign_keys fk
 JOIN sys.foreign_key_columns fkc
   ON fk.object_id = fkc.constraint_object_id

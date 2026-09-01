@@ -40,6 +40,7 @@ export interface RelationshipEdge {
   fromColumn?: string; // FK column in source (optional for column-less edges)
   toColumn?: string; // Referenced column in target (optional for column-less edges)
   constraintName?: string; // FK constraint name (shared across a composite FK's edges)
+  isDisabled?: boolean; // FK constraint is disabled on the server (NOCHECK)
 }
 
 // Trigger definition

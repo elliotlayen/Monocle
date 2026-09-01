@@ -1,0 +1,71 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic: Monocle
+        - generic:
+          - button:
+            - img
+          - button:
+            - img
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - heading [level=2]: Explorer
+                - generic:
+                  - button:
+                    - img
+                  - button:
+                    - img
+              - generic:
+                - img
+                - textbox:
+                  - /placeholder: Filter clients...
+        - generic:
+          - button:
+            - img
+            - generic: Open details panel
+          - generic:
+            - generic:
+              - img
+              - heading [level=2]: Integration Explorer
+              - paragraph: Click a file in the sidebar to open it.
+  - dialog "Settings" [active] [ref=e76]:
+    - heading "Settings" [level=2] [ref=e78]
+    - generic [ref=e80]:
+      - navigation [ref=e81]:
+        - button "Graph" [ref=e82]:
+          - img
+          - generic [ref=e83]: Graph
+        - button "Appearance" [ref=e84]:
+          - img
+          - generic [ref=e85]: Appearance
+        - button "Sources" [ref=e86]:
+          - img
+          - generic [ref=e87]: Sources
+        - button "About" [ref=e88]:
+          - img
+          - generic [ref=e89]: About
+      - generic [ref=e112]:
+        - generic [ref=e113]:
+          - heading "Folder Sources" [level=3] [ref=e114]
+          - paragraph [ref=e115]: Configure root folder paths to browse in the explorer.
+        - generic [ref=e121]:
+          - button [ref=e122]:
+            - img [ref=e123]
+          - textbox "Display name" [ref=e130]
+          - textbox "Enter path (e.g., \\\\server\\share\\integrations)" [ref=e132]
+          - textbox "Tag" [ref=e133]
+          - button "Browse for folder" [ref=e134]:
+            - img
+          - button "Remove source" [ref=e135]:
+            - img
+        - status [ref=e136]
+        - button "Add Source" [ref=e137]:
+          - img
+          - text: Add Source
+    - button "Close" [ref=e110]:
+      - img
+      - generic [ref=e111]: Close

@@ -274,6 +274,7 @@ async fn load_foreign_keys(
         let ref_schema: &str = row.get(4).unwrap_or_default();
         let ref_table: &str = row.get(5).unwrap_or_default();
         let ref_column: &str = row.get(6).unwrap_or_default();
+        let is_disabled: bool = row.get(7).unwrap_or_default();
 
         let from_id = format!("{}.{}", src_schema, src_table);
         let to_id = format!("{}.{}", ref_schema, ref_table);
@@ -285,6 +286,7 @@ async fn load_foreign_keys(
             from_column: Some(src_column.to_string()),
             to_column: Some(ref_column.to_string()),
             constraint_name: Some(fk_name.to_string()),
+            is_disabled,
         });
     }
 
