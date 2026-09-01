@@ -18,7 +18,7 @@ export interface FilteredCounts {
   };
   edgeBreakdown: {
     relationships: { filtered: number; total: number };
-    triggerDependencies: { filtered: number; total: number };
+    triggerReads: { filtered: number; total: number };
     triggerWrites: { filtered: number; total: number };
     procedureReads: { filtered: number; total: number };
     procedureWrites: { filtered: number; total: number };
@@ -52,7 +52,7 @@ export function useFilteredCounts(
         },
         edgeBreakdown: {
           relationships: { filtered: 0, total: 0 },
-          triggerDependencies: { filtered: 0, total: 0 },
+          triggerReads: { filtered: 0, total: 0 },
           triggerWrites: { filtered: 0, total: 0 },
           procedureReads: { filtered: 0, total: 0 },
           procedureWrites: { filtered: 0, total: 0 },
@@ -94,14 +94,9 @@ export function useFilteredCounts(
       });
     }
 
-    // Trigger dependency edges (trigger to parent table + trigger to referenced tables)
-    let triggerDepCount = 0;
-    if (edgeTypeFilter.has("triggerDependencies")) {
-      // Trigger to parent table edges
-      triggerDepCount += filteredTriggers.filter((tr) =>
-        tableIds.has(tr.tableId)
-      ).length;
-      // Trigger to referenced tables edges (write edges subsume read edges)
+    // Trigger read edges (write edges subsume read edges)
+    let triggerReadsCount = 0;
+    if (edgeTypeFilter.has("triggerReads")) {
       filteredTriggers.forEach((trigger) => {
         const affectedTableIds = new Set(trigger.affectedTables || []);
         (trigger.referencedTables || []).forEach((tableId) => {
@@ -110,7 +105,7 @@ export function useFilteredCounts(
             tableId !== trigger.tableId &&
             !affectedTableIds.has(tableId)
           ) {
-            triggerDepCount++;
+            triggerReadsCount++;
           }
         });
       });
@@ -203,11 +198,8 @@ export function useFilteredCounts(
       }
     });
 
-    let totalTriggerDepEdges = 0;
+    let totalTriggerReadsEdges = 0;
     allTriggers.forEach((trigger) => {
-      if (allTableIds.has(trigger.tableId)) {
-        totalTriggerDepEdges++;
-      }
       const affectedTableIds = new Set(trigger.affectedTables || []);
       (trigger.referencedTables || []).forEach((tableId) => {
         if (
@@ -215,7 +207,7 @@ export function useFilteredCounts(
           tableId !== trigger.tableId &&
           !affectedTableIds.has(tableId)
         ) {
-          totalTriggerDepEdges++;
+          totalTriggerReadsEdges++;
         }
       });
     });
@@ -266,7 +258,7 @@ export function useFilteredCounts(
 
     const totalEdgeCount =
       totalRelationshipEdges +
-      totalTriggerDepEdges +
+      totalTriggerReadsEdges +
       totalTriggerWritesEdges +
       totalProcReadsEdges +
       totalProcWritesEdges +
@@ -275,7 +267,7 @@ export function useFilteredCounts(
 
     const filteredEdges =
       relationshipCount +
-      triggerDepCount +
+      triggerReadsCount +
       triggerWritesCount +
       procReadsCount +
       procWritesCount +
@@ -328,9 +320,9 @@ export function useFilteredCounts(
           filtered: relationshipCount,
           total: totalRelationshipEdges,
         },
-        triggerDependencies: {
-          filtered: triggerDepCount,
-          total: totalTriggerDepEdges,
+        triggerReads: {
+          filtered: triggerReadsCount,
+          total: totalTriggerReadsEdges,
         },
         triggerWrites: {
           filtered: triggerWritesCount,

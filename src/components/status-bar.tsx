@@ -154,9 +154,8 @@ export function StatusBar() {
               {counts.edgeBreakdown.relationships.total}
             </div>
             <div>
-              Trigger Dependencies:{" "}
-              {counts.edgeBreakdown.triggerDependencies.filtered} /{" "}
-              {counts.edgeBreakdown.triggerDependencies.total}
+              Trigger Reads: {counts.edgeBreakdown.triggerReads.filtered} /{" "}
+              {counts.edgeBreakdown.triggerReads.total}
             </div>
             <div>
               Trigger Writes: {counts.edgeBreakdown.triggerWrites.filtered} /{" "}

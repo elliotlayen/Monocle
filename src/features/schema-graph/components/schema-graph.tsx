@@ -555,29 +555,21 @@ function buildBaseEdges(
   });
 
   (schema.triggers || []).forEach((trigger) => {
-    edges.push({
-      id: `trigger-edge-${trigger.id}`,
-      type: "triggerDependencies",
-      source: trigger.tableId,
-      target: trigger.id,
-      sourceHandle: `${buildNodeHandleBase(trigger.tableId)}-source`,
-      targetHandle: `${buildNodeHandleBase(trigger.id)}-target`,
-      label: trigger.name,
-    });
-
     const affectedTableIds = new Set(trigger.affectedTables || []);
 
+    // Reads flow table -> trigger (data-flow convention shared with
+    // procedure/function reads); writes flow trigger -> table.
     (trigger.referencedTables || []).forEach((tableId) => {
       if (tableId === trigger.tableId) return;
       // A write edge to the same table already implies the read dependency.
       if (affectedTableIds.has(tableId)) return;
       edges.push({
         id: `trigger-ref-edge-${trigger.id}-${tableId}`,
-        type: "triggerDependencies",
-        source: trigger.id,
-        target: tableId,
-        sourceHandle: `${buildNodeHandleBase(trigger.id)}-source`,
-        targetHandle: `${buildNodeHandleBase(tableId)}-target`,
+        type: "triggerReads",
+        source: tableId,
+        target: trigger.id,
+        sourceHandle: `${buildNodeHandleBase(tableId)}-source`,
+        targetHandle: `${buildNodeHandleBase(trigger.id)}-target`,
         label: trigger.name,
       });
     });
@@ -975,21 +967,14 @@ function SchemaGraphInner({
             "writes"
           );
           break;
-        case "triggerDependencies": {
-          const targetIsTrigger = schema.triggers.some(
-            (t) => t.id === descriptor.targetId
+        case "triggerReads":
+          // Reads flow table -> trigger, so the trigger is the target.
+          removeTriggerReference(
+            descriptor.targetId,
+            descriptor.sourceId,
+            "reads"
           );
-          if (targetIsTrigger) {
-            removeTrigger(descriptor.targetId);
-          } else {
-            removeTriggerReference(
-              descriptor.sourceId,
-              descriptor.targetId,
-              "reads"
-            );
-          }
           break;
-        }
         case "viewDependencies":
           if (
             descriptor.targetColumn &&
@@ -1009,10 +994,8 @@ function SchemaGraphInner({
       removeFunctionReference,
       removeProcedureReference,
       removeRelationship,
-      removeTrigger,
       removeTriggerReference,
       removeViewColumnSource,
-      schema.triggers,
     ]
   );
 

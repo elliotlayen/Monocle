@@ -30,7 +30,7 @@ const OBJECT_TYPE_ORDER: ObjectType[] = [
 const EDGE_TYPE_ORDER: EdgeType[] = [
   "relationships",
   "viewDependencies",
-  "triggerDependencies",
+  "triggerReads",
   "triggerWrites",
   "procedureReads",
   "procedureWrites",

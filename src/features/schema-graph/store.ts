@@ -41,7 +41,7 @@ export type ObjectType =
 
 export type EdgeType =
   | "relationships"
-  | "triggerDependencies"
+  | "triggerReads"
   | "triggerWrites"
   | "procedureReads"
   | "procedureWrites"
@@ -216,7 +216,7 @@ const ALL_OBJECT_TYPES: Set<ObjectType> = new Set([
 
 const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
   "relationships",
-  "triggerDependencies",
+  "triggerReads",
   "triggerWrites",
   "procedureReads",
   "procedureWrites",

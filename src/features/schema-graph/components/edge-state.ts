@@ -34,7 +34,7 @@ const EDGE_STYLE: Record<
     labelDimmed: "#93c5fd",
     labelSelected: "#1d4ed8",
   },
-  triggerDependencies: {
+  triggerReads: {
     base: "#f59e0b",
     dimmed: "#fcd34d",
     selected: "#d97706",
