@@ -13,9 +13,7 @@ interface ViewNodeData extends TableViewNodeCommonData {
 
 const VIEW_VARIANT: TableViewNodeVariant = {
   kindLabel: "View",
-  headerClassName: "bg-emerald-600",
-  kindLabelClassName: "text-emerald-200",
-  focusClassName: "border-emerald-500 ring-2 ring-emerald-200",
+  objectType: "views",
   showPrimaryKeys: false,
 };
 

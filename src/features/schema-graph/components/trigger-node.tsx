@@ -1,8 +1,14 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Trigger } from "../types";
-import { cn } from "@/lib/utils";
+import { OBJECT_COLORS } from "@/constants/edge-colors";
 import { buildNodeHandleBase } from "@/features/schema-graph/utils/handle-ids";
+import {
+  NodeKindDot,
+  nodeFocusStyle,
+  nodeHandleClass,
+  nodeShellClass,
+} from "./table-view-node-shared";
 
 interface TriggerNodeData {
   trigger: Trigger;
@@ -17,6 +23,7 @@ function TriggerNodeComponent({ data }: NodeProps) {
   const { trigger, nodeWidth, isFocused, isDimmed, canvasMode, onClick } =
     data as unknown as TriggerNodeData;
   const nodeHandleBase = buildNodeHandleBase(trigger.id);
+  const handleClass = nodeHandleClass(canvasMode);
 
   const events = [
     trigger.firesOnInsert && "I",
@@ -27,22 +34,17 @@ function TriggerNodeComponent({ data }: NodeProps) {
   return (
     <div
       onClick={onClick}
-      style={{ width: nodeWidth }}
-      className={cn(
-        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-shadow duration-200 cursor-pointer relative",
-        isFocused && "border-amber-500 ring-2 ring-amber-200",
-        isDimmed && "opacity-40",
-        !isDimmed && "hover:shadow-md"
-      )}
+      style={{ width: nodeWidth, ...nodeFocusStyle("triggers", isFocused) }}
+      className={nodeShellClass(isDimmed)}
     >
       {/* Header */}
-      <div className="bg-amber-600 text-white px-3 py-2 relative">
+      <div className="relative border-b bg-muted/40 px-3 py-2">
         {/* Left handle for connection FROM parent table - inside header */}
         <Handle
           type="target"
           position={Position.Left}
           id={`${nodeHandleBase}-target`}
-          className={canvasMode ? "!w-2 !h-2 !bg-amber-400 !border-amber-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
+          className={handleClass}
           style={{ top: "50%", transform: "translateY(-50%)", left: -4 }}
         />
         {/* Right handle for outgoing connections (affects edges) - inside header */}
@@ -50,41 +52,46 @@ function TriggerNodeComponent({ data }: NodeProps) {
           type="source"
           position={Position.Right}
           id={`${nodeHandleBase}-source`}
-          className={canvasMode ? "!w-2 !h-2 !bg-amber-400 !border-amber-500 !rounded-full" : "!w-0 !h-0 !bg-transparent !border-0"}
+          className={handleClass}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-amber-200 uppercase tracking-wide">
+        <div className="flex items-center gap-1.5">
+          <NodeKindDot objectType="triggers" />
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Trigger
           </span>
           {trigger.isDisabled && (
-            <span className="text-[9px] bg-amber-800/50 px-1.5 py-0.5 rounded">
+            <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
               DISABLED
             </span>
           )}
         </div>
-        <span className="text-sm font-semibold block whitespace-nowrap">
+        <span className="block whitespace-nowrap text-sm font-semibold">
           {trigger.name}
         </span>
       </div>
 
       {/* Body */}
-      <div className="px-3 py-2 space-y-1">
+      <div className="space-y-1 px-3 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground uppercase">
+          <span className="text-[10px] uppercase text-muted-foreground">
             Type:
           </span>
           <span className="text-xs text-foreground">{trigger.triggerType}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground uppercase">
+          <span className="text-[10px] uppercase text-muted-foreground">
             Events:
           </span>
           <div className="flex gap-1">
             {events.map((event, idx) => (
               <span
                 key={idx}
-                className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded"
+                className="rounded-sm px-1.5 py-0.5 text-[9px] font-bold"
+                style={{
+                  color: OBJECT_COLORS.triggers,
+                  backgroundColor: `color-mix(in srgb, ${OBJECT_COLORS.triggers} 15%, transparent)`,
+                }}
               >
                 {event}
               </span>

@@ -1,11 +1,9 @@
 import { memo, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { TbCircleDashedLetterN, TbLink } from "react-icons/tb";
-import { IoMdKey } from "react-icons/io";
 import { Column } from "../types";
-import { EdgeType } from "../store";
+import { EdgeType, ObjectType } from "../store";
 import { cn } from "@/lib/utils";
-import { EDGE_COLORS } from "@/constants/edge-colors";
+import { EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 import {
   Tooltip,
   TooltipContent,
@@ -41,12 +39,53 @@ export function HandleIndicators({
   );
 }
 
+/** Canvas-mode connection handles share one accent look across node kinds. */
+export function nodeHandleClass(canvasMode?: boolean): string {
+  return canvasMode
+    ? "!w-2 !h-2 !rounded-full !bg-accent-blue !border-accent-blue"
+    : "!w-0 !h-0 !bg-transparent !border-0";
+}
+
+// transition-shadow, not transition-all: focus/dim toggles flip classes on
+// hundreds of nodes at once and must not animate.
+export const NODE_SHELL_CLASS =
+  "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-shadow duration-200 cursor-pointer relative";
+
+export function nodeShellClass(isDimmed?: boolean): string {
+  return cn(
+    NODE_SHELL_CLASS,
+    isDimmed && "opacity-40",
+    !isDimmed && "hover:shadow-md"
+  );
+}
+
+/** Per-type focus emphasis derived from the object color tokens. */
+export function nodeFocusStyle(
+  objectType: ObjectType,
+  isFocused?: boolean
+): React.CSSProperties | undefined {
+  if (!isFocused) return undefined;
+  const color = OBJECT_COLORS[objectType];
+  return {
+    borderColor: color,
+    boxShadow: `0 0 0 1px ${color}, 0 0 0 4px color-mix(in srgb, ${color} 25%, transparent)`,
+  };
+}
+
+export function NodeKindDot({ objectType }: { objectType: ObjectType }) {
+  return (
+    <span
+      aria-hidden
+      className="h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ backgroundColor: OBJECT_COLORS[objectType] }}
+    />
+  );
+}
+
 /** Per-node-kind presentation differences between tables and views. */
 export interface TableViewNodeVariant {
   kindLabel: string;
-  headerClassName: string;
-  kindLabelClassName: string;
-  focusClassName: string;
+  objectType: ObjectType;
   showPrimaryKeys: boolean;
 }
 
@@ -105,18 +144,16 @@ function ColumnRowComponent({
     fkOutgoingTargets,
     fkIncomingTargets,
   } = row;
-  const fkClass =
+  const fkColor =
     hasFkOut && hasFkIn
-      ? "text-violet-500"
+      ? OBJECT_COLORS.storedProcedures
       : hasFkOut
-        ? "text-blue-500"
-        : "text-emerald-500";
+        ? "var(--accent-blue)"
+        : OBJECT_COLORS.views;
 
   // In canvas mode, all columns get handles and they're visible
   const showHandle = hasHandle || canvasMode;
-  const handleClass = canvasMode
-    ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full"
-    : "!w-0 !h-0 !bg-transparent !border-0";
+  const handleClass = nodeHandleClass(canvasMode);
 
   if (isCompact) {
     return (
@@ -175,13 +212,18 @@ function ColumnRowComponent({
           {column.name}
         </span>
         {showPrimaryKeys && column.isPrimaryKey && (
-          <IoMdKey className="text-slate-400 w-3.5 h-3.5 shrink-0 -ml-1" />
+          <span className="shrink-0 text-[8px] font-bold tracking-wide text-muted-foreground">
+            PK
+          </span>
         )}
         {(hasFkOut || hasFkIn) && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <TbLink className={`${fkClass} w-3.5 h-3.5 shrink-0 -ml-1`} />
+              <span
+                className="inline-flex shrink-0 text-[8px] font-bold tracking-wide"
+                style={{ color: fkColor }}
+              >
+                FK
               </span>
             </TooltipTrigger>
             <TooltipContent side="top" align="start" className="max-w-xs">
@@ -222,7 +264,12 @@ function ColumnRowComponent({
           {column.dataType}
         </span>
         {column.isNullable && (
-          <TbCircleDashedLetterN className="text-amber-500 w-3.5 h-3.5 shrink-0 -ml-1" />
+          <span
+            className="shrink-0 text-[8px] font-medium text-muted-foreground/70"
+            title="Nullable"
+          >
+            N
+          </span>
         )}
       </div>
 
@@ -313,9 +360,7 @@ export function TableViewNodeBody({
     [columns, nodeId, columnsWithHandles, fkColumnUsage, fkColumnLinks, handleEdgeTypes]
   );
 
-  const nodeLevelHandleClass = canvasMode
-    ? "!w-2 !h-2 !bg-blue-400 !border-blue-500 !rounded-full"
-    : "!w-0 !h-0 !bg-transparent !border-0";
+  const nodeLevelHandleClass = nodeHandleClass(canvasMode);
 
   return (
     <div
@@ -323,23 +368,12 @@ export function TableViewNodeBody({
       style={{
         width: nodeWidth,
         minHeight: getTableViewNodeHeight(columns.length),
+        ...nodeFocusStyle(variant.objectType, isFocused),
       }}
-      className={cn(
-        // transition-shadow, not transition-all: focus/dim toggles flip
-        // classes on hundreds of nodes at once and must not animate.
-        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-shadow duration-200 cursor-pointer relative",
-        isFocused && variant.focusClassName,
-        isDimmed && "opacity-40",
-        !isDimmed && "hover:shadow-md"
-      )}
+      className={nodeShellClass(isDimmed)}
     >
       {/* Header */}
-      <div
-        className={cn(
-          "text-white px-3 py-2 flex items-center relative",
-          variant.headerClassName
-        )}
-      >
+      <div className="relative flex items-center border-b bg-muted/40 px-3 py-2">
         {/* Generic target handle for incoming node-level references - inside header */}
         <Handle
           type="target"
@@ -357,22 +391,18 @@ export function TableViewNodeBody({
           />
         </div>
 
-        <div className="flex-1">
-          <span
-            className={cn(
-              "text-[10px] uppercase tracking-wide block",
-              variant.kindLabelClassName
-            )}
-          >
+        <div className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+            <NodeKindDot objectType={variant.objectType} />
             {variant.kindLabel}
           </span>
-          <span className="text-sm font-semibold">{name}</span>
+          <span className="block truncate text-sm font-semibold">{name}</span>
         </div>
 
         {/* Browse mode: expand hidden neighbors */}
         {(hiddenNeighborCount ?? 0) > 0 && onExpandNeighbors && (
           <button
-            className="mr-1 shrink-0 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium hover:bg-white/35"
+            className="mr-1 shrink-0 rounded-full bg-accent-blue/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue transition-colors duration-[var(--duration-fast)] hover:bg-accent-blue/25"
             title={`Show ${hiddenNeighborCount} more connected object${
               hiddenNeighborCount === 1 ? "" : "s"
             }`}

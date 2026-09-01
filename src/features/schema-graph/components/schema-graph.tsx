@@ -1869,12 +1869,12 @@ function SchemaGraphInner({
         className="!bg-background [&>pattern>circle]:!fill-border"
         gap={20}
       />
-      <Controls className="!bg-background !border-border !shadow-sm [&>button]:!bg-background [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
+      <Controls className="!rounded-lg !border !border-[var(--panel-border)] !bg-[var(--panel-bg)] !shadow-[var(--panel-shadow)] !overflow-hidden [&>button]:!bg-transparent [&>button]:!border-0 [&>button]:!border-b [&>button]:!border-[var(--panel-border)] [&>button]:!text-foreground [&>button:hover]:!bg-muted [&>button>svg]:!fill-current" />
       {showMiniMap && (
         <MiniMap
           nodeColor={getMinimapNodeColor}
           maskColor="var(--minimap-mask)"
-          className="!bg-background"
+          className="!rounded-lg !bg-[var(--panel-bg)]"
           pannable
           zoomable
         />
@@ -1930,7 +1930,7 @@ function SchemaGraphInner({
                 top: hoverCard.y + EDGE_HOVER_CARD_OFFSET_Y,
                 zIndex: 120,
               }}
-              className="pointer-events-none max-w-[420px] break-words rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+              className="panel-glass pointer-events-none max-w-[420px] break-words rounded-md px-2.5 py-1.5 text-xs text-popover-foreground"
             >
               {hoverCard.title && (
                 <div className="mb-1 font-medium">{hoverCard.title}</div>

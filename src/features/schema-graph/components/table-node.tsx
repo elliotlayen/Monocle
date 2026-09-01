@@ -13,9 +13,7 @@ interface TableNodeData extends TableViewNodeCommonData {
 
 const TABLE_VARIANT: TableViewNodeVariant = {
   kindLabel: "Table",
-  headerClassName: "bg-slate-700",
-  kindLabelClassName: "text-slate-400",
-  focusClassName: "border-blue-500 ring-2 ring-blue-200",
+  objectType: "tables",
   showPrimaryKeys: true,
 };
 
