@@ -1876,9 +1876,11 @@ function SchemaGraphInner({
       <Controls
         className="!rounded-lg !border !border-[var(--panel-border)] !bg-[var(--panel-bg)] !shadow-[var(--panel-shadow)] !overflow-hidden [&>button]:!bg-transparent [&>button]:!border-0 [&>button]:!border-b [&>button]:!border-[var(--panel-border)] [&>button]:!text-foreground [&>button:hover]:!bg-muted [&>button>svg]:!fill-current"
         style={{
-          // Clear the floating sidebar and bottom status strip.
-          marginBottom: 32,
-          marginLeft: sidebarOpen ? SIDEBAR_WIDTH + 12 : 0,
+          // Inline margins replace React Flow's 15px panel margin, so these
+          // include the gap: 12px past the status strip (36px tall zone) and
+          // 12px past the sidebar's right edge (12px inset + width).
+          marginBottom: 48,
+          marginLeft: sidebarOpen ? SIDEBAR_WIDTH + 24 : 12,
           transition:
             "margin-left var(--duration-slow) var(--ease-out)",
         }}
@@ -1888,7 +1890,7 @@ function SchemaGraphInner({
           nodeColor={getMinimapNodeColor}
           maskColor="var(--minimap-mask)"
           className="!rounded-lg !bg-[var(--panel-bg)]"
-          style={{ marginBottom: 32 }}
+          style={{ marginBottom: 48, marginRight: 12 }}
           pannable
           zoomable
         />
