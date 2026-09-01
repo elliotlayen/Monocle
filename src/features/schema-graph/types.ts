@@ -43,6 +43,13 @@ export interface RelationshipEdge {
   isDisabled?: boolean; // FK constraint is disabled on the server (NOCHECK)
 }
 
+// Code object referencing another code object (proc calling a proc, any
+// object using a function). Caller -> callee; table reads/writes are separate.
+export interface CodeDependency {
+  from: string; // Caller object ID
+  to: string; // Callee object ID
+}
+
 // Trigger definition
 export interface Trigger {
   id: string; // Format: "schema.table.trigger_name"
@@ -99,6 +106,7 @@ export interface SchemaGraph {
   triggers: Trigger[];
   storedProcedures: StoredProcedure[];
   scalarFunctions: ScalarFunction[];
+  codeDependencies?: CodeDependency[];
 }
 
 // Authentication type

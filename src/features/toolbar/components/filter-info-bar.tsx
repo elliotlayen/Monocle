@@ -35,6 +35,7 @@ const EDGE_TYPE_ORDER: EdgeType[] = [
   "procedureReads",
   "procedureWrites",
   "functionReads",
+  "codeCalls",
 ];
 
 type BorderMode = "left-accent" | "full-border";

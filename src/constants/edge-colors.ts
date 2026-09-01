@@ -8,6 +8,7 @@ export const EDGE_COLORS: Record<EdgeType, string> = {
   procedureWrites: "#ef4444",
   viewDependencies: "#10b981",
   functionReads: "#06b6d4",
+  codeCalls: "#64748b",
 };
 
 export const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
@@ -18,6 +19,7 @@ export const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
   procedureWrites: "Procedure Writes",
   viewDependencies: "View Dependencies",
   functionReads: "Function Reads",
+  codeCalls: "Calls",
 };
 
 export const OBJECT_COLORS: Record<ObjectType, string> = {

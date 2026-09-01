@@ -628,6 +628,23 @@ function buildBaseEdges(
     });
   });
 
+  // Code-to-code call edges: caller -> callee.
+  const seenCalls = new Set<string>();
+  (schema.codeDependencies || []).forEach((dep) => {
+    if (!dep.from || !dep.to || dep.from === dep.to) return;
+    const key = `${dep.from}=>${dep.to}`;
+    if (seenCalls.has(key)) return;
+    seenCalls.add(key);
+    edges.push({
+      id: `call-edge-${dep.from}-${dep.to}`,
+      type: "codeCalls",
+      source: dep.from,
+      target: dep.to,
+      sourceHandle: `${buildNodeHandleBase(dep.from)}-source`,
+      targetHandle: `${buildNodeHandleBase(dep.to)}-target`,
+    });
+  });
+
   (schema.views || []).forEach((view) => {
     const sources = viewColumnSources.get(view.id) ?? [];
     const representedSourceIds = new Set<string>();

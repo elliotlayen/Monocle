@@ -178,6 +178,10 @@ export function StatusBar() {
               Function Reads: {counts.edgeBreakdown.functionReads.filtered} /{" "}
               {counts.edgeBreakdown.functionReads.total}
             </div>
+            <div>
+              Calls: {counts.edgeBreakdown.codeCalls.filtered} /{" "}
+              {counts.edgeBreakdown.codeCalls.total}
+            </div>
           </div>
         </PopoverContent>
       </Popover>

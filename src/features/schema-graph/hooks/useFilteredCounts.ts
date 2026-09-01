@@ -24,6 +24,7 @@ export interface FilteredCounts {
     procedureWrites: { filtered: number; total: number };
     viewDependencies: { filtered: number; total: number };
     functionReads: { filtered: number; total: number };
+    codeCalls: { filtered: number; total: number };
   };
 }
 
@@ -58,6 +59,7 @@ export function useFilteredCounts(
           procedureWrites: { filtered: 0, total: 0 },
           viewDependencies: { filtered: 0, total: 0 },
           functionReads: { filtered: 0, total: 0 },
+          codeCalls: { filtered: 0, total: 0 },
         },
       };
     }
@@ -178,6 +180,24 @@ export function useFilteredCounts(
       });
     }
 
+    // Code call edges (caller and callee are both code objects; views can call)
+    let codeCallsCount = 0;
+    if (edgeTypeFilter.has("codeCalls")) {
+      const filteredCodeObjectIds = new Set<string>([
+        ...filteredTriggers.map((t) => t.id),
+        ...filteredProcedures.map((p) => p.id),
+        ...filteredFunctions.map((f) => f.id),
+      ]);
+      (schema.codeDependencies || []).forEach((dep) => {
+        if (
+          (filteredCodeObjectIds.has(dep.from) || viewIds.has(dep.from)) &&
+          filteredCodeObjectIds.has(dep.to)
+        ) {
+          codeCallsCount++;
+        }
+      });
+    }
+
     // Total edges (all edge types enabled, all objects visible)
     const allTables = schema.tables;
     const allViews = schema.views || [];
@@ -256,6 +276,23 @@ export function useFilteredCounts(
       });
     });
 
+    let totalCodeCallsEdges = 0;
+    {
+      const allCodeObjectIds = new Set<string>([
+        ...allTriggers.map((t) => t.id),
+        ...allProcedures.map((p) => p.id),
+        ...allFunctions.map((f) => f.id),
+      ]);
+      (schema.codeDependencies || []).forEach((dep) => {
+        if (
+          (allCodeObjectIds.has(dep.from) || allViewIds.has(dep.from)) &&
+          allCodeObjectIds.has(dep.to)
+        ) {
+          totalCodeCallsEdges++;
+        }
+      });
+    }
+
     const totalEdgeCount =
       totalRelationshipEdges +
       totalTriggerReadsEdges +
@@ -263,7 +300,8 @@ export function useFilteredCounts(
       totalProcReadsEdges +
       totalProcWritesEdges +
       totalViewDepEdges +
-      totalFuncReadsEdges;
+      totalFuncReadsEdges +
+      totalCodeCallsEdges;
 
     const filteredEdges =
       relationshipCount +
@@ -272,7 +310,8 @@ export function useFilteredCounts(
       procReadsCount +
       procWritesCount +
       viewDepCount +
-      funcReadsCount;
+      funcReadsCount +
+      codeCallsCount;
 
     const totalObjects =
       schema.tables.length +
@@ -338,6 +377,7 @@ export function useFilteredCounts(
         },
         viewDependencies: { filtered: viewDepCount, total: totalViewDepEdges },
         functionReads: { filtered: funcReadsCount, total: totalFuncReadsEdges },
+        codeCalls: { filtered: codeCallsCount, total: totalCodeCallsEdges },
       },
     };
   }, [

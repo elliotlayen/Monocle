@@ -8,13 +8,13 @@ use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
 
 use crate::db::{
-    create_client, format_data_type, ConnectionError, FOREIGN_KEYS_QUERY, SCALAR_FUNCTIONS_QUERY,
-    STORED_PROCEDURES_QUERY, TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY,
-    VIEW_COLUMN_SOURCES_QUERY,
+    create_client, format_data_type, ConnectionError, CODE_DEPENDENCIES_QUERY, FOREIGN_KEYS_QUERY,
+    SCALAR_FUNCTIONS_QUERY, STORED_PROCEDURES_QUERY, TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY,
+    VIEWS_AND_COLUMNS_QUERY, VIEW_COLUMN_SOURCES_QUERY,
 };
 use crate::types::{
-    Column, ColumnSource, ConnectionParams, ProcedureParameter, RelationshipEdge, ScalarFunction,
-    SchemaGraph, StoredProcedure, TableNode, Trigger, ViewNode,
+    CodeDependency, Column, ColumnSource, ConnectionParams, ProcedureParameter, RelationshipEdge,
+    ScalarFunction, SchemaGraph, StoredProcedure, TableNode, Trigger, ViewNode,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -67,6 +67,10 @@ pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, Schem
         load_scalar_functions(&mut client, &name_to_id).await,
         "scalar functions",
     );
+    let code_dependencies = default_with_warning(
+        load_code_dependencies(&mut client).await,
+        "code dependencies",
+    );
 
     Ok(SchemaGraph {
         tables,
@@ -75,7 +79,42 @@ pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, Schem
         triggers,
         stored_procedures,
         scalar_functions,
+        code_dependencies,
     })
+}
+
+async fn load_code_dependencies(
+    client: &mut Client<Compat<TcpStream>>,
+) -> Result<Vec<CodeDependency>, SchemaError> {
+    let mut dependencies = Vec::new();
+
+    let stream = client.query(CODE_DEPENDENCIES_QUERY, &[]).await?;
+    let mut row_stream = stream.into_row_stream();
+
+    while let Some(row) = row_stream.try_next().await? {
+        let src_schema: &str = row.get(0).unwrap_or_default();
+        let src_name: &str = row.get(1).unwrap_or_default();
+        let src_type: &str = row.get(2).unwrap_or_default();
+        let src_parent_table: &str = row.get(3).unwrap_or_default();
+        let ref_schema: &str = row.get(4).unwrap_or_default();
+        let ref_name: &str = row.get(5).unwrap_or_default();
+
+        // Trigger IDs embed the parent table (schema.table.trigger); every
+        // other code object is schema.name.
+        let from = if src_type == "TR" {
+            if src_parent_table.is_empty() {
+                continue; // database-level trigger, not represented in the graph
+            }
+            format!("{}.{}.{}", src_schema, src_parent_table, src_name)
+        } else {
+            format!("{}.{}", src_schema, src_name)
+        };
+        let to = format!("{}.{}", ref_schema, ref_name);
+
+        dependencies.push(CodeDependency { from, to });
+    }
+
+    Ok(dependencies)
 }
 
 async fn load_tables_and_columns(

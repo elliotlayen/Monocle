@@ -65,6 +65,28 @@ WHERE t_src.is_ms_shipped = 0
 ORDER BY sch_src.name, t_src.name, fk.name, fkc.constraint_column_id
 "#;
 
+pub const CODE_DEPENDENCIES_QUERY: &str = r#"
+SELECT DISTINCT
+    sch_src.name AS src_schema,
+    o_src.name AS src_name,
+    RTRIM(o_src.type) AS src_type,
+    ISNULL(t_src.name, '') AS src_parent_table,
+    sch_ref.name AS ref_schema,
+    o_ref.name AS ref_name
+FROM sys.sql_expression_dependencies d
+JOIN sys.objects o_src ON d.referencing_id = o_src.object_id
+JOIN sys.schemas sch_src ON o_src.schema_id = sch_src.schema_id
+JOIN sys.objects o_ref ON d.referenced_id = o_ref.object_id
+JOIN sys.schemas sch_ref ON o_ref.schema_id = sch_ref.schema_id
+LEFT JOIN sys.tables t_src ON o_src.parent_object_id = t_src.object_id
+WHERE o_src.is_ms_shipped = 0
+  AND o_ref.is_ms_shipped = 0
+  AND o_src.type IN ('P', 'TR', 'V', 'FN', 'IF', 'TF')
+  AND o_ref.type IN ('P', 'FN', 'IF', 'TF')
+  AND o_src.object_id <> o_ref.object_id
+ORDER BY sch_src.name, o_src.name, sch_ref.name, o_ref.name
+"#;
+
 pub const TRIGGERS_QUERY: &str = r#"
 SELECT
     s.name AS schema_name,

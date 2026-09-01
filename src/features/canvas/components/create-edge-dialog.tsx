@@ -51,6 +51,7 @@ const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
   procedureWrites: "Procedure Write",
   viewDependencies: "View Dependency",
   functionReads: "Function Read",
+  codeCalls: "Call",
 };
 
 function getColumnsForObject(

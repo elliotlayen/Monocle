@@ -452,6 +452,7 @@ pub fn load_schema_mock(size: String) -> Result<SchemaGraph, String> {
         triggers,
         stored_procedures,
         scalar_functions,
+        code_dependencies: Vec::new(),
     })
 }
 

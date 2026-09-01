@@ -42,6 +42,7 @@ export type ObjectType =
 export type EdgeType =
   | "relationships"
   | "triggerReads"
+  | "codeCalls"
   | "triggerWrites"
   | "procedureReads"
   | "procedureWrites"
@@ -222,6 +223,7 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
   "procedureWrites",
   "viewDependencies",
   "functionReads",
+  "codeCalls",
 ]);
 
 const createDefaultObjectFilterState = () => ({

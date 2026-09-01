@@ -82,6 +82,14 @@ const EDGE_STYLE: Record<
     labelDimmed: "#67e8f9",
     labelSelected: "#155e75",
   },
+  codeCalls: {
+    base: "#64748b",
+    dimmed: "#cbd5e1",
+    selected: "#475569",
+    label: "#475569",
+    labelDimmed: "#cbd5e1",
+    labelSelected: "#334155",
+  },
 };
 
 export interface EdgeStateInput {
