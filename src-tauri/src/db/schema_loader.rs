@@ -272,15 +272,23 @@ async fn load_foreign_keys(
         let to_id = format!("{}.{}", ref_schema, ref_table);
 
         relationships.push(RelationshipEdge {
-            id: fk_name.to_string(),
+            id: build_fk_edge_id(&from_id, fk_name, src_column, ref_column),
             from: from_id,
             to: to_id,
             from_column: Some(src_column.to_string()),
             to_column: Some(ref_column.to_string()),
+            constraint_name: Some(fk_name.to_string()),
         });
     }
 
     Ok(relationships)
+}
+
+/// Edge IDs must be unique per FK column pair: a composite FK yields one row
+/// per column pair sharing the constraint name, and constraint names are only
+/// unique per schema, so the name alone collides in both cases.
+fn build_fk_edge_id(from_id: &str, fk_name: &str, src_column: &str, ref_column: &str) -> String {
+    format!("{}::{}::{}->{}", from_id, fk_name, src_column, ref_column)
 }
 
 async fn load_triggers(
@@ -497,4 +505,29 @@ fn build_name_lookup(tables: &[TableNode], views: &[ViewNode]) -> HashMap<String
     }
 
     name_to_id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_fk_edge_id;
+
+    #[test]
+    fn composite_fk_column_pairs_get_distinct_ids() {
+        let a = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderId", "Id");
+        let b = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderVersion", "Version");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn cross_schema_same_name_fks_get_distinct_ids() {
+        let a = build_fk_edge_id("sales.Order", "FK_Order_Customer", "CustomerId", "Id");
+        let b = build_fk_edge_id("hr.Order", "FK_Order_Customer", "CustomerId", "Id");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn id_embeds_all_components() {
+        let id = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderId", "Id");
+        assert_eq!(id, "dbo.OrderLine::FK_OrderLine_Order::OrderId->Id");
+    }
 }

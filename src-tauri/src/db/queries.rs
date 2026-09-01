@@ -59,6 +59,9 @@ JOIN sys.schemas sch_ref
 JOIN sys.columns c_ref
   ON fkc.referenced_object_id = c_ref.object_id
  AND fkc.referenced_column_id = c_ref.column_id
+WHERE t_src.is_ms_shipped = 0
+  AND t_ref.is_ms_shipped = 0
+ORDER BY sch_src.name, t_src.name, fk.name, fkc.constraint_column_id
 "#;
 
 pub const TRIGGERS_QUERY: &str = r#"
