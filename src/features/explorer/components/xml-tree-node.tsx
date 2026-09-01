@@ -84,7 +84,7 @@ function renderElementNode(
         <FileCode className="h-3.5 w-3.5 flex-shrink-0" />
 
         {/* Tag name */}
-        <span className="text-sm text-[oklch(0.55_0.18_280)] dark:text-[oklch(0.72_0.14_280)]">
+        <span className="text-sm text-accent-blue">
           {node.tagName}
         </span>
 
@@ -95,11 +95,11 @@ function renderElementNode(
               .slice(0, shownAttrs)
               .map((attr) => (
                 <span key={attr.name} className="flex items-center gap-0">
-                  <span className="text-xs text-[oklch(0.55_0.15_250)] dark:text-[oklch(0.72_0.12_250)]">
+                  <span className="text-xs text-object-functions">
                     {attr.name}
                   </span>
                   <span className="text-xs text-muted-foreground">=</span>
-                  <span className="text-xs text-[oklch(0.55_0.12_150)] dark:text-[oklch(0.72_0.10_150)]">
+                  <span className="text-xs text-success">
                     &quot;{attr.value}&quot;
                   </span>
                 </span>
@@ -190,7 +190,7 @@ function renderCDATANode(node: Node, depth: number, nodeKey: string) {
     >
       <span className="w-4 flex-shrink-0" />
       <Braces className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-      <span className="text-sm truncate max-w-[400px] text-[oklch(0.55_0.08_60)] dark:text-[oklch(0.72_0.06_60)]">
+      <span className="text-sm truncate max-w-[400px] text-muted-foreground">
         &lt;![CDATA[{node.textContent}]]&gt;
       </span>
     </div>

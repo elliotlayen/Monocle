@@ -130,7 +130,7 @@ export function FolderTreeNode({
     if (isSource) {
       if (isError) {
         return (
-          <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
         );
       }
       return <FolderSync className="h-4 w-4 flex-shrink-0" />;
@@ -177,10 +177,10 @@ export function FolderTreeNode({
             {node.childCount}
           </span>
           {folderBadge === "error" && (
-            <span className="h-2 w-2 rounded-full bg-red-500 dark:bg-red-400" />
+            <span className="h-2 w-2 rounded-full bg-destructive" />
           )}
           {folderBadge === "warning" && (
-            <span className="h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-400" />
+            <span className="h-2 w-2 rounded-full bg-warning" />
           )}
         </span>
       );
@@ -189,24 +189,24 @@ export function FolderTreeNode({
     // Folder nodes without childCount (not yet loaded but scanned)
     if (node.isDir && !isSource && folderBadge === "error") {
       return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-red-500 dark:bg-red-400 ml-1" />
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-destructive ml-1" />
       );
     }
     if (node.isDir && !isSource && folderBadge === "warning") {
       return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-amber-500 dark:bg-amber-400 ml-1" />
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-warning ml-1" />
       );
     }
 
     if (!node.isDir && validationStatus === "error") {
       return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-red-500 dark:bg-red-400 ml-1" />
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-destructive ml-1" />
       );
     }
 
     if (!node.isDir && validationStatus === "warning") {
       return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-amber-500 dark:bg-amber-400 ml-1" />
+        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-warning ml-1" />
       );
     }
 
@@ -240,7 +240,7 @@ export function FolderTreeNode({
     if (!node.isDir || isSource || !node.isFavorite) return null;
 
     return (
-      <Star className="h-3.5 w-3.5 flex-shrink-0 fill-amber-500 text-amber-500" />
+      <Star className="h-3.5 w-3.5 flex-shrink-0 fill-warning text-warning" />
     );
   };
 
@@ -394,7 +394,7 @@ export function FolderTreeSourceNode({
         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       )}
       {isError ? (
-        <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+        <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
       ) : (
         <FolderSync className="h-4 w-4 flex-shrink-0" />
       )}

@@ -48,11 +48,11 @@ function ScanFileRowComponent({ file, onFileClick }: ScanFileRowProps) {
 
   const statusIcon =
     file.status === "error" ? (
-      <CircleAlert className="h-4 w-4 flex-shrink-0 text-red-500 dark:text-red-400" />
+      <CircleAlert className="h-4 w-4 flex-shrink-0 text-destructive" />
     ) : file.status === "warning" ? (
-      <TriangleAlert className="h-4 w-4 flex-shrink-0 text-amber-500 dark:text-amber-400" />
+      <TriangleAlert className="h-4 w-4 flex-shrink-0 text-warning" />
     ) : (
-      <CircleCheck className="h-4 w-4 flex-shrink-0 text-green-500 dark:text-green-400" />
+      <CircleCheck className="h-4 w-4 flex-shrink-0 text-success" />
     );
 
   return (
@@ -82,12 +82,12 @@ function ScanFileRowComponent({ file, onFileClick }: ScanFileRowProps) {
         </span>
         <span className="flex-1" />
         {errorCount > 0 && (
-          <span className="text-xs text-red-500 dark:text-red-400 flex-shrink-0">
+          <span className="text-xs text-destructive flex-shrink-0">
             {errorCount} errors
           </span>
         )}
         {warningCount > 0 && (
-          <span className="text-xs text-amber-500 dark:text-amber-400 flex-shrink-0">
+          <span className="text-xs text-warning flex-shrink-0">
             {warningCount} warnings
           </span>
         )}
@@ -106,14 +106,14 @@ function ScanFileRowComponent({ file, onFileClick }: ScanFileRowProps) {
               <CircleAlert
                 className={cn(
                   "h-4 w-4 flex-shrink-0",
-                  "text-red-500 dark:text-red-400"
+                  "text-destructive"
                 )}
               />
             ) : (
               <TriangleAlert
                 className={cn(
                   "h-4 w-4 flex-shrink-0",
-                  "text-amber-500 dark:text-amber-400"
+                  "text-warning"
                 )}
               />
             )}

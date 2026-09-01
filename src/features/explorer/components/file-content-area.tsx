@@ -191,9 +191,9 @@ export function FileContentArea() {
         onCollapseAll={showTreeView ? () => treeViewRef.current?.collapseAll() : () => sourceViewRef.current?.foldAll()}
       />
       {showParseErrorBanner && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0" />
-          <span className="text-sm text-amber-800 dark:text-amber-200">
+        <div className="flex items-center gap-2 px-4 py-2 bg-warning/10 border-b border-warning/30">
+          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+          <span className="text-sm text-foreground">
             Unable to parse XML tree -- showing source view
           </span>
         </div>

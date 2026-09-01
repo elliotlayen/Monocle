@@ -49,16 +49,16 @@ export function ProblemsPanel({
         <span className="flex-1" />
         {errorCount > 0 && (
           <span className="flex items-center gap-1">
-            <CircleDot className="h-3 w-3 text-red-500 dark:text-red-400" />
-            <span className="text-xs text-red-500 dark:text-red-400">
+            <CircleDot className="h-3 w-3 text-destructive" />
+            <span className="text-xs text-destructive">
               {errorCount}
             </span>
           </span>
         )}
         {warningCount > 0 && (
           <span className="flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 text-amber-500 dark:text-amber-400" />
-            <span className="text-xs text-amber-500 dark:text-amber-400">
+            <AlertTriangle className="h-3 w-3 text-warning" />
+            <span className="text-xs text-warning">
               {warningCount}
             </span>
           </span>

@@ -67,13 +67,13 @@ export function ScanProgressPanel() {
         <div className="flex items-center gap-3">
           {(scanProgress?.totalErrors ?? 0) > 0 && (
             <span className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-red-500 dark:bg-red-400" />
+              <span className="h-2 w-2 rounded-full bg-destructive" />
               <span>{scanProgress?.totalErrors} errors</span>
             </span>
           )}
           {(scanProgress?.totalWarnings ?? 0) > 0 && (
             <span className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-400" />
+              <span className="h-2 w-2 rounded-full bg-warning" />
               <span>{scanProgress?.totalWarnings} warnings</span>
             </span>
           )}

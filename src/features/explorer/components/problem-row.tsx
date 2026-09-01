@@ -33,14 +33,14 @@ export function ProblemRow({ problem, onClick }: ProblemRowProps) {
         <CircleAlert
           className={cn(
             "h-4 w-4 flex-shrink-0",
-            "text-red-500 dark:text-red-400"
+            "text-destructive"
           )}
         />
       ) : (
         <TriangleAlert
           className={cn(
             "h-4 w-4 flex-shrink-0",
-            "text-amber-500 dark:text-amber-400"
+            "text-warning"
           )}
         />
       )}
