@@ -101,12 +101,14 @@ export function useFilteredCounts(
       triggerDepCount += filteredTriggers.filter((tr) =>
         tableIds.has(tr.tableId)
       ).length;
-      // Trigger to referenced tables edges
+      // Trigger to referenced tables edges (write edges subsume read edges)
       filteredTriggers.forEach((trigger) => {
+        const affectedTableIds = new Set(trigger.affectedTables || []);
         (trigger.referencedTables || []).forEach((tableId) => {
           if (
             (tableIds.has(tableId) || viewIds.has(tableId)) &&
-            tableId !== trigger.tableId
+            tableId !== trigger.tableId &&
+            !affectedTableIds.has(tableId)
           ) {
             triggerDepCount++;
           }
@@ -206,10 +208,12 @@ export function useFilteredCounts(
       if (allTableIds.has(trigger.tableId)) {
         totalTriggerDepEdges++;
       }
+      const affectedTableIds = new Set(trigger.affectedTables || []);
       (trigger.referencedTables || []).forEach((tableId) => {
         if (
           (allTableIds.has(tableId) || allViewIds.has(tableId)) &&
-          tableId !== trigger.tableId
+          tableId !== trigger.tableId &&
+          !affectedTableIds.has(tableId)
         ) {
           totalTriggerDepEdges++;
         }

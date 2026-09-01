@@ -565,8 +565,12 @@ function buildBaseEdges(
       label: trigger.name,
     });
 
+    const affectedTableIds = new Set(trigger.affectedTables || []);
+
     (trigger.referencedTables || []).forEach((tableId) => {
       if (tableId === trigger.tableId) return;
+      // A write edge to the same table already implies the read dependency.
+      if (affectedTableIds.has(tableId)) return;
       edges.push({
         id: `trigger-ref-edge-${trigger.id}-${tableId}`,
         type: "triggerDependencies",
