@@ -54,14 +54,25 @@ describe("buildVisibleTree", () => {
     expect(lines.isExpanded).toBe(false);
   });
 
-  it("marks text children and keeps document order", () => {
+  it("inlines single-text-child elements into one node", () => {
     const doc = parse(SAMPLE);
-    const visible = buildVisibleTree(doc, new Set(["0", "0.0", "0.0.0"]));
+    const visible = buildVisibleTree(doc, new Set(["0", "0.0"]));
     const name = visible.find((n) => n.id === "0.0.0");
     expect(name?.label).toBe("name");
-    const text = visible.find((n) => n.id === "0.0.0.0");
-    expect(text?.kind).toBe("text");
-    expect(text?.label).toBe("Acme");
+    expect(name?.value).toBe("Acme");
+    expect(name?.hasChildren).toBe(false);
+    expect(visible.some((n) => n.id === "0.0.0.0")).toBe(false);
+  });
+
+  it("inlines the title example with attributes intact", () => {
+    const doc = parse('<lib><title lang="en">The Great Gatsby</title></lib>');
+    const visible = buildVisibleTree(doc, new Set(["0"]));
+    expect(visible).toHaveLength(2);
+    const title = visible[1];
+    expect(title.label).toBe("title");
+    expect(title.attrs).toEqual([{ name: "lang", value: "en" }]);
+    expect(title.value).toBe("The Great Gatsby");
+    expect(title.hasChildren).toBe(false);
   });
 });
 
@@ -70,7 +81,8 @@ describe("collectExpandableKeys", () => {
     const doc = parse(SAMPLE);
     const keys: string[] = [];
     collectExpandableKeys(doc.documentElement, "0", keys);
-    expect(keys).toEqual(["0", "0.0", "0.0.0", "0.1"]);
+    // name has a lone text child, so it renders inlined and is not expandable
+    expect(keys).toEqual(["0", "0.0", "0.1"]);
   });
 });
 
@@ -78,7 +90,7 @@ describe("computeDefaultExpandedIds", () => {
   it("expands to the depth limit for small documents", () => {
     const doc = parse(SAMPLE);
     const ids = computeDefaultExpandedIds(doc, 3, 400);
-    expect([...ids].sort()).toEqual(["0", "0.0", "0.0.0", "0.1"]);
+    expect([...ids].sort()).toEqual(["0", "0.0", "0.1"]);
   });
 
   it("backs off to shallower depth when the cap is exceeded", () => {

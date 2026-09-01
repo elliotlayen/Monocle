@@ -11,15 +11,19 @@ export const XML_NODE_MAX_WIDTH = 640;
 // attribute size.
 const LABEL_CHAR_W = 7.2;
 const ATTR_CHAR_W = 6;
+const VALUE_CHAR_W = 6.6; // 11px value text
 const BASE_PADDING = 46; // horizontal padding + kind icon + gaps
 const PILL_RESERVE = 44; // room for the +N children pill
 
-/** Content-fitted node width so labels and attributes never truncate. */
+/** Content-fitted node width so labels, attributes, and inlined values never truncate. */
 export function estimateXmlNodeWidth(node: VisibleXmlNode): number {
   let width = BASE_PADDING + node.label.length * LABEL_CHAR_W;
   for (const attr of node.attrs) {
     // name="value" plus inter-attribute gap
     width += (attr.name.length + attr.value.length + 3) * ATTR_CHAR_W + 8;
+  }
+  if (node.value) {
+    width += node.value.length * VALUE_CHAR_W + 14;
   }
   if (node.hasChildren) width += PILL_RESERVE;
   return Math.round(

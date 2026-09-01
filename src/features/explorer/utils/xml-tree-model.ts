@@ -18,6 +18,8 @@ export interface VisibleXmlNode {
   kind: XmlNodeKind;
   label: string;
   attrs: XmlAttr[];
+  /** Inlined text for elements whose only child is a text node. */
+  value?: string;
   childCount: number;
   hasChildren: boolean;
   isExpanded: boolean;
@@ -69,6 +71,18 @@ function labelOf(node: Node, kind: XmlNodeKind): string {
   }
 }
 
+/**
+ * Elements like <title lang="en">The Great Gatsby</title> collapse into a
+ * single node carrying the text as its value instead of a two-node chain.
+ */
+function inlineTextValue(kind: XmlNodeKind, children: Node[]): string | null {
+  if (kind !== "element") return null;
+  if (children.length !== 1) return null;
+  const only = children[0];
+  if (only.nodeType !== 3) return null;
+  return only.textContent?.trim() ?? "";
+}
+
 function attrsOf(node: Node, kind: XmlNodeKind): XmlAttr[] {
   if (kind !== "element") return [];
   const el = node as Element;
@@ -101,6 +115,22 @@ export function buildVisibleTree(
     const kind = kindOf(node);
     const children = filteredChildren(node);
     const isExpanded = expandedIds.has(id);
+    const value = inlineTextValue(kind, children);
+    if (value !== null) {
+      result.push({
+        id,
+        parentId,
+        depth,
+        kind,
+        label: labelOf(node, kind),
+        attrs: attrsOf(node, kind),
+        value,
+        childCount: 0,
+        hasChildren: false,
+        isExpanded: false,
+      });
+      return;
+    }
     result.push({
       id,
       parentId,
@@ -129,6 +159,8 @@ export function collectExpandableKeys(
   keys: string[]
 ): void {
   const children = filteredChildren(node);
+  // Single-text elements render inlined, so they are not expandable.
+  if (inlineTextValue(kindOf(node), children) !== null) return;
   if (children.length > 0) keys.push(key);
   children.forEach((child, index) => {
     collectExpandableKeys(child, `${key}.${index}`, keys);
@@ -143,6 +175,7 @@ function expandableKeysAboveDepth(doc: Document, maxDepth: number): string[] {
   const keys: string[] = [];
   const visit = (node: Node, key: string, depth: number) => {
     const children = filteredChildren(node);
+    if (inlineTextValue(kindOf(node), children) !== null) return;
     if (children.length > 0 && depth < maxDepth) keys.push(key);
     children.forEach((child, index) => {
       visit(child, `${key}.${index}`, depth + 1);
