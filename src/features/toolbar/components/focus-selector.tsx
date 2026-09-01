@@ -19,15 +19,9 @@ import {
 import { useSchemaStore, type ObjectType } from "@/features/schema-graph/store";
 import { OBJECT_COLORS } from "@/constants/edge-colors";
 
-const MAX_RESULTS = 50;
+import { OBJECT_TYPE_SINGULAR_LABELS } from "@/constants/object-type-meta";
 
-const TYPE_LABELS: Record<ObjectType, string> = {
-  tables: "table",
-  views: "view",
-  triggers: "trigger",
-  storedProcedures: "procedure",
-  scalarFunctions: "function",
-};
+const MAX_RESULTS = 50;
 
 interface ObjectEntry {
   id: string;
@@ -198,7 +192,7 @@ export function FocusSelector() {
                   />
                   <span className="truncate flex-1">{entry.id}</span>
                   <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">
-                    {TYPE_LABELS[entry.type]}
+                    {OBJECT_TYPE_SINGULAR_LABELS[entry.type]}
                   </span>
                 </CommandItem>
               ))}

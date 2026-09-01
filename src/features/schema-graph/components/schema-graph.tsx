@@ -26,6 +26,7 @@ import {
   ScalarFunction,
 } from "../types";
 import { ObjectType, EdgeType, useSchemaStore } from "../store";
+import { OBJECT_COLORS } from "@/constants/edge-colors";
 import { getSchemaIndex } from "@/lib/schema-index";
 import { useShallow } from "zustand/shallow";
 import { TableNode } from "./table-node";
@@ -158,13 +159,13 @@ const ALL_OBJECT_TYPES_FALLBACK: Set<ObjectType> = new Set([
 
 // MiniMap node color function - defined outside component for stable reference
 function getMinimapNodeColor(node: Node): string {
-  if (node.data?.isFocused) return "#3b82f6";
+  if (node.data?.isFocused) return "var(--accent-blue)";
   if (node.data?.isDimmed) return "var(--color-muted)";
-  if (node.type === "viewNode") return "#10b981";
-  if (node.type === "triggerNode") return "#f59e0b";
-  if (node.type === "storedProcedureNode") return "#8b5cf6";
-  if (node.type === "scalarFunctionNode") return "#06b6d4";
-  return "#64748b";
+  if (node.type === "viewNode") return OBJECT_COLORS.views;
+  if (node.type === "triggerNode") return OBJECT_COLORS.triggers;
+  if (node.type === "storedProcedureNode") return OBJECT_COLORS.storedProcedures;
+  if (node.type === "scalarFunctionNode") return OBJECT_COLORS.scalarFunctions;
+  return OBJECT_COLORS.tables;
 }
 
 interface SchemaGraphProps {
@@ -1295,19 +1296,19 @@ function SchemaGraphInner({
   const objectTextColorById = useMemo(() => {
     const colors = new Map<string, string>();
     schema.tables.forEach((table) => {
-      colors.set(table.id, "#64748b");
+      colors.set(table.id, OBJECT_COLORS.tables);
     });
     (schema.views || []).forEach((view) => {
-      colors.set(view.id, "#10b981");
+      colors.set(view.id, OBJECT_COLORS.views);
     });
     (schema.triggers || []).forEach((trigger) => {
-      colors.set(trigger.id, "#f59e0b");
+      colors.set(trigger.id, OBJECT_COLORS.triggers);
     });
     (schema.storedProcedures || []).forEach((procedure) => {
-      colors.set(procedure.id, "#8b5cf6");
+      colors.set(procedure.id, OBJECT_COLORS.storedProcedures);
     });
     (schema.scalarFunctions || []).forEach((fn) => {
-      colors.set(fn.id, "#06b6d4");
+      colors.set(fn.id, OBJECT_COLORS.scalarFunctions);
     });
     return colors;
   }, [schema]);

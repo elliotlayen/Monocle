@@ -54,21 +54,11 @@ import {
   type ObjectBuckets,
 } from "@/features/schema-graph/utils/object-filtering";
 
-const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
-  tables: "Tables",
-  views: "Views",
-  triggers: "Triggers",
-  storedProcedures: "Stored Procedures",
-  scalarFunctions: "Scalar Functions",
-};
+import {
+  OBJECT_TYPE_LABELS,
+  OBJECT_TYPE_ORDER,
+} from "@/constants/object-type-meta";
 
-const OBJECT_TYPE_ORDER: ObjectType[] = [
-  "tables",
-  "views",
-  "triggers",
-  "storedProcedures",
-  "scalarFunctions",
-];
 const ALL_OBJECT_TYPES_FOR_PANEL = new Set<ObjectType>(OBJECT_TYPE_ORDER);
 
 const EMPTY_OBJECT_BUCKETS: ObjectBuckets = {
@@ -485,12 +475,7 @@ export function Toolbar({
     <div className="relative z-20 flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
       {/* Left: Monocle branding + canvas controls */}
       <div className="flex items-center gap-2">
-        <span
-          className="font-semibold text-base"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          Monocle
-        </span>
+        <span className="font-semibold text-base">Monocle</span>
 
         {canvasMode && (
           <>

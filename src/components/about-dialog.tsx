@@ -26,7 +26,6 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           <MonocleLogo className="w-20 h-20 mb-4" />
           <h2
             className="text-2xl font-bold mb-1"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             Monocle
           </h2>

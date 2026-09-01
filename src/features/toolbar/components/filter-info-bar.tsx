@@ -10,23 +10,11 @@ import {
   EDGE_COLORS,
   OBJECT_COLORS,
 } from "@/constants/edge-colors";
+import {
+  OBJECT_TYPE_LABELS,
+  OBJECT_TYPE_ORDER,
+} from "@/constants/object-type-meta";
 
-const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
-  tables: "Tables",
-  views: "Views",
-  triggers: "Triggers",
-  storedProcedures: "Stored Procedures",
-  scalarFunctions: "Scalar Functions",
-};
-
-// Order for consistent color display
-const OBJECT_TYPE_ORDER: ObjectType[] = [
-  "tables",
-  "views",
-  "triggers",
-  "storedProcedures",
-  "scalarFunctions",
-];
 const EDGE_TYPE_ORDER: EdgeType[] = [
   "relationships",
   "viewDependencies",
@@ -40,15 +28,10 @@ const EDGE_TYPE_ORDER: EdgeType[] = [
 
 type BorderMode = "left-accent" | "full-border";
 
-function hexToRgba(hex: string, alpha: number): string {
-  const normalized = hex.replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return hex;
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+// Colors arrive as CSS var references (see edge-colors.ts), so alpha is
+// applied with color-mix rather than hex parsing.
+function withAlpha(color: string, alphaPercent: number): string {
+  return `color-mix(in srgb, ${color} ${alphaPercent}%, transparent)`;
 }
 
 export function FilterInfoBar() {
@@ -187,7 +170,7 @@ function FilterBox({
   // Full-border mode is used for focus to match notification chips.
   const borderStyle =
     borderMode === "full-border"
-      ? { borderColor: hexToRgba(colors[0], 0.3) }
+      ? { borderColor: withAlpha(colors[0], 30) }
       : colors.length === 1
         ? { borderLeftWidth: 3, borderLeftColor: colors[0] }
         : {

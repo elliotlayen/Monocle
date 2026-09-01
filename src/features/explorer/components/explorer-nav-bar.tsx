@@ -45,7 +45,6 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
     <div className="relative z-20 flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
       <span
         className="font-semibold text-base"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
         Monocle
       </span>

@@ -1,6 +1,7 @@
 import { type Edge, MarkerType } from "@xyflow/react";
 import { type EdgeType } from "../store";
 import { isEdgeRenderable } from "./edge-visibility";
+import { EDGE_COLORS } from "@/constants/edge-colors";
 
 export interface EdgeMeta {
   id: string;
@@ -15,81 +16,38 @@ export interface EdgeMeta {
   isDisabled?: boolean;
 }
 
-const EDGE_STYLE: Record<
-  EdgeType,
-  {
-    base: string;
-    dimmed: string;
-    selected: string;
-    label: string;
-    labelDimmed: string;
-    labelSelected: string;
-  }
-> = {
-  relationships: {
-    base: "#3b82f6",
-    dimmed: "#93c5fd",
-    selected: "#2563eb",
-    label: "#2563eb",
-    labelDimmed: "#93c5fd",
-    labelSelected: "#1d4ed8",
-  },
-  triggerReads: {
-    base: "#f59e0b",
-    dimmed: "#fcd34d",
-    selected: "#d97706",
-    label: "#b45309",
-    labelDimmed: "#fcd34d",
-    labelSelected: "#92400e",
-  },
-  triggerWrites: {
-    base: "#ef4444",
-    dimmed: "#fca5a5",
-    selected: "#dc2626",
-    label: "#dc2626",
-    labelDimmed: "#fca5a5",
-    labelSelected: "#991b1b",
-  },
-  procedureReads: {
-    base: "#8b5cf6",
-    dimmed: "#c4b5fd",
-    selected: "#7c3aed",
-    label: "#7c3aed",
-    labelDimmed: "#c4b5fd",
-    labelSelected: "#5b21b6",
-  },
-  procedureWrites: {
-    base: "#ef4444",
-    dimmed: "#fca5a5",
-    selected: "#dc2626",
-    label: "#dc2626",
-    labelDimmed: "#fca5a5",
-    labelSelected: "#991b1b",
-  },
-  viewDependencies: {
-    base: "#10b981",
-    dimmed: "#6ee7b7",
-    selected: "#059669",
-    label: "#047857",
-    labelDimmed: "#6ee7b7",
-    labelSelected: "#065f46",
-  },
-  functionReads: {
-    base: "#06b6d4",
-    dimmed: "#67e8f9",
-    selected: "#0891b2",
-    label: "#0891b2",
-    labelDimmed: "#67e8f9",
-    labelSelected: "#155e75",
-  },
-  codeCalls: {
-    base: "#64748b",
-    dimmed: "#cbd5e1",
-    selected: "#475569",
-    label: "#475569",
-    labelDimmed: "#cbd5e1",
-    labelSelected: "#334155",
-  },
+interface EdgeStylePalette {
+  base: string;
+  dimmed: string;
+  selected: string;
+  label: string;
+  labelDimmed: string;
+  labelSelected: string;
+}
+
+// All edge color identity comes from the --edge-* tokens in index.css via
+// EDGE_COLORS; dimmed/selected/label variants are derived with color-mix so
+// they adapt to both themes (alpha for dimming, foreground mix for emphasis).
+function edgeStylePalette(base: string): EdgeStylePalette {
+  return {
+    base,
+    dimmed: `color-mix(in srgb, ${base} 45%, transparent)`,
+    selected: `color-mix(in srgb, ${base} 82%, var(--foreground))`,
+    label: `color-mix(in srgb, ${base} 78%, var(--foreground))`,
+    labelDimmed: `color-mix(in srgb, ${base} 45%, transparent)`,
+    labelSelected: `color-mix(in srgb, ${base} 65%, var(--foreground))`,
+  };
+}
+
+const EDGE_STYLE: Record<EdgeType, EdgeStylePalette> = {
+  relationships: edgeStylePalette(EDGE_COLORS.relationships),
+  triggerReads: edgeStylePalette(EDGE_COLORS.triggerReads),
+  triggerWrites: edgeStylePalette(EDGE_COLORS.triggerWrites),
+  procedureReads: edgeStylePalette(EDGE_COLORS.procedureReads),
+  procedureWrites: edgeStylePalette(EDGE_COLORS.procedureWrites),
+  viewDependencies: edgeStylePalette(EDGE_COLORS.viewDependencies),
+  functionReads: edgeStylePalette(EDGE_COLORS.functionReads),
+  codeCalls: edgeStylePalette(EDGE_COLORS.codeCalls),
 };
 
 export interface EdgeStateInput {
@@ -264,8 +222,8 @@ export function deriveEdgeState({
         : undefined,
       labelBgStyle: label
         ? {
-            fill: "#ffffff",
-            fillOpacity: 0.8,
+            fill: "var(--background)",
+            fillOpacity: 0.85,
           }
         : undefined,
     });

@@ -31,7 +31,6 @@ export function HomeScreen({
         <MonocleLogo className="w-16 h-16" />
         <h1
           className="text-5xl font-bold"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
         >
           Monocle
         </h1>

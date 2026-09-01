@@ -31,7 +31,6 @@ export function AboutSettingsSection() {
           <div>
             <p
               className="font-semibold text-sm"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
               Monocle
             </p>

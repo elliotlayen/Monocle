@@ -116,7 +116,9 @@ describe("deriveEdgeState", () => {
     const edge = result.edges[0];
     expect(edge.id).toBe("edge-orders-column-customers-column");
     expect(edge.style).toMatchObject({ strokeWidth: 4, opacity: 1 });
-    expect(edge.markerEnd).toMatchObject({ color: "#2563eb" });
+    // Selected stroke is a themed color-mix derivation; the marker must match it.
+    expect(edge.style?.stroke).toContain("color-mix");
+    expect(edge.markerEnd).toMatchObject({ color: edge.style?.stroke });
     expect(Object.prototype.hasOwnProperty.call(edge, "hidden")).toBe(false);
   });
 
