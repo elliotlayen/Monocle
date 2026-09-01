@@ -25,14 +25,14 @@ function HomeActionRow({
 }) {
   return (
     <button
-      className="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-xs transition-[background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-backwards hover:bg-accent active:scale-[0.99]"
+      className="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-sm transition-[background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-backwards hover:bg-accent active:scale-[0.99]"
       style={{ animationDelay: `${delayMs}ms` }}
       onClick={action.onClick}
     >
       <span className="text-muted-foreground">{action.icon}</span>
       <span className="flex-1 font-medium">{action.label}</span>
       {action.shortcut && (
-        <kbd className="rounded-sm border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        <kbd className="rounded-sm border px-2 py-0.5 text-[11px] text-muted-foreground">
           {action.shortcut}
         </kbd>
       )}
@@ -54,31 +54,31 @@ export function HomeScreen({
 
   const actions: HomeAction[] = [
     {
-      icon: <Server className="h-4 w-4" />,
+      icon: <Server className="h-5 w-5" />,
       label: "Schema Browser",
       shortcut: `${modKey}+N`,
       onClick: onOpenConnectionModal,
     },
     {
-      icon: <PenTool className="h-4 w-4" />,
+      icon: <PenTool className="h-5 w-5" />,
       label: "Canvas Mode",
       shortcut: `${modKey}+K`,
       onClick: onEnterCanvasMode,
     },
     {
-      icon: <FolderSync className="h-4 w-4" />,
+      icon: <FolderSync className="h-5 w-5" />,
       label: "Integration Explorer",
       shortcut: `${modKey}+E`,
       onClick: onEnterExplorer,
     },
     {
-      icon: <Settings className="h-4 w-4" />,
+      icon: <Settings className="h-5 w-5" />,
       label: "Settings",
       shortcut: `${modKey}+,`,
       onClick: onOpenSettings,
     },
     {
-      icon: <Info className="h-4 w-4" />,
+      icon: <Info className="h-5 w-5" />,
       label: "About",
       onClick: onOpenAbout,
     },
