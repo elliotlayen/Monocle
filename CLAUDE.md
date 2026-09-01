@@ -74,12 +74,13 @@ src/
         edge-visibility.ts          - Edge/handle renderability checks
         node-render-update.ts       - Efficient node render diffing
         zoom-band.ts                - Discrete zoom band thresholds
-        detail-popover.tsx          - Popover for object details
+        detail-inspector.tsx        - Floating inspector panel for object details
+        detail-drawer.tsx           - Bottom drawer for object details
         detail-content.tsx          - Content for detail popover
         sql-code-block.tsx          - Monaco SQL syntax highlighting (readonly)
       hooks/
         useFilteredCounts.ts        - Filter statistics hook
-        use-detail-popover.ts       - Detail popover state hook
+        use-detail-view.ts          - Detail view state, presence, dismissal hooks
       services/
         schema-service.ts           - Tauri IPC for schema loading
       utils/
@@ -95,7 +96,6 @@ src/
     toolbar/
       components/
         toolbar.tsx                 - Main toolbar with controls
-        search-bar.tsx              - Fuzzy search component
         filter-info-bar.tsx         - Active filter display
         database-selector.tsx       - Database dropdown
         focus-selector.tsx          - Focus/browse selection dropdown
@@ -132,6 +132,7 @@ src/
   lib/
     schema-index.ts                 - Schema search index and relationship lookups
     monaco-sql-loader.ts            - Lazy Monaco Editor + SQL language loader
+    monaco-themes.ts                - Monocle Monaco themes (hexes mirror index.css tokens)
     sql-intellisense.ts             - SQL autocomplete provider for schema objects
   utils/
     index.ts                        - Utility exports
@@ -251,6 +252,16 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - **No emojis**: Do not use emojis anywhere in code, comments, commits, or documentation
 - **Commit messages**: Do not include "Generated with Claude Code" or "Co-Authored-By" lines
 - **Components**: Use shadcn/ui for UI components
+
+## Design System ("Instrument")
+
+- All color identity lives in `src/index.css` tokens: shadcn semantics plus `--object-*` (five object types), `--edge-*`, `--accent-blue`, glass panel tokens (`--panel-bg/border/blur/shadow`), and motion tokens (`--ease-out`, `--ease-in-out`, `--duration-fast/base/slow`). Dark is the design source; light derives from the same ramp. Never hardcode palette hexes in components; `EDGE_COLORS`/`OBJECT_COLORS` in `src/constants/edge-colors.ts` are `var(--...)` references.
+- Chrome floats over a full-bleed canvas as `.panel-glass` panels (toolbar, sidebar, status strip, filter chips, detail views). The sidebar overlays the canvas; it does not push layout.
+- JetBrains Mono is the body face, self-hosted via `@fontsource/jetbrains-mono` (weights 400-700, imported in `main.tsx`). No Google Fonts CDN.
+- Motion: CSS-only, transform/opacity, sub-300ms, tokens for easing/duration, `active:scale-[0.97]` press feedback in the button primitive, global `prefers-reduced-motion` override in `index.css`. Nodes keep the transition-shadow-only constraint (see `table-view-node-shared.tsx`).
+- Toasts render through Sonner behind the existing `useToastStore`/`showToast` API in `src/features/notifications/store.tsx` (headless `toast.custom` content). One `<Toaster />` mounts in `App.tsx`.
+- Monaco editors use the `monocle-dark`/`monocle-light` themes from `src/lib/monaco-themes.ts`; its hexes mirror the CSS tokens and must be kept in sync.
+- Object details open per the `detailViewMode` setting ("inspector" | "drawer"), persisted like `showMiniMap`.
 
 ## Notes
 
