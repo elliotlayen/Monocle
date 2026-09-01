@@ -88,6 +88,12 @@ interface SchemaStore {
   // UI
   sidebarOpen: boolean;
 
+  // Browse mode (focus-first startup)
+  viewMode: "full" | "browse";
+  browseThreshold: number;
+  focusRoots: Set<string>;
+  expandedNodeIds: Set<string>;
+
   // Derived data
   availableSchemas: string[];
 
@@ -110,6 +116,14 @@ interface SchemaStore {
   clearFocus: () => void;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
+  setBrowseThreshold: (threshold: number) => void;
+  toggleFocusRoot: (id: string) => void;
+  removeFocusRoot: (id: string) => void;
+  clearFocusRoots: () => void;
+  expandNodeNeighbors: (id: string) => void;
+  showFullGraph: () => void;
+  enterBrowseMode: () => void;
+  focusObject: (id: string) => void;
   toggleObjectType: (type: ObjectType) => void;
   setObjectTypeFilter: (types: Set<ObjectType>) => void;
   selectAllObjectTypes: () => void;
@@ -230,6 +244,28 @@ const ALL_EDGE_TYPES: Set<EdgeType> = new Set([
   "functionReads",
   "codeCalls",
 ]);
+
+const countSchemaObjects = (schema: SchemaGraph) =>
+  schema.tables.length +
+  (schema.views?.length || 0) +
+  (schema.triggers?.length || 0) +
+  (schema.storedProcedures?.length || 0) +
+  (schema.scalarFunctions?.length || 0);
+
+// Large schemas start in browse mode: nothing renders until the user picks
+// focus roots, so connecting never pays for a full-graph layout.
+const createBrowseStateForSchema = (
+  schema: SchemaGraph,
+  browseThreshold: number
+) => {
+  const browse = countSchemaObjects(schema) > browseThreshold;
+  return {
+    viewMode: (browse ? "browse" : "full") as "full" | "browse",
+    focusRoots: new Set<string>(),
+    expandedNodeIds: new Set<string>(),
+    ...(browse ? { sidebarOpen: true } : {}),
+  };
+};
 
 const createDefaultObjectFilterState = () => ({
   objectTypeFilter: new Set(ALL_OBJECT_TYPES),
@@ -469,6 +505,10 @@ export const createInitialSchemaState = () => ({
   showMiniMap: true,
   focusedTableId: null,
   sidebarOpen: true,
+  viewMode: "full" as const,
+  browseThreshold: 100,
+  focusRoots: new Set<string>(),
+  expandedNodeIds: new Set<string>(),
   ...createDefaultObjectFilterState(),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
   selectedEdgeIds: new Set<string>(),
@@ -709,6 +749,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         schemaFilter: resolvedSchemaFilter,
         ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
+        ...createBrowseStateForSchema(schema, get().browseThreshold),
       });
       return true;
     } catch (err) {
@@ -744,6 +785,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set<string>(),
+        ...createBrowseStateForSchema(schema, get().browseThreshold),
       });
       return true;
     } catch (err) {
@@ -823,6 +865,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         ...createDefaultObjectFilterState(),
         edgeTypeFilter: new Set(ALL_EDGE_TYPES),
         selectedEdgeIds: new Set<string>(),
+        ...createBrowseStateForSchema(schema, get().browseThreshold),
       });
       return true;
     } catch (err) {
@@ -883,6 +926,16 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         ...(focusChanged
           ? createDefaultObjectFilterState()
           : { excludedObjectIds: resolvedExcludedObjectIds }),
+        // Keep the current view mode across refresh; drop roots and
+        // expansions for objects that no longer exist.
+        focusRoots: new Set(
+          [...get().focusRoots].filter((id) => getAllNodeIds(schema).has(id))
+        ),
+        expandedNodeIds: new Set(
+          [...get().expandedNodeIds].filter((id) =>
+            getAllNodeIds(schema).has(id)
+          )
+        ),
         selectedEdgeIds: new Set<string>(),
         connectionInfo: {
           server: serverConnection.server,
@@ -912,6 +965,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set<string>(),
       availableSchemas: [],
+      viewMode: "full",
+      focusRoots: new Set<string>(),
+      expandedNodeIds: new Set<string>(),
       error: null,
     }),
 
@@ -947,6 +1003,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
     if (settings.focusExpandThreshold !== undefined) {
       updates.focusExpandThreshold = settings.focusExpandThreshold;
+    }
+    if (settings.browseThreshold !== undefined) {
+      updates.browseThreshold = settings.browseThreshold;
     }
 
     if (settings.edgeLabelMode) {
@@ -993,6 +1052,58 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+
+  setBrowseThreshold: (threshold: number) => {
+    set({ browseThreshold: threshold });
+    settingsService.saveSettings({ browseThreshold: threshold }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  toggleFocusRoot: (id: string) =>
+    set((state) => {
+      const focusRoots = new Set(state.focusRoots);
+      if (focusRoots.has(id)) {
+        focusRoots.delete(id);
+      } else {
+        focusRoots.add(id);
+      }
+      return { focusRoots };
+    }),
+
+  removeFocusRoot: (id: string) =>
+    set((state) => {
+      if (!state.focusRoots.has(id)) return state;
+      const focusRoots = new Set(state.focusRoots);
+      focusRoots.delete(id);
+      return { focusRoots };
+    }),
+
+  clearFocusRoots: () =>
+    set({ focusRoots: new Set<string>(), expandedNodeIds: new Set<string>() }),
+
+  expandNodeNeighbors: (id: string) =>
+    set((state) => {
+      if (state.expandedNodeIds.has(id)) return state;
+      const expandedNodeIds = new Set(state.expandedNodeIds);
+      expandedNodeIds.add(id);
+      return { expandedNodeIds };
+    }),
+
+  showFullGraph: () => set({ viewMode: "full" }),
+
+  enterBrowseMode: () => set({ viewMode: "browse", focusedTableId: null }),
+
+  // Route an object focus request by view mode: browse mode toggles the
+  // object as a root; full view toggles the dim-focus highlight.
+  focusObject: (id: string) => {
+    const state = get();
+    if (state.viewMode === "browse" && state.mode !== "canvas") {
+      state.toggleFocusRoot(id);
+      return;
+    }
+    state.setFocusedTable(state.focusedTableId === id ? null : id);
+  },
 
   setFocusedTable: (tableId: string | null) =>
     set((state) => {
@@ -1086,6 +1197,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set<string>(),
       availableSchemas: [],
+      viewMode: "full",
+      focusRoots: new Set<string>(),
+      expandedNodeIds: new Set<string>(),
       error: null,
     }),
 
@@ -1116,6 +1230,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       ...createDefaultObjectFilterState(),
       edgeTypeFilter: new Set(ALL_EDGE_TYPES),
       selectedEdgeIds: new Set<string>(),
+      viewMode: "full",
+      focusRoots: new Set<string>(),
+      expandedNodeIds: new Set<string>(),
       error: null,
     });
   },

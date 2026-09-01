@@ -17,6 +17,8 @@ const EDGE_LABEL_MODES: Array<{ label: string; value: EdgeLabelMode }> = [
 
 const FOCUS_THRESHOLD_OPTIONS = ["5", "10", "15", "20", "25"];
 
+const BROWSE_THRESHOLD_OPTIONS = ["50", "100", "200", "500", "1000"];
+
 export function GraphSettingsSection() {
   const {
     schema,
@@ -25,6 +27,8 @@ export function GraphSettingsSection() {
     setSchemaFilter,
     focusExpandThreshold,
     setFocusExpandThreshold,
+    browseThreshold,
+    setBrowseThreshold,
     edgeLabelMode,
     setEdgeLabelMode,
     showMiniMap,
@@ -37,6 +41,8 @@ export function GraphSettingsSection() {
       setSchemaFilter: state.setSchemaFilter,
       focusExpandThreshold: state.focusExpandThreshold,
       setFocusExpandThreshold: state.setFocusExpandThreshold,
+      browseThreshold: state.browseThreshold,
+      setBrowseThreshold: state.setBrowseThreshold,
       edgeLabelMode: state.edgeLabelMode,
       setEdgeLabelMode: state.setEdgeLabelMode,
       showMiniMap: state.showMiniMap,
@@ -96,6 +102,30 @@ export function GraphSettingsSection() {
         </Select>
         <p className="text-xs text-muted-foreground">
           Max neighbors to show expanded when focusing an object.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Browse Mode Threshold</label>
+        <Select
+          value={String(browseThreshold)}
+          onValueChange={(value) => setBrowseThreshold(Number(value))}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BROWSE_THRESHOLD_OPTIONS.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option} objects
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Databases with more objects than this start with an empty canvas;
+          pick objects to explore instead of rendering the full graph. Applies
+          on the next database load.
         </p>
       </div>
 
