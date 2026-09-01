@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useExplorerStore } from "../store";
 import { FileContentHeader } from "./file-content-header";
 import { XmlSourceView, type XmlSourceViewHandle } from "./xml-source-view";
-import { XmlTreeView, type XmlTreeViewHandle } from "./xml-tree-view";
+import { XmlTreeFlow, type XmlTreeViewHandle } from "./xml-tree-flow";
 import { ProblemsPanel } from "./problems-panel";
 import { ValidationStatusBar } from "./validation-status-bar";
 import { ScanResultsTab } from "./scan-results-tab";
@@ -21,6 +21,7 @@ export function FileContentArea() {
     activeTabId,
     setScrollPosition,
     setTreeExpandedIds,
+    setTreeViewport,
     setMonacoViewState,
     problemsPanelOpen,
     problemsPanelHeight,
@@ -36,6 +37,7 @@ export function FileContentArea() {
       activeTabId: state.activeTabId,
       setScrollPosition: state.setScrollPosition,
       setTreeExpandedIds: state.setTreeExpandedIds,
+      setTreeViewport: state.setTreeViewport,
       setMonacoViewState: state.setMonacoViewState,
       problemsPanelOpen: state.problemsPanelOpen,
       problemsPanelHeight: state.problemsPanelHeight,
@@ -85,6 +87,13 @@ export function FileContentArea() {
       if (activeTab) setTreeExpandedIds(activeTab.id, Array.from(ids));
     },
     [activeTab?.id, setTreeExpandedIds]
+  );
+
+  const handleTreeViewportChange = useCallback(
+    (viewport: { x: number; y: number; zoom: number }) => {
+      if (activeTab) setTreeViewport(activeTab.id, viewport);
+    },
+    [activeTab?.id, setTreeViewport]
   );
 
   const handleViewStateChange = useCallback(
@@ -162,10 +171,6 @@ export function FileContentArea() {
     setScrollPosition(activeTab.id, "source", position);
   };
 
-  const handleTreeScrollChange = (position: number) => {
-    setScrollPosition(activeTab.id, "tree", position);
-  };
-
   const showParseErrorBanner = activeTab.isXml && activeTab.parseError;
   const showTreeView =
     activeTab.viewMode === "tree" &&
@@ -207,13 +212,13 @@ export function FileContentArea() {
           </div>
         </div>
       ) : showTreeView ? (
-        <XmlTreeView
+        <XmlTreeFlow
           ref={treeViewRef}
           content={activeTab.content}
-          scrollPosition={activeTab.scrollPosition.tree}
-          onScrollChange={handleTreeScrollChange}
           expandedIds={treeExpandedIds}
           onExpandedIdsChange={handleTreeExpandedIdsChange}
+          viewport={activeTab.treeViewport ?? null}
+          onViewportChange={handleTreeViewportChange}
         />
       ) : (
         <XmlSourceView

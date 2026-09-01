@@ -59,6 +59,7 @@ export interface FileTab {
   viewMode: ViewMode;
   scrollPosition: { source: number; tree: number };
   treeExpandedIds: string[];
+  treeViewport?: { x: number; y: number; zoom: number } | null;
   monacoViewState: unknown | null;
   isXml: boolean;
   parseError: boolean;

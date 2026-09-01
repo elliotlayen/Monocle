@@ -99,6 +99,10 @@ interface ExplorerStore {
   setViewMode: (tabId: string, mode: ViewMode) => void;
   setScrollPosition: (tabId: string, view: ViewMode, position: number) => void;
   setTreeExpandedIds: (tabId: string, ids: string[]) => void;
+  setTreeViewport: (
+    tabId: string,
+    viewport: { x: number; y: number; zoom: number } | null
+  ) => void;
   setMonacoViewState: (tabId: string, state: unknown | null) => void;
   toggleProblemsPanel: () => void;
   setProblemsPanelHeight: (height: number) => void;
@@ -705,6 +709,17 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const { tabs } = get();
     const updated = tabs.map((t) =>
       t.id === tabId ? { ...t, treeExpandedIds: ids } : t
+    );
+    set({ tabs: updated });
+  },
+
+  setTreeViewport: (
+    tabId: string,
+    viewport: { x: number; y: number; zoom: number } | null
+  ) => {
+    const { tabs } = get();
+    const updated = tabs.map((t) =>
+      t.id === tabId ? { ...t, treeViewport: viewport } : t
     );
     set({ tabs: updated });
   },
