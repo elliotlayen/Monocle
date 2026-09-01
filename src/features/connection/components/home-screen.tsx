@@ -25,7 +25,7 @@ function HomeActionRow({
 }) {
   return (
     <button
-      className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-xs transition-[background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-backwards hover:bg-accent active:scale-[0.99]"
+      className="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-xs transition-[background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-backwards hover:bg-accent active:scale-[0.99]"
       style={{ animationDelay: `${delayMs}ms` }}
       onClick={action.onClick}
     >
@@ -86,22 +86,15 @@ export function HomeScreen({
 
   return (
     <div className="dot-grid flex h-screen flex-col items-center justify-center bg-background p-8">
-      <div className="panel-glass w-96 animate-in fade-in-0 zoom-in-95 duration-[var(--duration-slow)] ease-[var(--ease-out)]">
+      <div className="panel-glass w-[30rem] animate-in fade-in-0 zoom-in-95 duration-[var(--duration-slow)] ease-[var(--ease-out)]">
         {/* Hero - Logo and wordmark */}
-        <div className="flex items-center gap-3 border-b px-5 py-5">
-          <MonocleLogo className="h-9 w-9" />
-          <div>
-            <h1 className="text-lg font-bold leading-tight tracking-wide">
-              Monocle
-            </h1>
-            <p className="text-[11px] text-muted-foreground">
-              SQL Server schema visualizer
-            </p>
-          </div>
+        <div className="flex items-center justify-center gap-4 border-b px-6 py-8">
+          <MonocleLogo className="h-16 w-16" />
+          <h1 className="text-5xl font-bold tracking-wide">Monocle</h1>
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col gap-0.5 p-2">
+        <div className="flex flex-col gap-1 p-3">
           {actions.map((action, index) => (
             <HomeActionRow
               key={action.label}
