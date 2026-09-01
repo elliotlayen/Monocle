@@ -9,7 +9,8 @@ import { FilterInfoBar } from "@/features/toolbar/components/filter-info-bar";
 import { StatusBar } from "@/components/status-bar";
 import { SchemaGraphView } from "@/features/schema-graph/components";
 import { UpdateChecker } from "@/components/update-checker";
-import { ToastContainer } from "@/components/toast-container";
+import { Toaster } from "sonner";
+import { useResolvedTheme } from "@/hooks/use-resolved-theme";
 import { settingsService } from "@/features/settings/services/settings-service";
 import { useMenuEvents } from "@/hooks/use-menu-events";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -90,6 +91,7 @@ function App() {
   );
 
   const { addToast } = useToastStore();
+  const resolvedTheme = useResolvedTheme();
 
   const [connectionModalOpen, setConnectionModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -383,7 +385,14 @@ function App() {
 
   return (
     <>
-      <ToastContainer />
+      <Toaster
+        position="top-left"
+        theme={resolvedTheme}
+        visibleToasts={3}
+        gap={8}
+        offset={{ top: 56, left: 12 }}
+        mobileOffset={{ top: 56, left: 12 }}
+      />
       <UpdateChecker
         checkRequested={checkUpdatesRequested}
         onCheckComplete={() => setCheckUpdatesRequested(false)}
