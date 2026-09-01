@@ -9,7 +9,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PanelLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { ExplorerNavBar } from "./explorer-nav-bar";
 import { ExplorerEmptyState } from "./explorer-empty-state";
 import { ExplorerSidebar } from "./explorer-sidebar";
@@ -66,35 +67,34 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
     : null;
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="relative flex h-screen flex-col overflow-hidden">
       <ExplorerNavBar onHome={onHome} onOpenSettings={onOpenSettings} />
-      <div className="flex flex-row flex-1 overflow-hidden">
-        <ExplorerSidebar width={width} isDragging={isDragging} startDrag={startDrag} />
-        {!sidebarOpen && (
-          <button
-            className="flex-shrink-0 flex items-center justify-center w-8 border-r hover:bg-muted transition-colors"
-            onClick={() => setSidebarOpen(true)}
-            title="Open sidebar"
-          >
-            <PanelLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
+      {/* Floating chrome below the docked nav bar. */}
+      <ExplorerSidebar width={width} isDragging={isDragging} startDrag={startDrag} />
+      <SidebarToggle onClick={() => setSidebarOpen(true)} visible={!sidebarOpen} />
+      <div
+        className={cn(
+          "panel-glass absolute bottom-3 right-3 top-14 z-10 flex flex-col overflow-hidden",
+          // Tracks the sidebar edge 1:1 during drag; animates on toggle.
+          !isDragging &&
+            "transition-[left] duration-[var(--duration-slow)] ease-[var(--ease-out)]"
         )}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {hasOpenTabs ? (
-            <>
-              <FileTabBar />
-              {isScanning && <ScanProgressPanel />}
-              <FileContentArea />
-            </>
-          ) : isScanning ? (
-            <div className="flex-1 flex flex-col">
-              <ScanProgressPanel />
-              <div className="flex-1" />
-            </div>
-          ) : (
-            <ExplorerEmptyState onOpenSettings={onOpenSettings} />
-          )}
-        </div>
+        style={{ left: sidebarOpen ? width + 24 : 56 }}
+      >
+        {hasOpenTabs ? (
+          <>
+            <FileTabBar />
+            {isScanning && <ScanProgressPanel />}
+            <FileContentArea />
+          </>
+        ) : isScanning ? (
+          <div className="flex flex-1 flex-col">
+            <ScanProgressPanel />
+            <div className="flex-1" />
+          </div>
+        ) : (
+          <ExplorerEmptyState onOpenSettings={onOpenSettings} />
+        )}
       </div>
 
       {/* Scan confirmation dialog (D-04) */}

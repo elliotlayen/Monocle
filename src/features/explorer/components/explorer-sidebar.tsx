@@ -139,17 +139,13 @@ export function ExplorerSidebar({
   return (
     <div
       className={cn(
-        "relative flex-shrink-0 border-r bg-background overflow-hidden",
+        "panel-glass absolute bottom-3 left-3 top-14 z-20 flex flex-col overflow-hidden",
         !isDragging &&
-          "transition-[width] duration-[var(--duration-slow)] ease-[var(--ease-out)]"
+          "transition-transform duration-[var(--duration-slow)] ease-[var(--ease-out)]",
+        sidebarOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
       )}
-      style={{ width: sidebarOpen ? width : 0 }}
+      style={{ width }}
     >
-      {/* Inner container with fixed width to prevent content reflow */}
-      <div
-        className="flex flex-col h-full"
-        style={{ width: sidebarOpen ? width : width }}
-      >
         {/* Header */}
         <div className="flex-shrink-0 border-b p-3">
           <div className="flex items-center justify-between mb-2">
@@ -285,7 +281,6 @@ export function ExplorerSidebar({
         ) : (
           <FolderTree />
         )}
-      </div>
 
       {/* Resize handle */}
       <div
