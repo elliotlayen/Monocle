@@ -42,6 +42,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ExportButton } from "@/features/export/components/export-button";
 import { DatabaseSelector } from "./database-selector";
+import { FocusSelector } from "./focus-selector";
 import {
   EDGE_TYPE_LABELS,
   EDGE_COLORS,
@@ -500,9 +501,10 @@ export function Toolbar({
         )}
       </div>
 
-      {/* Center: Database selector or canvas filename */}
+      {/* Center: Focus selector + database selector, or canvas filename */}
       {showDatabaseSelector && (
-        <div className="absolute left-1/2 -translate-x-1/2">
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+          <FocusSelector />
           <DatabaseSelector />
         </div>
       )}
