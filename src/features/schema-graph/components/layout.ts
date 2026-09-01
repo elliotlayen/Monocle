@@ -487,37 +487,60 @@ function buildTarjanComponents(
   const components: string[][] = [];
   let index = 0;
 
-  const strongConnect = (nodeId: string) => {
-    indices.set(nodeId, index);
-    lowLinks.set(nodeId, index);
-    index++;
-    stack.push(nodeId);
-    onStack.add(nodeId);
+  // Iterative Tarjan: long FK chains would overflow the call stack with the
+  // recursive form. Emits components in the same post-order.
+  const strongConnect = (startId: string) => {
+    type Frame = { nodeId: string; neighbors: string[]; next: number };
+    const frames: Frame[] = [];
 
-    for (const next of adjacency.get(nodeId) ?? []) {
-      if (!indices.has(next)) {
-        strongConnect(next);
+    const open = (nodeId: string) => {
+      indices.set(nodeId, index);
+      lowLinks.set(nodeId, index);
+      index++;
+      stack.push(nodeId);
+      onStack.add(nodeId);
+      frames.push({
+        nodeId,
+        neighbors: [...(adjacency.get(nodeId) ?? [])],
+        next: 0,
+      });
+    };
+
+    open(startId);
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1];
+      if (frame.next < frame.neighbors.length) {
+        const next = frame.neighbors[frame.next];
+        frame.next += 1;
+        if (!indices.has(next)) {
+          open(next);
+        } else if (onStack.has(next)) {
+          lowLinks.set(
+            frame.nodeId,
+            Math.min(lowLinks.get(frame.nodeId)!, indices.get(next)!)
+          );
+        }
+        continue;
+      }
+
+      frames.pop();
+      const parent = frames[frames.length - 1];
+      if (parent) {
         lowLinks.set(
-          nodeId,
-          Math.min(lowLinks.get(nodeId)!, lowLinks.get(next)!)
-        );
-      } else if (onStack.has(next)) {
-        lowLinks.set(
-          nodeId,
-          Math.min(lowLinks.get(nodeId)!, indices.get(next)!)
+          parent.nodeId,
+          Math.min(lowLinks.get(parent.nodeId)!, lowLinks.get(frame.nodeId)!)
         );
       }
-    }
-
-    if (lowLinks.get(nodeId) === indices.get(nodeId)) {
-      const component: string[] = [];
-      while (stack.length > 0) {
-        const popped = stack.pop()!;
-        onStack.delete(popped);
-        component.push(popped);
-        if (popped === nodeId) break;
+      if (lowLinks.get(frame.nodeId) === indices.get(frame.nodeId)) {
+        const component: string[] = [];
+        while (stack.length > 0) {
+          const popped = stack.pop()!;
+          onStack.delete(popped);
+          component.push(popped);
+          if (popped === frame.nodeId) break;
+        }
+        components.push(component);
       }
-      components.push(component);
     }
   };
 
@@ -571,30 +594,66 @@ function computeLayerRanks(
     }
   });
 
-  const queue = [...indegree.entries()]
-    .filter(([, deg]) => deg === 0)
-    .map(([compId]) => compId)
-    .sort((a, b) =>
-      getStableId(components[a]).localeCompare(getStableId(components[b]))
-    );
+  // Deterministic Kahn topo-sort: always dequeue the component with the
+  // smallest stable id. A binary min-heap replaces the previous
+  // shift-and-resort queue, which was O(n^2 log n) on large graphs; stable
+  // ids are precomputed since getStableId sorts the component each call.
+  const stableIds = components.map(getStableId);
+  const compareComponents = (a: number, b: number) =>
+    stableIds[a].localeCompare(stableIds[b]);
+  const heap: number[] = [];
+  const heapPush = (value: number) => {
+    heap.push(value);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (compareComponents(heap[i], heap[parent]) < 0) {
+        [heap[i], heap[parent]] = [heap[parent], heap[i]];
+        i = parent;
+      } else {
+        break;
+      }
+    }
+  };
+  const heapPop = (): number => {
+    const top = heap[0];
+    const last = heap.pop()!;
+    if (heap.length > 0) {
+      heap[0] = last;
+      let i = 0;
+      for (;;) {
+        const left = 2 * i + 1;
+        const right = 2 * i + 2;
+        let smallest = i;
+        if (left < heap.length && compareComponents(heap[left], heap[smallest]) < 0) {
+          smallest = left;
+        }
+        if (right < heap.length && compareComponents(heap[right], heap[smallest]) < 0) {
+          smallest = right;
+        }
+        if (smallest === i) break;
+        [heap[i], heap[smallest]] = [heap[smallest], heap[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  };
+
+  for (const [compId, deg] of indegree.entries()) {
+    if (deg === 0) heapPush(compId);
+  }
 
   const topoOrder: number[] = [];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  while (heap.length > 0) {
+    const current = heapPop();
     topoOrder.push(current);
-    const outgoing = [...(componentAdj.get(current) ?? [])].sort((a, b) =>
-      getStableId(components[a]).localeCompare(getStableId(components[b]))
-    );
-    outgoing.forEach((target) => {
+    for (const target of componentAdj.get(current) ?? []) {
       const nextIn = (indegree.get(target) ?? 0) - 1;
       indegree.set(target, nextIn);
       if (nextIn === 0) {
-        queue.push(target);
-        queue.sort((a, b) =>
-          getStableId(components[a]).localeCompare(getStableId(components[b]))
-        );
+        heapPush(target);
       }
-    });
+    }
   }
 
   const ranks = new Map<number, number>();
