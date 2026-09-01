@@ -28,7 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Target,
+  Crosshair,
   Box,
   ChevronDown,
   ChevronRight,
@@ -573,7 +573,7 @@ export function Toolbar({
                             : undefined
                         }
                       >
-                        <Target className="w-4 h-4" />
+                        <Crosshair className="w-4 h-4" />
                       </Button>
                     </PopoverTrigger>
                   </TooltipTrigger>
