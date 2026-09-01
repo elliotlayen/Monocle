@@ -49,13 +49,15 @@ import {
   TRIGGER_MIN_WIDTH,
 } from "./node-width";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
-import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
+import {
+  SchemaBrowserSidebar,
+  SIDEBAR_WIDTH,
+} from "./schema-browser-sidebar";
 import { DetailPopover } from "./detail-popover";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useDetailPopover } from "../hooks/use-detail-popover";
 import type { DetailSidebarData } from "./detail-content";
-import { cn } from "@/lib/utils";
 import {
   menuToggleSidebarHub,
   menuFitViewHub,
@@ -714,7 +716,6 @@ function SchemaGraphInner({
   importDialogOpen,
   onImportDialogOpenChange,
 }: SchemaGraphProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<EdgeHoverCardState | null>(null);
   const [editDialogState, setEditDialogState] = useState<{
@@ -754,6 +755,9 @@ function SchemaGraphInner({
     selectedEdgeIds,
     toggleEdgeSelection,
     clearEdgeSelection,
+    sidebarOpen,
+    setSidebarOpen,
+    toggleSidebar,
     focusExpandThreshold,
     edgeLabelMode,
     showMiniMap,
@@ -774,6 +778,9 @@ function SchemaGraphInner({
       selectedEdgeIds: state.selectedEdgeIds,
       toggleEdgeSelection: state.toggleEdgeSelection,
       clearEdgeSelection: state.clearEdgeSelection,
+      sidebarOpen: state.sidebarOpen,
+      setSidebarOpen: state.setSidebarOpen,
+      toggleSidebar: state.toggleSidebar,
       focusExpandThreshold: state.focusExpandThreshold,
       edgeLabelMode: state.edgeLabelMode,
       showMiniMap: state.showMiniMap,
@@ -801,8 +808,8 @@ function SchemaGraphInner({
 
   // Menu event handlers
   const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => !prev);
-  }, []);
+    toggleSidebar();
+  }, [toggleSidebar]);
 
   const handleFitView = useCallback(() => {
     fitView({ padding: 0.2, duration: 300 });
@@ -1799,12 +1806,7 @@ function SchemaGraphInner({
     // mounted a provider per FK column.
     <TooltipProvider delayDuration={200}>
     <div className="w-full h-full relative flex">
-      <SchemaBrowserSidebar
-        open={sidebarOpen}
-        onOpenChange={setSidebarOpen}
-        schema={schema}
-        onItemClick={handleSidebarItemClick}
-      />
+      <SchemaBrowserSidebar onItemClick={handleSidebarItemClick} />
       <DetailPopover
         open={popoverOpen}
         data={popoverData}
@@ -1813,10 +1815,8 @@ function SchemaGraphInner({
         onEdit={canvasMode ? handleEditFromPopover : undefined}
       />
       <main
-        className={cn(
-          "flex-1 h-full transition-all duration-300",
-          sidebarOpen && "ml-[280px]"
-        )}
+        className="flex-1 h-full transition-[margin-left] duration-300"
+        style={{ marginLeft: sidebarOpen ? SIDEBAR_WIDTH : 0 }}
       >
         <div
           className="relative w-full h-full"

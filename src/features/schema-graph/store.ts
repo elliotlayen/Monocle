@@ -85,6 +85,9 @@ interface SchemaStore {
   // Selection
   selectedEdgeIds: Set<string>;
 
+  // UI
+  sidebarOpen: boolean;
+
   // Derived data
   availableSchemas: string[];
 
@@ -105,6 +108,8 @@ interface SchemaStore {
   setShowMiniMap: (show: boolean) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
   toggleObjectType: (type: ObjectType) => void;
   setObjectTypeFilter: (types: Set<ObjectType>) => void;
   selectAllObjectTypes: () => void;
@@ -463,6 +468,7 @@ export const createInitialSchemaState = () => ({
   edgeLabelMode: "auto" as EdgeLabelMode,
   showMiniMap: true,
   focusedTableId: null,
+  sidebarOpen: true,
   ...createDefaultObjectFilterState(),
   edgeTypeFilter: new Set(ALL_EDGE_TYPES),
   selectedEdgeIds: new Set<string>(),
@@ -983,6 +989,10 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       // Ignore persistence errors
     });
   },
+
+  setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
+
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 
   setFocusedTable: (tableId: string | null) =>
     set((state) => {
