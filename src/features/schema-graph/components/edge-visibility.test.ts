@@ -65,4 +65,19 @@ describe("edge visibility helpers", () => {
       true
     );
   });
+
+  it("keeps columns named like a direction suffix renderable", () => {
+    const renderableNodes = new Set(["dbo.orders"]);
+    const columns = new Map<string, Set<string>>([
+      ["dbo.orders", new Set(["foo-target", "bar-source"])],
+    ]);
+    const sourceHandle = `${buildColumnHandleBase("dbo.orders", "foo-target")}-source`;
+    const targetHandle = `${buildColumnHandleBase("dbo.orders", "bar-source")}-target`;
+    expect(isHandleRenderable(sourceHandle, renderableNodes, columns)).toBe(
+      true
+    );
+    expect(isHandleRenderable(targetHandle, renderableNodes, columns)).toBe(
+      true
+    );
+  });
 });

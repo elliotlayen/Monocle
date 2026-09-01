@@ -80,6 +80,7 @@ import {
   buildColumnHandleBase,
   buildNodeHandleBase,
   parseHandleBase,
+  stripHandleSuffix,
 } from "@/features/schema-graph/utils/handle-ids";
 import {
   areEdgesEquivalent,
@@ -163,8 +164,7 @@ function parseHandleId(handleId: string | null | undefined): {
   columnName: string;
 } {
   if (!handleId) return { tableId: "", columnName: "" };
-  const withoutSuffix = handleId.replace(/-source$/, "").replace(/-target$/, "");
-  const parsed = parseHandleBase(withoutSuffix);
+  const parsed = parseHandleBase(stripHandleSuffix(handleId));
   return { tableId: parsed.nodeId, columnName: parsed.columnName };
 }
 

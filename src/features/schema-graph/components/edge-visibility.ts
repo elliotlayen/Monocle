@@ -1,14 +1,13 @@
-import { parseHandleBase } from "@/features/schema-graph/utils/handle-ids";
+import {
+  parseHandleBase,
+  stripHandleSuffix,
+} from "@/features/schema-graph/utils/handle-ids";
 
 export interface EdgeHandleRef {
   source: string;
   target: string;
   sourceHandle?: string;
   targetHandle?: string;
-}
-
-function stripHandleSuffix(handleId: string): string {
-  return handleId.replace(/-source$/, "").replace(/-target$/, "");
 }
 
 export function isHandleRenderable(
