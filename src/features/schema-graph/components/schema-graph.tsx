@@ -1535,7 +1535,7 @@ function SchemaGraphInner({
         }
         // Triggers: dimmed if their table is not focused and not a neighbor
         else if (visibleTriggerIds.has(nodeId)) {
-          const trigger = (schema.triggers || []).find((t) => t.id === nodeId);
+          const trigger = schemaIndex.triggerById.get(nodeId);
           if (
             trigger &&
             trigger.tableId !== focusedTableId &&
@@ -1546,9 +1546,7 @@ function SchemaGraphInner({
         }
         // Procedures: dimmed if none of their tables are focused or a neighbor
         else if (visibleProcedureIds.has(nodeId)) {
-          const procedure = (schema.storedProcedures || []).find(
-            (p) => p.id === nodeId
-          );
+          const procedure = schemaIndex.procedureById.get(nodeId);
           if (procedure) {
             const refs = [
               ...(procedure.referencedTables || []),
@@ -1566,9 +1564,7 @@ function SchemaGraphInner({
         }
         // Functions: dimmed if none of their tables are focused or a neighbor
         else if (visibleFunctionIds.has(nodeId)) {
-          const fn = (schema.scalarFunctions || []).find(
-            (f) => f.id === nodeId
-          );
+          const fn = schemaIndex.functionById.get(nodeId);
           if (fn) {
             const refs = fn.referencedTables || [];
             if (
