@@ -18,23 +18,24 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm bg-muted">
+      <DialogContent className="sm:max-w-xs" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="sr-only">About Monocle</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col items-center py-4">
-          <MonocleLogo className="w-20 h-20 mb-4" />
-          <h2
-            className="text-2xl font-bold mb-1"
-          >
-            Monocle
-          </h2>
+        <div className="flex flex-col items-center py-2">
+          <MonocleLogo className="mb-4 h-14 w-14" />
+          <h2 className="text-lg font-bold tracking-wide">Monocle</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            SQL Server schema visualizer
+          </p>
           {version && (
-            <p className="text-sm text-muted-foreground mb-4">
-              Version {version}
-            </p>
+            <span className="mt-3 rounded-sm border px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+              v{version}
+            </span>
           )}
-          <p className="text-sm text-muted-foreground">By Elliot Layen</p>
+          <p className="mt-4 text-[11px] text-muted-foreground">
+            By Elliot Layen
+          </p>
           <button
             type="button"
             onClick={() =>
@@ -42,7 +43,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                 console.error
               )
             }
-            className="mt-1 text-[10px] text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
+            className="mt-1 text-[10px] text-muted-foreground underline underline-offset-4 transition-colors duration-[var(--duration-fast)] hover:text-foreground"
           >
             Documentation
           </button>

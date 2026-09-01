@@ -50,7 +50,10 @@ import {
   TRIGGER_MIN_WIDTH,
 } from "./node-width";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
-import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
+import {
+  SchemaBrowserSidebar,
+  SIDEBAR_WIDTH,
+} from "./schema-browser-sidebar";
 import { DetailInspector } from "./detail-inspector";
 import { DetailDrawer } from "./detail-drawer";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
@@ -1870,12 +1873,22 @@ function SchemaGraphInner({
         className="!bg-background [&>pattern>circle]:!fill-border"
         gap={20}
       />
-      <Controls className="!rounded-lg !border !border-[var(--panel-border)] !bg-[var(--panel-bg)] !shadow-[var(--panel-shadow)] !overflow-hidden [&>button]:!bg-transparent [&>button]:!border-0 [&>button]:!border-b [&>button]:!border-[var(--panel-border)] [&>button]:!text-foreground [&>button:hover]:!bg-muted [&>button>svg]:!fill-current" />
+      <Controls
+        className="!rounded-lg !border !border-[var(--panel-border)] !bg-[var(--panel-bg)] !shadow-[var(--panel-shadow)] !overflow-hidden [&>button]:!bg-transparent [&>button]:!border-0 [&>button]:!border-b [&>button]:!border-[var(--panel-border)] [&>button]:!text-foreground [&>button:hover]:!bg-muted [&>button>svg]:!fill-current"
+        style={{
+          // Clear the floating sidebar and bottom status strip.
+          marginBottom: 32,
+          marginLeft: sidebarOpen ? SIDEBAR_WIDTH + 12 : 0,
+          transition:
+            "margin-left var(--duration-slow) var(--ease-out)",
+        }}
+      />
       {showMiniMap && (
         <MiniMap
           nodeColor={getMinimapNodeColor}
           maskColor="var(--minimap-mask)"
           className="!rounded-lg !bg-[var(--panel-bg)]"
+          style={{ marginBottom: 32 }}
           pannable
           zoomable
         />
