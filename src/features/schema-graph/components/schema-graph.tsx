@@ -13,6 +13,7 @@ import {
   type EdgeMouseHandler,
   type Connection,
   type NodeMouseHandler,
+  type OnNodeDrag,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -1115,7 +1116,7 @@ function SchemaGraphInner({
   );
 
   // Persist node positions on drag stop
-  const onNodeDragStop: NodeMouseHandler = useCallback(
+  const onNodeDragStop: OnNodeDrag = useCallback(
     (_event, node) => {
       if (canvasMode) {
         updateNodePosition(node.id, node.position);
