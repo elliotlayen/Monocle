@@ -8,7 +8,6 @@ import { EDGE_COLORS } from "@/constants/edge-colors";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -285,8 +284,7 @@ function ColumnRowComponent({ row, isCompact, canvasMode }: ColumnRowProps) {
           {column.name}
         </span>
         {(hasFkOut || hasFkIn) && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
+          <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex">
                   <TbLink className={`${fkClass} w-3.5 h-3.5 shrink-0 -ml-1`} />
@@ -324,8 +322,7 @@ function ColumnRowComponent({ row, isCompact, canvasMode }: ColumnRowProps) {
                   )}
                 </div>
               </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          </Tooltip>
         )}
         <span className="text-[10px] text-muted-foreground shrink-0 ml-auto">
           {column.dataType}

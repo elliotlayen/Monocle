@@ -52,6 +52,7 @@ import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
 import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
 import { DetailPopover } from "./detail-popover";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useDetailPopover } from "../hooks/use-detail-popover";
 import type { DetailSidebarData } from "./detail-content";
 import { cn } from "@/lib/utils";
@@ -1793,6 +1794,9 @@ function SchemaGraphInner({
   );
 
   return (
+    // One tooltip provider for the whole graph: column rows previously
+    // mounted a provider per FK column.
+    <TooltipProvider delayDuration={200}>
     <div className="w-full h-full relative flex">
       <SchemaBrowserSidebar
         open={sidebarOpen}
@@ -1943,6 +1947,7 @@ function SchemaGraphInner({
         </>
       )}
     </div>
+    </TooltipProvider>
   );
 }
 
