@@ -34,6 +34,13 @@ impl serde::Serialize for SchemaError {
     }
 }
 
+fn default_with_warning<T: Default>(result: Result<T, SchemaError>, what: &str) -> T {
+    result.unwrap_or_else(|e| {
+        eprintln!("Failed to load {}, continuing without them: {}", what, e);
+        T::default()
+    })
+}
+
 pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, SchemaError> {
     let mut client = create_client(params).await?;
 
@@ -49,17 +56,17 @@ pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, Schem
     // Populate view references (needs tables to be loaded first)
     load_views_with_references(&mut views, &name_to_id);
 
-    // Optional data - continue with empty if fails
-    let relationships = load_foreign_keys(&mut client).await.unwrap_or_default();
-    let triggers = load_triggers(&mut client, &name_to_id)
-        .await
-        .unwrap_or_default();
-    let stored_procedures = load_stored_procedures(&mut client, &name_to_id)
-        .await
-        .unwrap_or_default();
-    let scalar_functions = load_scalar_functions(&mut client, &name_to_id)
-        .await
-        .unwrap_or_default();
+    // Optional data - continue with empty if fails, but never silently
+    let relationships = default_with_warning(load_foreign_keys(&mut client).await, "foreign keys");
+    let triggers = default_with_warning(load_triggers(&mut client, &name_to_id).await, "triggers");
+    let stored_procedures = default_with_warning(
+        load_stored_procedures(&mut client, &name_to_id).await,
+        "stored procedures",
+    );
+    let scalar_functions = default_with_warning(
+        load_scalar_functions(&mut client, &name_to_id).await,
+        "scalar functions",
+    );
 
     Ok(SchemaGraph {
         tables,
