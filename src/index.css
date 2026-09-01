@@ -160,6 +160,14 @@
 }
 
 @layer components {
+  .dot-grid {
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--foreground) 8%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
   .panel-glass {
     background: var(--panel-bg);
     -webkit-backdrop-filter: blur(var(--panel-blur));

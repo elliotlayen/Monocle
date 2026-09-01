@@ -420,17 +420,9 @@ function App() {
         />
       ) : (
         <ReactFlowProvider>
-          <div className="flex flex-col h-screen">
-            <Toolbar
-              onOpenSettings={() => setSettingsOpen(true)}
-              onDisconnect={handleDisconnect}
-              canvasMode={isCanvasMode}
-              onSave={handleCanvasSave}
-              onOpen={handleCanvasOpen}
-              onExitCanvas={handleExitCanvasMode}
-              onImport={handleImport}
-            />
-            <main className="relative flex-1 overflow-hidden">
+          {/* Full-bleed canvas with the chrome floating above it. */}
+          <div className="relative h-screen overflow-hidden">
+            <main className="absolute inset-0">
               {schema ? (
                 <>
                   <FilterInfoBar />
@@ -448,11 +440,20 @@ function App() {
                   />
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                   <p>Select a database from the toolbar.</p>
                 </div>
               )}
             </main>
+            <Toolbar
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDisconnect={handleDisconnect}
+              canvasMode={isCanvasMode}
+              onSave={handleCanvasSave}
+              onOpen={handleCanvasOpen}
+              onExitCanvas={handleExitCanvasMode}
+              onImport={handleImport}
+            />
             <StatusBar />
           </div>
         </ReactFlowProvider>

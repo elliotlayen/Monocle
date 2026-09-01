@@ -1,25 +1,19 @@
 import { memo } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Crosshair,
-  Eye,
-  FunctionSquare,
-  Settings2,
-  Table2,
-  Zap,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Crosshair } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OBJECT_COLORS } from "@/constants/edge-colors";
 import type { ObjectType } from "../../store";
 import type { SidebarItem, SidebarRow } from "./sidebar-tree";
 
-const CATEGORY_ICONS: Record<ObjectType, React.ReactNode> = {
-  tables: <Table2 className="h-4 w-4" />,
-  views: <Eye className="h-4 w-4" />,
-  triggers: <Zap className="h-4 w-4" />,
-  storedProcedures: <Settings2 className="h-4 w-4" />,
-  scalarFunctions: <FunctionSquare className="h-4 w-4" />,
-};
+function TypeDot({ type }: { type: ObjectType }) {
+  return (
+    <span
+      aria-hidden
+      className="h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ backgroundColor: OBJECT_COLORS[type] }}
+    />
+  );
+}
 
 function formatCount(shown: number, total: number): string {
   return shown === total ? `${total}` : `${shown}/${total}`;
@@ -53,21 +47,21 @@ function SidebarRowViewComponent({
         aria-selected={isActive}
         tabIndex={-1}
         className={cn(
-          "flex items-center gap-2 w-full h-full px-2 rounded hover:bg-muted text-left",
+          "flex h-full w-full items-center gap-2 rounded-sm px-2 text-left hover:bg-muted",
           isActive && "bg-muted"
         )}
         onClick={() => onToggleCategory(row.categoryType)}
       >
         {row.expanded ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         )}
-        <span className="text-muted-foreground flex-shrink-0">
-          {CATEGORY_ICONS[row.categoryType]}
+        <TypeDot type={row.categoryType} />
+        <span className="flex-1 truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {row.label}
         </span>
-        <span className="text-sm font-medium flex-1 truncate">{row.label}</span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[10px] tabular-nums text-muted-foreground">
           {formatCount(row.shown, row.total)}
         </span>
       </button>
@@ -83,20 +77,20 @@ function SidebarRowViewComponent({
         aria-selected={isActive}
         tabIndex={-1}
         className={cn(
-          "flex items-center gap-2 w-full h-full px-2 rounded hover:bg-muted text-left ml-4 max-w-[calc(100%-1rem)]",
+          "flex h-full w-full items-center gap-2 rounded-sm pl-6 pr-2 text-left hover:bg-muted",
           isActive && "bg-muted"
         )}
         onClick={() => onToggleSchema(row.key.replace(/^schema-/, ""))}
       >
         {row.expanded ? (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <ChevronDown className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <ChevronRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
         )}
-        <span className="text-sm text-muted-foreground flex-1 truncate">
+        <span className="flex-1 truncate text-xs text-muted-foreground">
           {row.label}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[10px] tabular-nums text-muted-foreground">
           {formatCount(row.shown, row.total)}
         </span>
       </button>
@@ -113,21 +107,21 @@ function SidebarRowViewComponent({
       aria-level={3}
       aria-selected={isActive || isFocusedObject}
       className={cn(
-        "group flex items-center gap-2 h-full px-2 rounded hover:bg-muted ml-8 max-w-[calc(100%-2rem)] cursor-pointer",
+        "group flex h-full cursor-pointer items-center gap-2 rounded-sm pl-9 pr-2 hover:bg-muted",
         isActive && "bg-muted",
-        isFocusedObject && "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+        isFocusedObject && "bg-accent-blue/10 text-accent-blue",
         dimmed && "opacity-50"
       )}
       onClick={(e) => onItemClick(item, e.currentTarget as HTMLElement)}
       onDoubleClick={focusable ? () => onItemFocus(item.id) : undefined}
     >
-      <span className="text-sm truncate flex-1">{item.name}</span>
+      <span className="flex-1 truncate text-xs">{item.name}</span>
       {focusable && (
         <button
           tabIndex={-1}
           className={cn(
-            "opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0",
-            isFocusedObject && "opacity-100 text-blue-500"
+            "shrink-0 text-muted-foreground opacity-0 transition-opacity duration-[var(--duration-fast)] hover:text-foreground group-hover:opacity-100",
+            isFocusedObject && "text-accent-blue opacity-100"
           )}
           title={isFocusedObject ? "Focused in graph" : "Focus in graph"}
           onClick={(e) => {

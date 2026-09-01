@@ -8,7 +8,44 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { EDGE_TYPE_LABELS } from "@/constants/edge-colors";
+import {
+  EDGE_TYPE_LABELS,
+  EDGE_COLORS,
+  OBJECT_COLORS,
+} from "@/constants/edge-colors";
+import {
+  OBJECT_TYPE_LABELS,
+  OBJECT_TYPE_ORDER,
+} from "@/constants/object-type-meta";
+import type { EdgeType } from "@/features/schema-graph/store";
+
+const EDGE_TYPE_ORDER = Object.keys(EDGE_TYPE_LABELS) as EdgeType[];
+
+function BreakdownRow({
+  label,
+  color,
+  filtered,
+  total,
+}: {
+  label: string;
+  color: string;
+  filtered: number;
+  total: number;
+}) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <span
+        aria-hidden
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <span className="text-muted-foreground">{label}</span>
+      <span className="ml-auto pl-6 tabular-nums">
+        {filtered} / {total}
+      </span>
+    </div>
+  );
+}
 
 export function StatusBar() {
   const {
@@ -65,153 +102,109 @@ export function StatusBar() {
   const [objectsOpen, setObjectsOpen] = useState(false);
   const [edgesOpen, setEdgesOpen] = useState(false);
 
+  const connectionLabel = isCanvasMode
+    ? (canvasFilePath?.split("/").pop()?.split("\\").pop() ?? "Untitled")
+    : connectionInfo
+      ? `${connectionInfo.server}${connectionInfo.database ? ` / ${connectionInfo.database}` : ""}`
+      : null;
+
   // Show minimal status bar when connected but no schema loaded
   if (!schema) {
+    if (!connectionLabel) return null;
     return (
-      <div className="flex items-center gap-4 h-6 px-3 text-xs bg-background border-t border-border text-muted-foreground">
-        <div className="flex-1" />
-        {connectionInfo && (
-          <span>
-            {connectionInfo.server}
-            {connectionInfo.database ? ` / ${connectionInfo.database}` : ""}
-          </span>
-        )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-end px-3 pb-2">
+        <div className="pointer-events-auto panel-glass flex h-7 items-center gap-4 px-3 text-[11px] text-muted-foreground">
+          <span>{connectionLabel}</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-4 h-6 px-3 text-xs bg-background border-t border-border text-muted-foreground">
-      <Popover open={objectsOpen} onOpenChange={setObjectsOpen}>
-        <PopoverTrigger asChild>
-          <button
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex px-3 pb-2">
+      <div className="pointer-events-auto panel-glass flex h-7 w-full items-center gap-4 px-3 text-[11px] text-muted-foreground">
+        <Popover open={objectsOpen} onOpenChange={setObjectsOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className="flex items-center gap-1.5 transition-colors duration-[var(--duration-fast)] hover:text-foreground"
+              onMouseEnter={() => setObjectsOpen(true)}
+              onMouseLeave={() => setObjectsOpen(false)}
+            >
+              <Box className="h-3 w-3" />
+              <span className="tabular-nums">
+                {hasActiveFilters
+                  ? `${counts.filteredObjects} / ${counts.totalObjects} Objects`
+                  : `${counts.totalObjects} Objects`}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-auto p-3 text-xs"
             onMouseEnter={() => setObjectsOpen(true)}
             onMouseLeave={() => setObjectsOpen(false)}
           >
-            <Box className="w-3 h-3" />
-            <span>
-              {hasActiveFilters
-                ? `${counts.filteredObjects} / ${counts.totalObjects} Objects`
-                : `${counts.totalObjects} Objects`}
-            </span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-auto p-3"
-          onMouseEnter={() => setObjectsOpen(true)}
-          onMouseLeave={() => setObjectsOpen(false)}
-        >
-          <div className="text-xs">
-            <div className="font-medium mb-1">Objects</div>
-            <div>
-              Tables: {counts.breakdown.tables.filtered} /{" "}
-              {counts.breakdown.tables.total}
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Objects
             </div>
-            <div>
-              Views: {counts.breakdown.views.filtered} /{" "}
-              {counts.breakdown.views.total}
-            </div>
-            <div>
-              Triggers: {counts.breakdown.triggers.filtered} /{" "}
-              {counts.breakdown.triggers.total}
-            </div>
-            <div>
-              Procedures: {counts.breakdown.storedProcedures.filtered} /{" "}
-              {counts.breakdown.storedProcedures.total}
-            </div>
-            <div>
-              Functions: {counts.breakdown.scalarFunctions.filtered} /{" "}
-              {counts.breakdown.scalarFunctions.total}
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-      <Popover open={edgesOpen} onOpenChange={setEdgesOpen}>
-        <PopoverTrigger asChild>
-          <button
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+            {OBJECT_TYPE_ORDER.map((type) => (
+              <BreakdownRow
+                key={type}
+                label={OBJECT_TYPE_LABELS[type]}
+                color={OBJECT_COLORS[type]}
+                filtered={counts.breakdown[type].filtered}
+                total={counts.breakdown[type].total}
+              />
+            ))}
+          </PopoverContent>
+        </Popover>
+        <Popover open={edgesOpen} onOpenChange={setEdgesOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className="flex items-center gap-1.5 transition-colors duration-[var(--duration-fast)] hover:text-foreground"
+              onMouseEnter={() => setEdgesOpen(true)}
+              onMouseLeave={() => setEdgesOpen(false)}
+            >
+              <Network className="h-3 w-3" />
+              <span className="tabular-nums">
+                {hasActiveFilters
+                  ? `${counts.filteredEdges} / ${counts.totalEdges} Edges`
+                  : `${counts.totalEdges} Edges`}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-auto p-3 text-xs"
             onMouseEnter={() => setEdgesOpen(true)}
             onMouseLeave={() => setEdgesOpen(false)}
           >
-            <Network className="w-3 h-3" />
-            <span>
-              {hasActiveFilters
-                ? `${counts.filteredEdges} / ${counts.totalEdges} Edges`
-                : `${counts.totalEdges} Edges`}
-            </span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-auto p-3"
-          onMouseEnter={() => setEdgesOpen(true)}
-          onMouseLeave={() => setEdgesOpen(false)}
-        >
-          <div className="text-xs">
-            <div className="font-medium mb-1">Edges</div>
-            <div>
-              Relationships: {counts.edgeBreakdown.relationships.filtered} /{" "}
-              {counts.edgeBreakdown.relationships.total}
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Edges
             </div>
-            <div>
-              Trigger Reads: {counts.edgeBreakdown.triggerReads.filtered} /{" "}
-              {counts.edgeBreakdown.triggerReads.total}
-            </div>
-            <div>
-              Trigger Writes: {counts.edgeBreakdown.triggerWrites.filtered} /{" "}
-              {counts.edgeBreakdown.triggerWrites.total}
-            </div>
-            <div>
-              Procedure Reads: {counts.edgeBreakdown.procedureReads.filtered} /{" "}
-              {counts.edgeBreakdown.procedureReads.total}
-            </div>
-            <div>
-              Procedure Writes: {counts.edgeBreakdown.procedureWrites.filtered}{" "}
-              / {counts.edgeBreakdown.procedureWrites.total}
-            </div>
-            <div>
-              View Dependencies:{" "}
-              {counts.edgeBreakdown.viewDependencies.filtered} /{" "}
-              {counts.edgeBreakdown.viewDependencies.total}
-            </div>
-            <div>
-              Function Reads: {counts.edgeBreakdown.functionReads.filtered} /{" "}
-              {counts.edgeBreakdown.functionReads.total}
-            </div>
-            <div>
-              Calls: {counts.edgeBreakdown.codeCalls.filtered} /{" "}
-              {counts.edgeBreakdown.codeCalls.total}
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+            {EDGE_TYPE_ORDER.map((type) => (
+              <BreakdownRow
+                key={type}
+                label={EDGE_TYPE_LABELS[type]}
+                color={EDGE_COLORS[type]}
+                filtered={counts.edgeBreakdown[type].filtered}
+                total={counts.edgeBreakdown[type].total}
+              />
+            ))}
+          </PopoverContent>
+        </Popover>
 
-      <div className="flex-1" />
+        <div className="flex-1" />
 
-      {/* Selection info */}
-      {focusedTableId && <span>Focus: {focusedTableId}</span>}
-      {selectedEdgeIds.size > 0 && (
-        <span>
-          {selectedEdgeIds.size} edge{selectedEdgeIds.size !== 1 ? "s" : ""}{" "}
-          selected
-        </span>
-      )}
-
-      {/* Connection or canvas info */}
-      {isCanvasMode ? (
-        <span>
-          {canvasFilePath
-            ? canvasFilePath.split("/").pop()?.split("\\").pop()
-            : "Untitled"}
-        </span>
-      ) : (
-        connectionInfo && (
-          <span>
-            {connectionInfo.server}
-            {connectionInfo.database ? ` / ${connectionInfo.database}` : ""}
+        {/* Selection info */}
+        {focusedTableId && <span className="truncate">Focus: {focusedTableId}</span>}
+        {selectedEdgeIds.size > 0 && (
+          <span className="tabular-nums">
+            {selectedEdgeIds.size} edge{selectedEdgeIds.size !== 1 ? "s" : ""}{" "}
+            selected
           </span>
-        )
-      )}
+        )}
+
+        {connectionLabel && <span className="truncate">{connectionLabel}</span>}
+      </div>
     </div>
   );
 }

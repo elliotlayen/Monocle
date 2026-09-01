@@ -23,7 +23,7 @@ export function ExportButton() {
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={isExporting}>
+            <Button variant="ghost" size="sm" disabled={isExporting}>
               {isExporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (

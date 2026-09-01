@@ -5,6 +5,7 @@ import {
   type EdgeType,
 } from "@/features/schema-graph/store";
 import { useShallow } from "zustand/shallow";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
 import {
   Crosshair,
   Box,
@@ -41,6 +43,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ExportButton } from "@/features/export/components/export-button";
+import { MonocleLogo } from "@/features/connection/components/monocle-logo";
 import { DatabaseSelector } from "./database-selector";
 import { FocusSelector } from "./focus-selector";
 import {
@@ -53,11 +56,25 @@ import {
   getFilteredObjectBuckets,
   type ObjectBuckets,
 } from "@/features/schema-graph/utils/object-filtering";
-
 import {
   OBJECT_TYPE_LABELS,
   OBJECT_TYPE_ORDER,
 } from "@/constants/object-type-meta";
+import {
+  type ExpandedObjectSections,
+  createDefaultExpandedFocusSections,
+  createDefaultExpandedObjectSections,
+  filterRowsBySearch,
+  formatSectionCountLabel,
+  getSectionSelectionState,
+  getTypeOffSelectionToggleIds,
+  isObjectSectionExpanded,
+  mergeRowsById,
+  shouldRenderObjectSection,
+  shouldToggleSectionFromKey,
+  sortRowsById,
+  stopSectionHeaderToggle,
+} from "./toolbar-helpers";
 
 const ALL_OBJECT_TYPES_FOR_PANEL = new Set<ObjectType>(OBJECT_TYPE_ORDER);
 
@@ -71,100 +88,18 @@ const EMPTY_OBJECT_BUCKETS: ObjectBuckets = {
 
 const EMPTY_EXCLUDED_IDS = new Set<string>();
 
-type ExpandedObjectSections = Record<ObjectType, boolean>;
+const FILTER_ACTIVE_CLASSES =
+  "bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/20 hover:text-accent-blue";
 
-export const createDefaultExpandedObjectSections =
-  (): ExpandedObjectSections => ({
-    tables: false,
-    views: false,
-    triggers: false,
-    storedProcedures: false,
-    scalarFunctions: false,
-  });
-
-export const createDefaultExpandedFocusSections =
-  (): ExpandedObjectSections => ({
-    tables: true,
-    views: true,
-    triggers: true,
-    storedProcedures: true,
-    scalarFunctions: true,
-  });
-
-export const isObjectSectionExpanded = (
-  sectionExpanded: boolean,
-  searchText: string,
-  matchCount: number
-) => (searchText.trim().length > 0 ? matchCount > 0 : sectionExpanded);
-
-export const shouldRenderObjectSection = (visibleCount: number) =>
-  visibleCount > 0;
-
-export const filterRowsBySearch = <T extends { id: string }>(
-  rows: T[],
-  searchText: string
-) => {
-  const lowerSearch = searchText.trim().toLowerCase();
-  if (!lowerSearch) return rows;
-  return rows.filter((row) => row.id.toLowerCase().includes(lowerSearch));
-};
-
-export const sortRowsById = <T extends { id: string }>(rows: T[]) =>
-  [...rows].sort((a, b) =>
-    a.id.localeCompare(b.id, undefined, { sensitivity: "base" })
+function TypeDot({ type }: { type: ObjectType }) {
+  return (
+    <span
+      aria-hidden
+      className="h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ backgroundColor: OBJECT_COLORS[type] }}
+    />
   );
-
-export const mergeRowsById = <T extends { id: string }>(
-  rows: T[],
-  extraRows: T[]
-) => {
-  const merged = new Map<string, T>();
-  rows.forEach((row) => merged.set(row.id, row));
-  extraRows.forEach((row) => merged.set(row.id, row));
-  return [...merged.values()];
-};
-
-export const stopSectionHeaderToggle = (event: { stopPropagation: () => void }) => {
-  event.stopPropagation();
-};
-
-export const getTypeOffSelectionToggleIds = (
-  contextRows: { id: string }[],
-  excludedObjectIds: Set<string>,
-  selectedRowId: string
-) => {
-  const idsToToggle: string[] = [];
-  contextRows.forEach((row) => {
-    const shouldBeExcluded = row.id !== selectedRowId;
-    const isExcluded = excludedObjectIds.has(row.id);
-    if (shouldBeExcluded !== isExcluded) {
-      idsToToggle.push(row.id);
-    }
-  });
-  return idsToToggle;
-};
-
-export const getSectionSelectionState = (
-  contextRows: { id: string }[],
-  excludedObjectIds: Set<string>,
-  typeEnabled: boolean
-) => {
-  const totalCount = contextRows.length;
-  const selectedCount = typeEnabled
-    ? contextRows.filter((row) => !excludedObjectIds.has(row.id)).length
-    : 0;
-  const sectionChecked = typeEnabled && selectedCount > 0;
-  return { totalCount, selectedCount, sectionChecked };
-};
-
-export const formatSectionCountLabel = (
-  label: string,
-  selectedCount: number,
-  totalCount: number
-) => `${label} (${selectedCount}/${totalCount})`;
-
-export const shouldToggleSectionFromKey = (key: string) =>
-  key === "Enter" || key === " ";
+}
 
 interface ToolbarProps {
   onOpenSettings?: () => void;
@@ -472,69 +407,70 @@ export function Toolbar({
     : "Untitled";
 
   return (
-    <div className="relative z-20 flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
-      {/* Left: Monocle branding + canvas controls */}
-      <div className="flex items-center gap-2">
-        <span className="font-semibold text-base">Monocle</span>
-
-        {canvasMode && (
-          <>
-            <TooltipProvider>
+    <TooltipProvider delayDuration={300}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start px-3 pt-3">
+        {/* Left: brand pill + canvas controls */}
+        <div className="pointer-events-auto panel-glass flex h-9 items-center gap-2 px-3">
+          <MonocleLogo className="h-4 w-4" />
+          <span className="text-xs font-semibold tracking-wide">Monocle</span>
+          {canvasMode && (
+            <>
+              <Separator orientation="vertical" className="h-4" />
               <AddObjectMenu onImport={onImport} />
-            </TooltipProvider>
-          </>
-        )}
-      </div>
-
-      {/* Center: Focus selector + database selector, or canvas filename */}
-      {showDatabaseSelector && (
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-          <FocusSelector />
-          <DatabaseSelector />
-        </div>
-      )}
-      {canvasMode && (
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 text-sm text-muted-foreground">
-          <span>{canvasFileName}</span>
-          {canvasIsDirty && (
-            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+            </>
           )}
         </div>
-      )}
 
-      <div className="flex-1" />
-
-      {/* Right: Button group + Settings */}
-      <div className="flex items-center gap-2">
-        {/* Canvas mode file buttons */}
+        {/* Center: focus + database selectors, or canvas filename */}
+        {showDatabaseSelector && (
+          <div className="pointer-events-auto absolute left-1/2 -translate-x-1/2">
+            <div className="panel-glass flex h-9 items-center gap-1 px-1">
+              <FocusSelector />
+              <Separator orientation="vertical" className="h-4" />
+              <DatabaseSelector />
+            </div>
+          </div>
+        )}
         {canvasMode && (
-          <TooltipProvider>
-            <div className="flex gap-1">
+          <div className="pointer-events-auto absolute left-1/2 -translate-x-1/2">
+            <div className="panel-glass flex h-9 items-center gap-1.5 px-3 text-xs text-muted-foreground">
+              <span>{canvasFileName}</span>
+              {canvasIsDirty && (
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-blue" />
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Right: filters, export, settings */}
+        <div className="pointer-events-auto panel-glass flex h-9 items-center gap-1 px-1">
+          {canvasMode && (
+            <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={onOpen}>
-                    <FolderOpen className="w-4 h-4" />
+                  <Button variant="ghost" size="sm" onClick={onOpen}>
+                    <FolderOpen className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Open File</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={onSave}>
-                    <Save className="w-4 h-4" />
+                  <Button variant="ghost" size="sm" onClick={onSave}>
+                    <Save className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Save</TooltipContent>
               </Tooltip>
-            </div>
-          </TooltipProvider>
-        )}
+              <Separator orientation="vertical" className="h-4" />
+            </>
+          )}
 
-        {/* Button group - only show when schema loaded */}
-        {hasSchema && (
-          <TooltipProvider>
-            <div className="flex">
-              {/* Focus button */}
+          {hasSchema && (
+            <>
+              {/* Focus */}
               <Popover
                 open={isFocusOpen}
                 onOpenChange={(open) => {
@@ -549,30 +485,25 @@ export function Toolbar({
                   <TooltipTrigger asChild>
                     <PopoverTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="rounded-r-none border-r-0"
-                        style={
-                          focusedTableId
-                            ? { backgroundColor: "#22c55e" }
-                            : undefined
-                        }
+                        className={cn(focusedTableId && FILTER_ACTIVE_CLASSES)}
                       >
-                        <Crosshair className="w-4 h-4" />
+                        <Crosshair className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
                   </TooltipTrigger>
                   <TooltipContent>Focus</TooltipContent>
                 </Tooltip>
                 <PopoverContent className="w-72 p-0" align="end">
-                  <div className="p-2 border-b">
+                  <div className="border-b p-2">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         placeholder="Focus on..."
                         value={focusSearch}
                         onChange={(e) => setFocusSearch(e.target.value)}
-                        className="pl-8 h-8"
+                        className="h-8 pl-7"
                         autoFocus
                       />
                     </div>
@@ -581,7 +512,7 @@ export function Toolbar({
                     <div className="w-max min-w-full">
                       {focusedTableId && (
                         <button
-                          className="w-max min-w-full px-3 py-2 text-left text-sm hover:bg-accent border-b"
+                          className="w-max min-w-full border-b px-3 py-2 text-left text-xs hover:bg-accent"
                           onClick={clearFocus}
                         >
                           Clear Focus
@@ -603,7 +534,7 @@ export function Toolbar({
                             className="w-max min-w-full border-b last:border-b-0"
                           >
                             <div
-                              className="w-max min-w-full px-3 py-2 bg-muted/50 flex items-center gap-2 cursor-pointer"
+                              className="flex w-max min-w-full cursor-pointer items-center gap-2 bg-muted/50 px-3 py-1.5"
                               role="button"
                               tabIndex={0}
                               onClick={() => toggleFocusSection(type)}
@@ -616,7 +547,7 @@ export function Toolbar({
                             >
                               <button
                                 type="button"
-                                className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-sm hover:bg-accent"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   toggleFocusSection(type);
@@ -624,17 +555,18 @@ export function Toolbar({
                                 aria-label={`Toggle ${OBJECT_TYPE_LABELS[type]} section`}
                               >
                                 {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                                 )}
                               </button>
                               <div
-                                className="text-xs font-medium text-muted-foreground cursor-pointer"
+                                className="flex cursor-pointer items-center gap-2"
                                 onClick={stopSectionHeaderToggle}
                                 onKeyDown={stopSectionHeaderToggle}
                               >
-                                <span style={{ color: OBJECT_COLORS[type] }}>
+                                <TypeDot type={type} />
+                                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                                   {OBJECT_TYPE_LABELS[type]}
                                 </span>
                               </div>
@@ -645,12 +577,14 @@ export function Toolbar({
                                   <button
                                     key={item.id}
                                     data-item-id={item.id}
-                                    className={`w-max min-w-full px-3 py-1.5 text-left text-sm hover:bg-accent ${
-                                      focusedTableId === item.id ? "bg-accent" : ""
-                                    }`}
-                                    style={{ color: OBJECT_COLORS[type] }}
+                                    className={cn(
+                                      "flex w-max min-w-full items-center gap-2 px-3 py-1 text-left text-xs hover:bg-accent",
+                                      focusedTableId === item.id &&
+                                        "bg-accent-blue/15 text-accent-blue"
+                                    )}
                                     onClick={() => setFocusedTable(item.id)}
                                   >
+                                    <TypeDot type={type} />
                                     {item.id}
                                   </button>
                                 ))}
@@ -660,7 +594,7 @@ export function Toolbar({
                         );
                       })}
                       {focusSearch.trim().length > 0 && !hasFocusSearchMatches && (
-                        <div className="w-max min-w-full px-3 py-4 text-sm text-center text-muted-foreground">
+                        <div className="w-max min-w-full px-3 py-4 text-center text-xs text-muted-foreground">
                           No matches found
                         </div>
                       )}
@@ -669,7 +603,7 @@ export function Toolbar({
                 </PopoverContent>
               </Popover>
 
-              {/* Objects button */}
+              {/* Objects */}
               <Popover
                 open={isObjectsOpen}
                 onOpenChange={(open) => {
@@ -682,30 +616,25 @@ export function Toolbar({
                   <TooltipTrigger asChild>
                     <PopoverTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="rounded-none border-r-0"
-                        style={
-                          hasObjectFilters
-                            ? { backgroundColor: "#22c55e" }
-                            : undefined
-                        }
+                        className={cn(hasObjectFilters && FILTER_ACTIVE_CLASSES)}
                       >
-                        <Box className="w-4 h-4" />
+                        <Box className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
                   </TooltipTrigger>
                   <TooltipContent>Objects</TooltipContent>
                 </Tooltip>
                 <PopoverContent className="w-72 p-0" align="end">
-                  <div className="p-2 border-b">
+                  <div className="border-b p-2">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         placeholder="Filter objects..."
                         value={objectsSearch}
                         onChange={(e) => setObjectsSearch(e.target.value)}
-                        className="pl-8 h-8"
+                        className="h-8 pl-7"
                       />
                     </div>
                   </div>
@@ -713,7 +642,7 @@ export function Toolbar({
                     <div className="w-max min-w-full">
                       {hasObjectFilters && (
                         <button
-                          className="w-max min-w-full px-3 py-2 text-left text-sm hover:bg-accent border-b"
+                          className="w-max min-w-full border-b px-3 py-2 text-left text-xs hover:bg-accent"
                           onClick={resetObjectFilters}
                         >
                           All Objects
@@ -742,7 +671,7 @@ export function Toolbar({
                         return (
                           <div key={type} className="w-max min-w-full border-b last:border-b-0">
                             <div
-                              className="w-max min-w-full px-3 py-2 bg-muted/50 flex items-center gap-2 cursor-pointer"
+                              className="flex w-max min-w-full cursor-pointer items-center gap-2 bg-muted/50 px-3 py-1.5"
                               role="button"
                               tabIndex={0}
                               onClick={() => toggleObjectSection(type)}
@@ -756,7 +685,7 @@ export function Toolbar({
                             >
                               <button
                                 type="button"
-                                className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-sm hover:bg-accent"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   toggleObjectSection(type);
@@ -765,9 +694,9 @@ export function Toolbar({
                                 aria-label={`Toggle ${OBJECT_TYPE_LABELS[type]} section`}
                               >
                                 {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                                 )}
                               </button>
                               <div
@@ -787,10 +716,8 @@ export function Toolbar({
                                   }
                                 />
                               </div>
-                              <span
-                                className="text-xs font-medium text-muted-foreground"
-                                style={{ color: OBJECT_COLORS[type] }}
-                              >
+                              <TypeDot type={type} />
+                              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                                 {formatSectionCountLabel(
                                   OBJECT_TYPE_LABELS[type],
                                   selectedCount,
@@ -806,9 +733,10 @@ export function Toolbar({
                                   return (
                                     <div
                                       key={item.id}
-                                      className={`w-max min-w-full flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent ${
-                                        !typeEnabled ? "opacity-50" : ""
-                                      }`}
+                                      className={cn(
+                                        "flex w-max min-w-full cursor-pointer items-center gap-2 px-3 py-1 text-xs hover:bg-accent",
+                                        !typeEnabled && "opacity-50"
+                                      )}
                                       role="button"
                                       tabIndex={0}
                                       onClick={() =>
@@ -850,9 +778,8 @@ export function Toolbar({
                                           }
                                         />
                                       </div>
-                                      <span style={{ color: OBJECT_COLORS[type] }}>
-                                        {item.id}
-                                      </span>
+                                      <TypeDot type={type} />
+                                      <span>{item.id}</span>
                                     </div>
                                   );
                                 })}
@@ -863,7 +790,7 @@ export function Toolbar({
                       })}
 
                       {objectsSearch.trim().length > 0 && !hasPanelSearchMatches && (
-                        <div className="w-max min-w-full px-3 py-4 text-sm text-center text-muted-foreground">
+                        <div className="w-max min-w-full px-3 py-4 text-center text-xs text-muted-foreground">
                           No matches found
                         </div>
                       )}
@@ -872,22 +799,17 @@ export function Toolbar({
                 </PopoverContent>
               </Popover>
 
-              {/* Edges button */}
+              {/* Edges */}
               <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="rounded-l-none"
-                        style={
-                          !allEdgesSelected
-                            ? { backgroundColor: "#22c55e" }
-                            : undefined
-                        }
+                        className={cn(!allEdgesSelected && FILTER_ACTIVE_CLASSES)}
                       >
-                        <Network className="w-4 h-4" />
+                        <Network className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
@@ -916,79 +838,66 @@ export function Toolbar({
                       onSelect={(e) => e.preventDefault()}
                       onCheckedChange={() => toggleEdgeType(type)}
                     >
-                      <span style={{ color: EDGE_COLORS[type] }}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          aria-hidden
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: EDGE_COLORS[type] }}
+                        />
                         {EDGE_TYPE_LABELS[type]}
                       </span>
                     </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
-          </TooltipProvider>
-        )}
 
-        {/* Export - only show when schema loaded */}
-        {hasSchema && (
-          <TooltipProvider>
-            <ExportButton />
-          </TooltipProvider>
-        )}
+              <ExportButton />
+              <Separator orientation="vertical" className="h-4" />
+            </>
+          )}
 
-        {/* Settings */}
-        <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-2"
-                onClick={onOpenSettings}
-              >
-                <Settings className="w-4 h-4" />
+              <Button variant="ghost" size="sm" onClick={onOpenSettings}>
+                <Settings className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
-        </TooltipProvider>
 
-        {/* Canvas leave */}
-        {canvasMode && onExitCanvas && (
-          <TooltipProvider>
+          {canvasMode && onExitCanvas && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="destructive"
+                  variant="ghost"
                   size="sm"
-                  className="h-9 px-2"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={onExitCanvas}
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Leave Canvas</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-        )}
+          )}
 
-        {/* Disconnect */}
-        {!canvasMode && isConnected && onDisconnect && (
-          <TooltipProvider>
+          {!canvasMode && isConnected && onDisconnect && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="destructive"
+                  variant="ghost"
                   size="sm"
-                  className="h-9 px-2"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={onDisconnect}
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Disconnect</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

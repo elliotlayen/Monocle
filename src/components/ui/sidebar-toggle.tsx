@@ -10,11 +10,11 @@ interface SidebarToggleProps {
 export function SidebarToggle({ onClick, visible }: SidebarToggleProps) {
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       className={cn(
-        "absolute top-4 left-4 z-10 h-9 w-9 bg-background shadow-sm",
-        "transition-opacity duration-200",
+        "panel-glass absolute top-14 left-3 z-10",
+        "transition-opacity duration-[var(--duration-base)] ease-[var(--ease-out)]",
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       onClick={onClick}

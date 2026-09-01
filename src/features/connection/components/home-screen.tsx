@@ -1,7 +1,5 @@
 import { Server, Settings, Info, PenTool, FolderSync } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { MonocleLogo } from "./monocle-logo";
-
 
 interface HomeScreenProps {
   onOpenConnectionModal?: () => void;
@@ -11,6 +9,37 @@ interface HomeScreenProps {
   onEnterExplorer?: () => void;
 }
 
+interface HomeAction {
+  icon: React.ReactNode;
+  label: string;
+  shortcut?: string;
+  onClick?: () => void;
+}
+
+function HomeActionRow({
+  action,
+  delayMs,
+}: {
+  action: HomeAction;
+  delayMs: number;
+}) {
+  return (
+    <button
+      className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-xs transition-[background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-backwards hover:bg-accent active:scale-[0.99]"
+      style={{ animationDelay: `${delayMs}ms` }}
+      onClick={action.onClick}
+    >
+      <span className="text-muted-foreground">{action.icon}</span>
+      <span className="flex-1 font-medium">{action.label}</span>
+      {action.shortcut && (
+        <kbd className="rounded-sm border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {action.shortcut}
+        </kbd>
+      )}
+    </button>
+  );
+}
+
 export function HomeScreen({
   onOpenConnectionModal,
   onOpenSettings,
@@ -18,92 +47,69 @@ export function HomeScreen({
   onEnterCanvasMode,
   onEnterExplorer,
 }: HomeScreenProps) {
-
   const isMac =
     typeof navigator !== "undefined" &&
     navigator.platform.toUpperCase().indexOf("MAC") >= 0;
   const modKey = isMac ? "Cmd" : "Ctrl";
 
+  const actions: HomeAction[] = [
+    {
+      icon: <Server className="h-4 w-4" />,
+      label: "Schema Browser",
+      shortcut: `${modKey}+N`,
+      onClick: onOpenConnectionModal,
+    },
+    {
+      icon: <PenTool className="h-4 w-4" />,
+      label: "Canvas Mode",
+      shortcut: `${modKey}+K`,
+      onClick: onEnterCanvasMode,
+    },
+    {
+      icon: <FolderSync className="h-4 w-4" />,
+      label: "Integration Explorer",
+      shortcut: `${modKey}+E`,
+      onClick: onEnterExplorer,
+    },
+    {
+      icon: <Settings className="h-4 w-4" />,
+      label: "Settings",
+      shortcut: `${modKey}+,`,
+      onClick: onOpenSettings,
+    },
+    {
+      icon: <Info className="h-4 w-4" />,
+      label: "About",
+      onClick: onOpenAbout,
+    },
+  ];
+
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-muted p-8">
-      {/* Hero - Logo and Title */}
-      <div className="flex items-center mb-12">
-        <MonocleLogo className="w-16 h-16" />
-        <h1
-          className="text-5xl font-bold"
-        >
-          Monocle
-        </h1>
-      </div>
+    <div className="dot-grid flex h-screen flex-col items-center justify-center bg-background p-8">
+      <div className="panel-glass w-96 animate-in fade-in-0 zoom-in-95 duration-[var(--duration-slow)] ease-[var(--ease-out)]">
+        {/* Hero - Logo and wordmark */}
+        <div className="flex items-center gap-3 border-b px-5 py-5">
+          <MonocleLogo className="h-9 w-9" />
+          <div>
+            <h1 className="text-lg font-bold leading-tight tracking-wide">
+              Monocle
+            </h1>
+            <p className="text-[11px] text-muted-foreground">
+              SQL Server schema visualizer
+            </p>
+          </div>
+        </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col gap-2 w-80">
-        <Button
-          variant="outline"
-          className="w-full h-12 justify-between px-4"
-          onClick={onOpenConnectionModal}
-        >
-          <span className="flex items-center gap-3">
-            <Server className="w-5 h-5" />
-            Schema Browser
-          </span>
-          <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {modKey}+N
-          </kbd>
-        </Button>
-
-        <Button
-          variant="outline"
-          className="w-full h-12 justify-between px-4"
-          onClick={onEnterCanvasMode}
-        >
-          <span className="flex items-center gap-3">
-            <PenTool className="w-5 h-5" />
-            Canvas Mode
-          </span>
-          <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {modKey}+K
-          </kbd>
-        </Button>
-
-        <Button
-          variant="outline"
-          className="w-full h-12 justify-between px-4"
-          onClick={onEnterExplorer}
-        >
-          <span className="flex items-center gap-3">
-            <FolderSync className="w-5 h-5" />
-            Integration Explorer
-          </span>
-          <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {modKey}+E
-          </kbd>
-        </Button>
-
-        <Button
-          variant="outline"
-          className="w-full h-12 justify-between px-4"
-          onClick={onOpenSettings}
-        >
-          <span className="flex items-center gap-3">
-            <Settings className="w-5 h-5" />
-            Settings
-          </span>
-          <kbd className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {modKey}+,
-          </kbd>
-        </Button>
-
-        <Button
-          variant="outline"
-          className="w-full h-12 justify-start px-4"
-          onClick={onOpenAbout}
-        >
-          <span className="flex items-center gap-3">
-            <Info className="w-5 h-5" />
-            About
-          </span>
-        </Button>
+        {/* Actions */}
+        <div className="flex flex-col gap-0.5 p-2">
+          {actions.map((action, index) => (
+            <HomeActionRow
+              key={action.label}
+              action={action}
+              delayMs={60 + index * 40}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -345,44 +345,46 @@ function SchemaBrowserSidebarComponent({
     <aside
       style={{ width: SIDEBAR_WIDTH }}
       className={cn(
-        "absolute left-0 top-0 bottom-0 bg-background border-r z-20",
+        "panel-glass absolute left-3 top-14 bottom-11 z-20",
         "flex flex-col overflow-hidden",
-        "transition-transform duration-300 ease-in-out",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        "transition-transform duration-[var(--duration-slow)] ease-[var(--ease-out)]",
+        sidebarOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
       )}
     >
       {/* Header */}
-      <div className="flex-shrink-0 border-b p-3">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold">Schema Browser</h2>
+      <div className="flex-shrink-0 border-b p-2.5">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h2 className="pl-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Schema Browser
+          </h2>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-6 w-6"
               onClick={toggleExpandAll}
               title={allExpanded ? "Collapse all" : "Expand all"}
             >
-              <ChevronsUpDown className="h-4 w-4" />
+              <ChevronsUpDown className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-6 w-6"
               onClick={() => setSidebarOpen(false)}
               title="Close sidebar"
             >
-              <PanelLeftClose className="h-4 w-4" />
+              <PanelLeftClose className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search objects..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pl-8 h-8 text-sm"
+            className="h-8 pl-8"
           />
         </div>
       </div>

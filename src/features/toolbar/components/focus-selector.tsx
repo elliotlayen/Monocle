@@ -129,10 +129,10 @@ export function FocusSelector() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           role="combobox"
           aria-expanded={open}
-          className="w-[220px] justify-between"
+          className="w-52 justify-between"
           size="sm"
           title="Focused objects"
         >

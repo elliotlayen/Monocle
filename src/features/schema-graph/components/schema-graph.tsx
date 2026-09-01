@@ -50,10 +50,7 @@ import {
   TRIGGER_MIN_WIDTH,
 } from "./node-width";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
-import {
-  SchemaBrowserSidebar,
-  SIDEBAR_WIDTH,
-} from "./schema-browser-sidebar";
+import { SchemaBrowserSidebar } from "./schema-browser-sidebar";
 import { DetailPopover } from "./detail-popover";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -1898,10 +1895,9 @@ function SchemaGraphInner({
         onClose={closePopover}
         onEdit={canvasMode ? handleEditFromPopover : undefined}
       />
-      <main
-        className="flex-1 h-full transition-[margin-left] duration-300"
-        style={{ marginLeft: sidebarOpen ? SIDEBAR_WIDTH : 0 }}
-      >
+      {/* The floating sidebar overlays the canvas; no layout push, so the
+          React Flow viewport stays stable when it toggles. */}
+      <main className="flex-1 h-full">
         <div
           className="relative w-full h-full"
           onContextMenu={canvasMode ? handleContextMenu : undefined}
@@ -1913,9 +1909,9 @@ function SchemaGraphInner({
           {reactFlowContent}
           {viewMode === "browse" && !canvasMode && focusRoots.size === 0 && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div className="pointer-events-auto max-w-md space-y-3 rounded-lg border bg-background/95 px-8 py-6 text-center shadow-sm">
+              <div className="panel-glass pointer-events-auto max-w-md space-y-3 px-8 py-6 text-center">
                 <h3 className="text-sm font-semibold">Browse mode</h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs leading-5 text-muted-foreground">
                   This database is large, so nothing is rendered yet. Pick an
                   object in the sidebar (double-click or the crosshair) to
                   explore its relationships, then expand outward from there.

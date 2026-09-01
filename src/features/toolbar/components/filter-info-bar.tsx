@@ -124,7 +124,7 @@ export function FilterInfoBar() {
   if (!hasActiveFilters) return null;
 
   return (
-    <div className="absolute top-2 right-3 z-10 flex flex-col items-end gap-2">
+    <div className="absolute top-16 right-3 z-20 flex flex-col items-end gap-2">
       {focusedTableId && focusedType && (
         <FilterBox
           label="Focus"
@@ -187,7 +187,7 @@ function FilterBox({
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-background border shadow-sm text-sm"
+      className="panel-glass flex items-center gap-2 rounded-md px-3 py-1.5 text-xs"
       style={borderStyle}
     >
       <span className="text-muted-foreground">{label}:</span>
@@ -197,8 +197,12 @@ function FilterBox({
       >
         {value}
       </span>
-      <button onClick={onClear} className="ml-1 hover:bg-muted rounded p-0.5">
-        <X className="w-3.5 h-3.5 text-muted-foreground" />
+      <button
+        onClick={onClear}
+        className="ml-1 rounded-sm p-0.5 transition-colors duration-[var(--duration-fast)] hover:bg-muted active:scale-[0.97]"
+        aria-label={`Clear ${label.toLowerCase()} filter`}
+      >
+        <X className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
     </div>
   );

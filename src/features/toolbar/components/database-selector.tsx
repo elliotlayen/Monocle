@@ -107,10 +107,10 @@ export function DatabaseSelector() {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             role="combobox"
             aria-expanded={open}
-            className="w-[448px] justify-between"
+            className="w-56 justify-between"
             size="sm"
             disabled={isSelecting}
           >
@@ -132,7 +132,7 @@ export function DatabaseSelector() {
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[448px] p-0">
+        <PopoverContent className="w-72 p-0" align="center">
           <Command>
             <CommandInput placeholder="Search database..." />
             <CommandList>
@@ -162,7 +162,7 @@ export function DatabaseSelector() {
       </Popover>
 
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
         className="px-2"
         onClick={() => {
