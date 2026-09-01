@@ -1,6 +1,7 @@
 import { useShallow } from "zustand/shallow";
 import { Input } from "@/components/ui/input";
 import { useExplorerStore } from "@/features/explorer/store";
+import { Label } from "@/components/ui/label";
 
 export function ExplorerSettingsSection() {
   const {
@@ -27,7 +28,7 @@ export function ExplorerSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Scan File Pattern</label>
+        <Label>Scan File Pattern</Label>
         <Input
           className="w-full"
           value={scanFilePattern}
@@ -40,7 +41,7 @@ export function ExplorerSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Content Search File Pattern</label>
+        <Label>Content Search File Pattern</Label>
         <Input
           className="w-full"
           value={searchFilePattern}

@@ -1,4 +1,5 @@
 import { useSchemaStore } from "@/features/schema-graph/store";
+import { Label } from "@/components/ui/label";
 import type {
   DetailViewMode,
   EdgeLabelMode,
@@ -70,7 +71,7 @@ export function GraphSettingsSection() {
 
       {hasSchema && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Schema Filter</label>
+          <Label>Schema Filter</Label>
           <Select value={schemaFilter} onValueChange={setSchemaFilter}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="All Schemas" />
@@ -91,7 +92,7 @@ export function GraphSettingsSection() {
       )}
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Focus Expand Threshold</label>
+        <Label>Focus Expand Threshold</Label>
         <Select
           value={String(focusExpandThreshold)}
           onValueChange={(value) => setFocusExpandThreshold(Number(value))}
@@ -113,7 +114,7 @@ export function GraphSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Browse Mode Threshold</label>
+        <Label>Browse Mode Threshold</Label>
         <Select
           value={String(browseThreshold)}
           onValueChange={(value) => setBrowseThreshold(Number(value))}
@@ -137,7 +138,7 @@ export function GraphSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Edge Labels</label>
+        <Label>Edge Labels</Label>
         <Select
           value={edgeLabelMode}
           onValueChange={(value) => setEdgeLabelMode(value as EdgeLabelMode)}
@@ -159,7 +160,7 @@ export function GraphSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">MiniMap</label>
+        <Label>MiniMap</Label>
         <Select
           value={showMiniMap ? "on" : "off"}
           onValueChange={(value) => setShowMiniMap(value === "on")}
@@ -178,7 +179,7 @@ export function GraphSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Object Details</label>
+        <Label>Object Details</Label>
         <Select
           value={detailViewMode}
           onValueChange={(value) => setDetailViewMode(value as DetailViewMode)}

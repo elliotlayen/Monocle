@@ -1,4 +1,5 @@
 import { useTheme } from "@/providers/theme-provider";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -20,7 +21,7 @@ export function AppearanceSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Theme</label>
+        <Label>Theme</Label>
         <Select value={theme} onValueChange={setTheme}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select theme" />

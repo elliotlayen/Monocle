@@ -66,37 +66,20 @@ export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) 
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 border-t">
-          <div className="border-b px-3 pb-3 sm:hidden">
-            <div className="grid grid-cols-4 gap-2">
-              {SETTINGS_SECTIONS.map((section) => {
-                const Icon = section.icon;
-                const isActive = activeSection === section.id;
-                return (
-                  <Button
-                    key={section.id}
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className={cn("w-full justify-center gap-2")}
-                    onClick={() => setActiveSection(section.id)}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-xs">{section.label}</span>
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
           <div className="flex h-full min-h-0">
-            <nav className="hidden w-52 shrink-0 flex-col gap-1 overflow-y-auto border-r p-2 sm:flex">
+            <nav className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2">
               {SETTINGS_SECTIONS.map((section) => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
                 return (
                   <Button
                     key={section.id}
-                    variant={isActive ? "secondary" : "ghost"}
-                    className="justify-start gap-2"
+                    variant="ghost"
+                    className={cn(
+                      "justify-start gap-2",
+                      isActive &&
+                        "bg-accent-blue/12 text-accent-blue hover:bg-accent-blue/18 hover:text-accent-blue"
+                    )}
                     onClick={() => setActiveSection(section.id)}
                   >
                     <Icon className="h-4 w-4" />
