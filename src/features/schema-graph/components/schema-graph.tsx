@@ -87,7 +87,10 @@ import {
   areEdgesEquivalent,
   deriveEdgeState,
   type EdgeMeta,
+  type EdgeStateResult,
 } from "./edge-state";
+import { getFilteredObjectBuckets } from "../utils/object-filtering";
+import { computeFocusState } from "./focus-state";
 import {
   buildEdgeHoverCardContent,
   type EdgeHoverEndpoint,
@@ -135,6 +138,15 @@ const nodeTypes = {
   storedProcedureNode: StoredProcedureNode,
   scalarFunctionNode: ScalarFunctionNode,
 };
+
+const EMPTY_ID_SET: Set<string> = new Set();
+const ALL_OBJECT_TYPES_FALLBACK: Set<ObjectType> = new Set([
+  "tables",
+  "views",
+  "triggers",
+  "storedProcedures",
+  "scalarFunctions",
+]);
 
 // MiniMap node color function - defined outside component for stable reference
 function getMinimapNodeColor(node: Node): string {
@@ -850,6 +862,7 @@ function SchemaGraphInner({
   const zoomRef = useRef(0.8);
   const edgesRef = useRef<Edge[]>([]);
   const handleEdgeTypesRef = useRef<Map<string, Set<EdgeType>>>(new Map());
+  const edgeDerivationRef = useRef<EdgeStateResult | null>(null);
 
   const [zoomBand, setZoomBand] = useState<ZoomBand>(() => getZoomBand(0.8));
   const [autoShowEdgeLabels, setAutoShowEdgeLabels] = useState(() =>
@@ -1423,183 +1436,44 @@ function SchemaGraphInner({
     originalPositionsRef.current = positions;
   }, [baseNodes]);
 
-  useEffect(() => {
-    const lowerSearch = searchFilter?.trim().toLowerCase() ?? "";
-    const hasSearch = lowerSearch.length > 0;
-    const matchesSearch = (map: Map<string, string>, id: string) => {
-      if (!hasSearch) return true;
-      const text = map.get(id);
-      return text ? text.includes(lowerSearch) : false;
-    };
+  // Visibility: which objects survive the search/schema/type/exclusion
+  // filters. Shares getFilteredObjectBuckets with useFilteredCounts so the
+  // graph, sidebar, and status bar agree by construction. Focus dimming is
+  // layered on separately (focusedTableId: null here keeps non-neighbors).
+  const visibility = useMemo(
+    () =>
+      getFilteredObjectBuckets({
+        schema,
+        searchFilter: searchFilter ?? "",
+        schemaFilter: schemaFilter ?? "",
+        objectTypeFilter: objectTypeFilter ?? ALL_OBJECT_TYPES_FALLBACK,
+        excludedObjectIds: excludedObjectIds ?? EMPTY_ID_SET,
+        focusedTableId: null,
+        schemaIndex,
+      }),
+    [
+      schema,
+      schemaIndex,
+      searchFilter,
+      schemaFilter,
+      objectTypeFilter,
+      excludedObjectIds,
+    ]
+  );
 
-    const showTables = !objectTypeFilter || objectTypeFilter.has("tables");
-    const showViews = !objectTypeFilter || objectTypeFilter.has("views");
-    const showTriggers = !objectTypeFilter || objectTypeFilter.has("triggers");
-    const showProcedures =
-      !objectTypeFilter || objectTypeFilter.has("storedProcedures");
-    const showFunctions =
-      !objectTypeFilter || objectTypeFilter.has("scalarFunctions");
-    const isIncludedObject = (id: string) => !excludedObjectIds?.has(id);
+  const focusState = useMemo(
+    () => computeFocusState(visibility, focusedTableId ?? null, schemaIndex),
+    [visibility, focusedTableId, schemaIndex]
+  );
 
-    let filteredTables = showTables
-      ? schema.tables.filter((t) => isIncludedObject(t.id))
-      : [];
-    if (hasSearch) {
-      filteredTables = filteredTables.filter((t) =>
-        matchesSearch(schemaIndex.tableSearch, t.id)
-      );
-    }
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredTables = filteredTables.filter((t) => t.schema === schemaFilter);
-    }
-
-    let filteredViews = showViews
-      ? (schema.views || []).filter((v) => isIncludedObject(v.id))
-      : [];
-    if (hasSearch) {
-      filteredViews = filteredViews.filter((v) =>
-        matchesSearch(schemaIndex.viewSearch, v.id)
-      );
-    }
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredViews = filteredViews.filter((v) => v.schema === schemaFilter);
-    }
-
-    const visibleTableIds = new Set(filteredTables.map((t) => t.id));
-    const visibleViewIds = new Set(filteredViews.map((v) => v.id));
-
-    let filteredTriggers = showTriggers
-      ? (schema.triggers || []).filter(
-          (tr) => visibleTableIds.has(tr.tableId) && isIncludedObject(tr.id)
-        )
-      : [];
-    if (hasSearch) {
-      filteredTriggers = filteredTriggers.filter((tr) =>
-        matchesSearch(schemaIndex.triggerSearch, tr.id)
-      );
-    }
-
-    let filteredProcedures = showProcedures
-      ? (schema.storedProcedures || []).filter((p) => isIncludedObject(p.id))
-      : [];
-    let filteredFunctions = showFunctions
-      ? (schema.scalarFunctions || []).filter((f) => isIncludedObject(f.id))
-      : [];
-
-    if (schemaFilter && schemaFilter !== "all") {
-      filteredProcedures = filteredProcedures.filter(
-        (p) => p.schema === schemaFilter
-      );
-      filteredFunctions = filteredFunctions.filter(
-        (f) => f.schema === schemaFilter
-      );
-    }
-    if (hasSearch) {
-      filteredProcedures = filteredProcedures.filter((p) =>
-        matchesSearch(schemaIndex.procedureSearch, p.id)
-      );
-      filteredFunctions = filteredFunctions.filter((f) =>
-        matchesSearch(schemaIndex.functionSearch, f.id)
-      );
-    }
-
-    const visibleTriggerIds = new Set(filteredTriggers.map((t) => t.id));
-    const visibleProcedureIds = new Set(filteredProcedures.map((p) => p.id));
-    const visibleFunctionIds = new Set(filteredFunctions.map((f) => f.id));
-
-    const visibleNodeIds = new Set<string>([
-      ...visibleTableIds,
-      ...visibleViewIds,
-      ...visibleTriggerIds,
-      ...visibleProcedureIds,
-      ...visibleFunctionIds,
-    ]);
-
-    // Get direct neighbors of focused node
-    const focusedNeighbors = focusedTableId
-      ? schemaIndex.neighbors.get(focusedTableId) ?? new Set<string>()
-      : new Set<string>();
-
-    // Helper to check if a node is a direct neighbor
-    const isNeighbor = (nodeId: string) => focusedNeighbors.has(nodeId);
-
-    // Calculate which nodes would be dimmed for focus mode
-    const dimmedNodeIds = new Set<string>();
-    if (focusedTableId) {
-      visibleNodeIds.forEach((nodeId) => {
-        // Tables and views: dimmed if not focused and not a neighbor
-        if (visibleTableIds.has(nodeId) || visibleViewIds.has(nodeId)) {
-          if (nodeId !== focusedTableId && !isNeighbor(nodeId)) {
-            dimmedNodeIds.add(nodeId);
-          }
-        }
-        // Triggers: dimmed if their table is not focused and not a neighbor
-        else if (visibleTriggerIds.has(nodeId)) {
-          const trigger = schemaIndex.triggerById.get(nodeId);
-          if (
-            trigger &&
-            trigger.tableId !== focusedTableId &&
-            !isNeighbor(trigger.tableId)
-          ) {
-            dimmedNodeIds.add(nodeId);
-          }
-        }
-        // Procedures: dimmed if none of their tables are focused or a neighbor
-        else if (visibleProcedureIds.has(nodeId)) {
-          const procedure = schemaIndex.procedureById.get(nodeId);
-          if (procedure) {
-            const refs = [
-              ...(procedure.referencedTables || []),
-              ...(procedure.affectedTables || []),
-            ];
-            if (
-              !refs.some(
-                (tableId) =>
-                  tableId === focusedTableId || isNeighbor(tableId)
-              )
-            ) {
-              dimmedNodeIds.add(nodeId);
-            }
-          }
-        }
-        // Functions: dimmed if none of their tables are focused or a neighbor
-        else if (visibleFunctionIds.has(nodeId)) {
-          const fn = schemaIndex.functionById.get(nodeId);
-          if (fn) {
-            const refs = fn.referencedTables || [];
-            if (
-              !refs.some(
-                (tableId) =>
-                  tableId === focusedTableId || isNeighbor(tableId)
-              )
-            ) {
-              dimmedNodeIds.add(nodeId);
-            }
-          }
-        }
-      });
-    }
-
-    // Count visible non-dimmed tables/views for per-node compact calculation
-    const visibleNonDimmedCount = [
-      ...visibleTableIds,
-      ...visibleViewIds,
-    ].filter((id) => !dimmedNodeIds.has(id)).length;
-    const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
-
-    // Hide-only focus mode: exclude dimmed nodes from rendered edges.
-    const renderableNodeIds = new Set(
-      [...visibleNodeIds].filter((id) => !dimmedNodeIds.has(id))
-    );
-
-    const {
-      edges: nextEdges,
-      handleEdgeTypes,
-      visibleEdgeIds,
-    } = deriveEdgeState({
+  // Edge derivation is cheap (O(edges)) and re-runs on hover/selection, but
+  // handleEdgeTypes keeps its previous reference when equivalent so the node
+  // patch effect below does not re-run on hover.
+  const edgeDerivation = useMemo(() => {
+    const result = deriveEdgeState({
       edges: baseEdges,
       edgeTypeFilter,
-      renderableNodeIds,
+      renderableNodeIds: focusState.renderableNodeIds,
       columnsByNodeId,
       focusedTableId: focusedTableId ?? null,
       selectedEdgeIds,
@@ -1608,7 +1482,34 @@ function SchemaGraphInner({
       showInlineLabelOnHover: false,
       previousHandleEdgeTypes: handleEdgeTypesRef.current,
     });
-    handleEdgeTypesRef.current = handleEdgeTypes;
+    handleEdgeTypesRef.current = result.handleEdgeTypes;
+    return result;
+  }, [
+    baseEdges,
+    edgeTypeFilter,
+    focusState,
+    columnsByNodeId,
+    focusedTableId,
+    selectedEdgeIds,
+    hoveredEdgeId,
+    showEdgeLabels,
+  ]);
+  edgeDerivationRef.current = edgeDerivation;
+
+  // Structure/focus orchestration: node visibility patching, focus
+  // transitions, compact layout, and the edge flush choreography. Hover and
+  // selection changes deliberately do not re-run this effect.
+  useEffect(() => {
+    const {
+      focusedNeighbors,
+      dimmedNodeIds,
+      renderableNodeIds,
+      visibleNonDimmedCount,
+    } = focusState;
+    const visibleNodeIds = visibility.visibleNodeIds;
+    const isNeighbor = (nodeId: string) => focusedNeighbors.has(nodeId);
+    const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
+    const handleEdgeTypes = edgeDerivation.handleEdgeTypes;
 
     const prevState = prevFocusStateRef.current;
     const nextFocusState: FocusSnapshot = {
@@ -1636,26 +1537,9 @@ function SchemaGraphInner({
       setIsEdgeFlushInProgress(true);
       edgesRef.current = [];
       setEdges([]);
-    } else if (!pendingEdgeFlushRef.current) {
-      if (!areEdgesEquivalent(edgesRef.current, nextEdges)) {
-        edgesRef.current = nextEdges;
-        setEdges(nextEdges);
-      }
-      if (!transitionNeedsFlush) {
-        lastFlushSignatureRef.current = "";
-        setIsEdgeFlushInProgress(false);
-      }
-    }
-
-    if (hoveredEdgeId && !visibleEdgeIds.has(hoveredEdgeId)) {
-      setHoveredEdgeId(null);
-      setHoverCard(null);
-    }
-    if (
-      selectedEdgeIds.size > 0 &&
-      [...selectedEdgeIds].some((id) => !visibleEdgeIds.has(id))
-    ) {
-      clearEdgeSelection();
+    } else if (!pendingEdgeFlushRef.current && !transitionNeedsFlush) {
+      lastFlushSignatureRef.current = "";
+      setIsEdgeFlushInProgress(false);
     }
 
     // Detect if we JUST exited focus mode (restore positions once, not continuously)
@@ -1682,45 +1566,9 @@ function SchemaGraphInner({
       let changed = false;
       const nextNodes = currentNodes.map((node) => {
         const isVisible = visibleNodeIds.has(node.id);
-        let isFocused = false;
-        let isDimmed = false;
         const isTableOrView = node.type === "tableNode" || node.type === "viewNode";
-
-        if (focusedTableId) {
-          if (isTableOrView) {
-            isFocused = node.id === focusedTableId;
-            isDimmed = !isFocused && !isNeighbor(node.id);
-          } else if (node.type === "triggerNode") {
-            const trigger = (node.data as { trigger?: Trigger }).trigger;
-            if (trigger) {
-              isDimmed =
-                trigger.tableId !== focusedTableId &&
-                !isNeighbor(trigger.tableId);
-            }
-          } else if (node.type === "storedProcedureNode") {
-            const procedure = (node.data as { procedure?: StoredProcedure })
-              .procedure;
-            if (procedure) {
-              const refs = [
-                ...(procedure.referencedTables || []),
-                ...(procedure.affectedTables || []),
-              ];
-              isDimmed = !refs.some(
-                (tableId) =>
-                  tableId === focusedTableId || isNeighbor(tableId)
-              );
-            }
-          } else if (node.type === "scalarFunctionNode") {
-            const fn = (node.data as { function?: ScalarFunction }).function;
-            if (fn) {
-              const refs = fn.referencedTables || [];
-              isDimmed = !refs.some(
-                (tableId) =>
-                  tableId === focusedTableId || isNeighbor(tableId)
-              );
-            }
-          }
-        }
+        const isFocused = isTableOrView && node.id === focusedTableId;
+        const isDimmed = dimmedNodeIds.has(node.id);
 
         const widthFallback =
           node.type === "triggerNode"
@@ -1800,6 +1648,7 @@ function SchemaGraphInner({
       requestAnimationFrame(() => {
         internalsRefreshIds.forEach((nodeId) => updateNodeInternals(nodeId));
         requestAnimationFrame(() => {
+          const nextEdges = edgeDerivationRef.current?.edges ?? [];
           edgesRef.current = nextEdges;
           setEdges(nextEdges);
           pendingEdgeFlushRef.current = false;
@@ -1812,6 +1661,7 @@ function SchemaGraphInner({
         internalsRefreshIds.forEach((nodeId) => updateNodeInternals(nodeId));
         if (!pendingEdgeFlushRef.current) {
           // Re-apply visible edges after handle geometry updates to avoid stale paths.
+          const nextEdges = edgeDerivationRef.current?.edges ?? [];
           edgesRef.current = nextEdges;
           setEdges([...nextEdges]);
         }
@@ -1834,30 +1684,49 @@ function SchemaGraphInner({
       focusLayoutLockedRef.current = false;
     }
   }, [
-    baseEdges,
-    edgeTypeFilter,
+    visibility,
+    focusState,
     focusedTableId,
     focusExpandThreshold,
     zoomBand,
     schema,
-    schemaFilter,
     schemaIndex,
-    searchFilter,
-    selectedEdgeIds,
-    hoveredEdgeId,
-    setEdges,
-    setNodes,
-    clearEdgeSelection,
-    showEdgeLabels,
-    objectTypeFilter,
-    excludedObjectIds,
-    columnsByNodeId,
     nodeHeights,
     nodeWidths,
     mainDependencyEdges,
+    edgeDerivation.handleEdgeTypes,
+    setEdges,
+    setNodes,
     fitView,
     updateNodeInternals,
   ]);
+
+  // Hover/selection hygiene: drop hover and selection state for edges that
+  // are no longer visible.
+  useEffect(() => {
+    const { visibleEdgeIds } = edgeDerivation;
+    if (hoveredEdgeId && !visibleEdgeIds.has(hoveredEdgeId)) {
+      setHoveredEdgeId(null);
+      setHoverCard(null);
+    }
+    if (
+      selectedEdgeIds.size > 0 &&
+      [...selectedEdgeIds].some((id) => !visibleEdgeIds.has(id))
+    ) {
+      clearEdgeSelection();
+    }
+  }, [edgeDerivation, hoveredEdgeId, selectedEdgeIds, clearEdgeSelection]);
+
+  // Steady-state edge sync: the intended per-hover cost is this equivalence
+  // check plus at most one edge-array commit. During a focus flush the RAF
+  // choreography above owns the edge writes instead.
+  useEffect(() => {
+    if (pendingEdgeFlushRef.current) return;
+    if (!areEdgesEquivalent(edgesRef.current, edgeDerivation.edges)) {
+      edgesRef.current = edgeDerivation.edges;
+      setEdges(edgeDerivation.edges);
+    }
+  }, [edgeDerivation, setEdges]);
 
   const renderHoverEndpoint = useCallback(
     (endpoint: EdgeHoverEndpoint) => {
