@@ -23,19 +23,18 @@ import { parseXml } from "../utils/xml-parser";
 import {
   buildVisibleTree,
   collectExpandableKeys,
-  computeDefaultExpandedIds,
 } from "../utils/xml-tree-model";
-import {
-  layoutXmlTree,
-  XML_NODE_HEIGHT,
-  XML_NODE_WIDTH,
-} from "../utils/xml-tree-layout";
+import { layoutXmlTree, XML_NODE_HEIGHT } from "../utils/xml-tree-layout";
 import {
   getZoomBand,
   isCompactForZoomBand,
   type ZoomBand,
 } from "@/features/schema-graph/components/zoom-band";
-import { XmlFlowNode, type XmlFlowNodeData } from "./xml-flow-node";
+import {
+  XML_KIND_COLORS,
+  XmlFlowNode,
+  type XmlFlowNodeData,
+} from "./xml-flow-node";
 
 export interface XmlTreeViewHandle {
   expandAll: () => void;
@@ -54,28 +53,30 @@ const nodeTypes = { xmlNode: XmlFlowNode };
 
 const DEFAULT_VIEWPORT: Viewport = { x: 24, y: 24, zoom: 1 };
 
-// Static handle geometry: with fixed node dimensions this lets React Flow
-// anchor edges without DOM measurement (the SSR/static-flow path).
-const STATIC_HANDLES = [
-  {
-    id: null,
-    type: "target" as const,
-    position: Position.Left,
-    x: 0,
-    y: XML_NODE_HEIGHT / 2,
-    width: 1,
-    height: 1,
-  },
-  {
-    id: null,
-    type: "source" as const,
-    position: Position.Right,
-    x: XML_NODE_WIDTH,
-    y: XML_NODE_HEIGHT / 2,
-    width: 1,
-    height: 1,
-  },
-];
+// Static handle geometry: with declared node dimensions this lets React
+// Flow anchor edges without DOM measurement (the SSR/static-flow path).
+function makeHandles(width: number) {
+  return [
+    {
+      id: null,
+      type: "target" as const,
+      position: Position.Left,
+      x: 0,
+      y: XML_NODE_HEIGHT / 2,
+      width: 1,
+      height: 1,
+    },
+    {
+      id: null,
+      type: "source" as const,
+      position: Position.Right,
+      x: width,
+      y: XML_NODE_HEIGHT / 2,
+      width: 1,
+      height: 1,
+    },
+  ];
+}
 
 function XmlTreeFlowInner(
   {
@@ -112,8 +113,8 @@ function XmlTreeFlowInner(
     [parseResult, onExpandedIdsChange]
   );
 
-  // Bounded default expansion on first open (mount-scoped, matching the
-  // previous tree view's re-trigger behavior after collapse-all + revisit).
+  // Expand the whole document on first open (mount-scoped, matching the
+  // previous tree view); viewport culling keeps large documents cheap.
   const initialExpandDone = useRef(false);
   useEffect(() => {
     if (
@@ -122,9 +123,10 @@ function XmlTreeFlowInner(
       !initialExpandDone.current
     ) {
       initialExpandDone.current = true;
-      const ids = computeDefaultExpandedIds(parseResult.document);
-      if (ids.size > 0) {
-        onExpandedIdsChange(ids);
+      const keys: string[] = [];
+      collectExpandableKeys(parseResult.document.documentElement, "0", keys);
+      if (keys.length > 0) {
+        onExpandedIdsChange(new Set(keys));
       }
     }
   }, [parseResult.document, expandedIds.size, onExpandedIdsChange]);
@@ -149,30 +151,36 @@ function XmlTreeFlowInner(
       return { nodes: [] as Node[], edges: [] as Edge[] };
     }
     const visible = buildVisibleTree(parseResult.document, expandedIds);
-    const { positions } = layoutXmlTree(visible);
+    const { positions, widths } = layoutXmlTree(visible);
     const nodes: Node[] = visible.map((xml) => ({
       id: xml.id,
       type: "xmlNode",
       position: positions[xml.id],
-      // Fixed dimensions: nodes are born measured, so edges anchor
-      // immediately and viewport culling is exact.
-      width: XML_NODE_WIDTH,
+      // Declared dimensions: nodes are born measured, so edges anchor
+      // immediately and viewport culling is exact. Width fits the content.
+      width: widths[xml.id],
       height: XML_NODE_HEIGHT,
-      handles: STATIC_HANDLES,
+      handles: makeHandles(widths[xml.id]),
       draggable: false,
       connectable: false,
-      data: { xml, compact, onToggle: handleToggle } satisfies XmlFlowNodeData,
+      data: {
+        xml,
+        width: widths[xml.id],
+        compact,
+        onToggle: handleToggle,
+      } satisfies XmlFlowNodeData,
     }));
+    // Bezier edges tinted by the child node's kind, so branch types read
+    // at a glance.
     const edges: Edge[] = visible
       .filter((xml) => xml.parentId !== null)
       .map((xml) => ({
         id: `e-${xml.id}`,
         source: xml.parentId!,
         target: xml.id,
-        type: "smoothstep",
         style: {
-          stroke: "color-mix(in srgb, var(--foreground) 22%, transparent)",
-          strokeWidth: 1,
+          stroke: `color-mix(in srgb, ${XML_KIND_COLORS[xml.kind]} 55%, transparent)`,
+          strokeWidth: 1.5,
         },
         focusable: false,
         selectable: false,

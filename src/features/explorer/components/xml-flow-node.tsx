@@ -2,63 +2,63 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
   Braces,
-  ChevronDown,
-  ChevronRight,
   FileCode,
   Hash,
   MessageSquare,
   Type,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { VisibleXmlNode, XmlNodeKind } from "../utils/xml-tree-model";
-import { XML_NODE_HEIGHT, XML_NODE_WIDTH } from "../utils/xml-tree-layout";
-
-const MAX_INLINE_ATTRIBUTES = 3;
+import { XML_NODE_HEIGHT } from "../utils/xml-tree-layout";
 
 export interface XmlFlowNodeData {
   xml: VisibleXmlNode;
+  width: number;
   compact: boolean;
   onToggle: (id: string) => void;
   [key: string]: unknown;
 }
 
-const KIND_ICONS: Record<XmlNodeKind, React.ReactNode> = {
-  element: <FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />,
-  text: <Type className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />,
-  cdata: <Braces className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />,
-  pi: <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />,
-  comment: (
-    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-  ),
-  other: <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />,
+// One color identity per node kind, shared with the edges so a branch's
+// type reads at a glance.
+export const XML_KIND_COLORS: Record<XmlNodeKind, string> = {
+  element: "var(--accent-blue)",
+  text: "var(--success)",
+  cdata: "var(--object-procedures)",
+  pi: "var(--object-triggers)",
+  comment: "var(--object-functions)",
+  other: "var(--muted-foreground)",
 };
 
-function labelClass(kind: XmlNodeKind): string {
-  switch (kind) {
-    case "element":
-      return "text-accent-blue";
-    case "text":
-      return "text-foreground";
-    case "comment":
-      return "italic text-muted-foreground";
-    default:
-      return "text-muted-foreground";
-  }
-}
+const KIND_ICONS: Record<XmlNodeKind, LucideIcon> = {
+  element: FileCode,
+  text: Type,
+  cdata: Braces,
+  pi: Hash,
+  comment: MessageSquare,
+  other: Hash,
+};
 
 function XmlFlowNodeComponent({ data }: NodeProps) {
-  const { xml, compact, onToggle } = data as unknown as XmlFlowNodeData;
+  const { xml, width, compact, onToggle } = data as unknown as XmlFlowNodeData;
   const toggleable = xml.kind === "element" && xml.hasChildren;
-  const shownAttrs = compact ? 0 : xml.attrs.slice(0, MAX_INLINE_ATTRIBUTES);
-  const overflow = compact
-    ? 0
-    : xml.attrs.length - Math.min(xml.attrs.length, MAX_INLINE_ATTRIBUTES);
+  const color = XML_KIND_COLORS[xml.kind];
+  const Icon = KIND_ICONS[xml.kind];
 
   return (
     <div
-      style={{ width: XML_NODE_WIDTH, height: XML_NODE_HEIGHT }}
+      style={{
+        width,
+        height: XML_NODE_HEIGHT,
+        // Kind-tinted rail, wash, and border make branch types vivid while
+        // staying on the token palette.
+        borderColor: `color-mix(in srgb, ${color} 35%, var(--border))`,
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, var(--card)), var(--card) 60%)`,
+        boxShadow: `inset 3px 0 0 0 ${color}`,
+      }}
       className={cn(
-        "relative flex items-center gap-1.5 overflow-hidden rounded-lg border border-border bg-card px-2.5 text-xs",
+        "relative flex items-center gap-2 overflow-hidden rounded-lg border pl-3 pr-2.5 text-xs",
         "transition-shadow duration-200",
         toggleable && "cursor-pointer hover:shadow-md"
       )}
@@ -72,20 +72,22 @@ function XmlFlowNodeComponent({ data }: NodeProps) {
         style={{ left: 0, top: "50%" }}
         isConnectable={false}
       />
-      {toggleable ? (
-        xml.isExpanded ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        )
-      ) : (
-        KIND_ICONS[xml.kind]
-      )}
-      <span className={cn("truncate font-medium", labelClass(xml.kind))}>
-        {xml.kind === "element" ? xml.label : xml.label || " "}
+      <Icon
+        className="h-3.5 w-3.5 shrink-0"
+        style={{ color }}
+        aria-hidden
+      />
+      <span
+        className={cn(
+          "truncate font-semibold",
+          xml.kind === "comment" && "font-normal italic"
+        )}
+        style={{ color: xml.kind === "text" ? "var(--foreground)" : color }}
+      >
+        {xml.label || " "}
       </span>
-      {shownAttrs !== 0 &&
-        shownAttrs.map((attr) => (
+      {!compact &&
+        xml.attrs.map((attr) => (
           <span
             key={attr.name}
             className="flex min-w-0 shrink items-center text-[10px]"
@@ -97,13 +99,14 @@ function XmlFlowNodeComponent({ data }: NodeProps) {
             </span>
           </span>
         ))}
-      {overflow > 0 && (
-        <span className="shrink-0 text-[10px] text-muted-foreground">
-          +{overflow}
-        </span>
-      )}
       {!xml.isExpanded && xml.hasChildren && (
-        <span className="ml-auto shrink-0 rounded-full bg-accent-blue/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
+        <span
+          className="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+          style={{
+            color,
+            backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
+          }}
+        >
           +{xml.childCount}
         </span>
       )}
