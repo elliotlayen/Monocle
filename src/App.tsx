@@ -24,6 +24,7 @@ import {
   CanvasDirtyDialog,
   type CanvasDirtyAction,
 } from "@/features/canvas/components/canvas-dirty-dialog";
+import { EDGE_TYPE_LABELS } from "@/constants/edge-colors";
 
 function App() {
   const {
@@ -34,7 +35,7 @@ function App() {
     canvasFilePath,
     canvasIsDirty,
     nodePositions,
-    searchFilter,
+    searchActive,
     debouncedSearchFilter,
     schemaFilter,
     focusedTableId,
@@ -63,7 +64,9 @@ function App() {
       canvasFilePath: state.canvasFilePath,
       canvasIsDirty: state.canvasIsDirty,
       nodePositions: state.nodePositions,
-      searchFilter: state.searchFilter,
+      // Derived boolean so keystrokes in the search bar do not re-render the
+      // whole app subtree; the graph consumes the debounced value.
+      searchActive: state.searchFilter.trim() !== "",
       debouncedSearchFilter: state.debouncedSearchFilter,
       schemaFilter: state.schemaFilter,
       focusedTableId: state.focusedTableId,
@@ -344,10 +347,10 @@ function App() {
   const hasFocus = focusedTableId !== null;
   const hasActiveFilters =
     hasFocus ||
-    searchFilter.trim() !== "" ||
+    searchActive ||
     objectTypeFilter.size !== 5 ||
     excludedObjectIds.size > 0 ||
-    edgeTypeFilter.size !== 7;
+    edgeTypeFilter.size !== Object.keys(EDGE_TYPE_LABELS).length;
 
   useEffect(() => {
     canvasMenuService

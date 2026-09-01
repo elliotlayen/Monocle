@@ -52,6 +52,10 @@ pub struct RelationshipEdge {
     pub from_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub to_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub constraint_name: Option<String>,
+    #[serde(default)]
+    pub is_disabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +110,15 @@ pub struct ScalarFunction {
     pub affected_tables: Vec<String>,
 }
 
+/// A code object referencing another code object (procedure calling a
+/// procedure, any object using a function). Table reads/writes are separate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeDependency {
+    pub from: String,
+    pub to: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaGraph {
@@ -115,6 +128,8 @@ pub struct SchemaGraph {
     pub triggers: Vec<Trigger>,
     pub stored_procedures: Vec<StoredProcedure>,
     pub scalar_functions: Vec<ScalarFunction>,
+    #[serde(default)]
+    pub code_dependencies: Vec<CodeDependency>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

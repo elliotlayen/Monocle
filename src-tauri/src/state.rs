@@ -24,6 +24,8 @@ pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_expand_threshold: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browse_threshold: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edge_label_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_mini_map: Option<bool>,
@@ -44,6 +46,7 @@ pub struct AppSettingsUpdate {
     pub theme: Option<String>,
     pub schema_filter: Option<String>,
     pub focus_expand_threshold: Option<u32>,
+    pub browse_threshold: Option<u32>,
     pub edge_label_mode: Option<String>,
     pub show_mini_map: Option<bool>,
     pub folder_sources: Option<Vec<FolderSource>>,
@@ -105,6 +108,9 @@ impl AppState {
         if let Some(threshold) = update.focus_expand_threshold {
             settings.focus_expand_threshold = Some(threshold);
         }
+        if let Some(threshold) = update.browse_threshold {
+            settings.browse_threshold = Some(threshold);
+        }
         if let Some(edge_label_mode) = update.edge_label_mode {
             settings.edge_label_mode = Some(edge_label_mode);
         }
@@ -158,6 +164,7 @@ mod tests {
                 theme: Some("light".to_string()),
                 schema_filter: Some("sales".to_string()),
                 focus_expand_threshold: None,
+                browse_threshold: None,
                 edge_label_mode: Some("auto".to_string()),
                 show_mini_map: Some(true),
                 folder_sources: None,

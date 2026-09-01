@@ -129,7 +129,7 @@ export function SearchBar() {
       searchFilter: state.searchFilter,
       setSearchFilter: state.setSearchFilter,
       setDebouncedSearchFilter: state.setDebouncedSearchFilter,
-      setFocusedTable: state.setFocusedTable,
+      setFocusedTable: state.focusObject,
     }))
   );
 

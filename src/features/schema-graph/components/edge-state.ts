@@ -12,6 +12,7 @@ export interface EdgeMeta {
   label?: string;
   sourceColumn?: string;
   targetColumn?: string;
+  isDisabled?: boolean;
 }
 
 const EDGE_STYLE: Record<
@@ -33,7 +34,7 @@ const EDGE_STYLE: Record<
     labelDimmed: "#93c5fd",
     labelSelected: "#1d4ed8",
   },
-  triggerDependencies: {
+  triggerReads: {
     base: "#f59e0b",
     dimmed: "#fcd34d",
     selected: "#d97706",
@@ -80,6 +81,14 @@ const EDGE_STYLE: Record<
     label: "#0891b2",
     labelDimmed: "#67e8f9",
     labelSelected: "#155e75",
+  },
+  codeCalls: {
+    base: "#64748b",
+    dimmed: "#cbd5e1",
+    selected: "#475569",
+    label: "#475569",
+    labelDimmed: "#cbd5e1",
+    labelSelected: "#334155",
   },
 };
 
@@ -240,6 +249,7 @@ export function deriveEdgeState({
         strokeWidth,
         opacity: isDimmed ? 0.4 : 1,
         cursor: isFocusActive ? "default" : "pointer",
+        ...(edge.isDisabled ? { strokeDasharray: "6 4" } : {}),
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,

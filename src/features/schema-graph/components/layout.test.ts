@@ -844,4 +844,30 @@ describe("layout helpers", () => {
 
     expect(auxBounds.minY).toBeGreaterThanOrEqual(mainLayout.bounds.maxBottom + 100);
   });
+
+  it("handles a 20k-node FK chain without stack overflow and ranks it left to right", () => {
+    const count = 20000;
+    const nodeIds = Array.from({ length: count }, (_, i) => `dbo.t${i}`);
+    const edges = Array.from({ length: count - 1 }, (_, i) => ({
+      from: `dbo.t${i}`,
+      to: `dbo.t${i + 1}`,
+    }));
+
+    const layout = layoutLayeredLeftToRight({
+      nodeIds,
+      edges,
+      layerGapX: 140,
+      laneGapX: 72,
+      gapY: 100,
+      getHeight: () => 150,
+      getWidth: () => 300,
+    });
+
+    expect(layout.positions["dbo.t0"].x).toBeLessThan(
+      layout.positions[`dbo.t${count - 1}`].x
+    );
+    expect(layout.positions["dbo.t100"].x).toBeLessThanOrEqual(
+      layout.positions["dbo.t101"].x
+    );
+  });
 });

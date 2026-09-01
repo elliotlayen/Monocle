@@ -30,11 +30,12 @@ const OBJECT_TYPE_ORDER: ObjectType[] = [
 const EDGE_TYPE_ORDER: EdgeType[] = [
   "relationships",
   "viewDependencies",
-  "triggerDependencies",
+  "triggerReads",
   "triggerWrites",
   "procedureReads",
   "procedureWrites",
   "functionReads",
+  "codeCalls",
 ];
 
 type BorderMode = "left-accent" | "full-border";

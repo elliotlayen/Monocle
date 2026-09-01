@@ -28,7 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Target,
+  Crosshair,
   Box,
   ChevronDown,
   ChevronRight,
@@ -42,6 +42,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ExportButton } from "@/features/export/components/export-button";
 import { DatabaseSelector } from "./database-selector";
+import { FocusSelector } from "./focus-selector";
 import {
   EDGE_TYPE_LABELS,
   EDGE_COLORS,
@@ -226,7 +227,7 @@ export function Toolbar({
       edgeTypeFilter: state.edgeTypeFilter,
       canvasFilePath: state.canvasFilePath,
       canvasIsDirty: state.canvasIsDirty,
-      setFocusedTable: state.setFocusedTable,
+      setFocusedTable: state.focusObject,
       clearFocus: state.clearFocus,
       toggleObjectType: state.toggleObjectType,
       toggleObjectExclusion: state.toggleObjectExclusion,
@@ -500,9 +501,10 @@ export function Toolbar({
         )}
       </div>
 
-      {/* Center: Database selector or canvas filename */}
+      {/* Center: Focus selector + database selector, or canvas filename */}
       {showDatabaseSelector && (
-        <div className="absolute left-1/2 -translate-x-1/2">
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+          <FocusSelector />
           <DatabaseSelector />
         </div>
       )}
@@ -571,7 +573,7 @@ export function Toolbar({
                             : undefined
                         }
                       >
-                        <Target className="w-4 h-4" />
+                        <Crosshair className="w-4 h-4" />
                       </Button>
                     </PopoverTrigger>
                   </TooltipTrigger>

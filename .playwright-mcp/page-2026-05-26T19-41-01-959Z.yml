@@ -1,0 +1,80 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic: Monocle
+        - generic:
+          - button:
+            - img
+          - button:
+            - img
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - heading [level=2]: Explorer
+                - generic:
+                  - button:
+                    - img
+                  - button:
+                    - img
+              - generic:
+                - img
+                - textbox:
+                  - /placeholder: Filter clients...
+            - generic:
+              - paragraph: No folder sources configured
+        - generic:
+          - button:
+            - img
+            - generic: Open details panel
+          - generic:
+            - generic:
+              - img
+              - heading [level=2]: Integration Explorer
+              - paragraph: Add a folder source in Settings to get started.
+              - button:
+                - img
+                - text: Open Settings
+  - dialog "Settings" [ref=e76]:
+    - heading "Settings" [level=2] [ref=e78]
+    - generic [ref=e80]:
+      - navigation [ref=e81]:
+        - button "Graph" [active] [ref=e82]:
+          - img
+          - generic [ref=e83]: Graph
+        - button "Appearance" [ref=e84]:
+          - img
+          - generic [ref=e85]: Appearance
+        - button "Sources" [ref=e86]:
+          - img
+          - generic [ref=e87]: Sources
+        - button "About" [ref=e88]:
+          - img
+          - generic [ref=e89]: About
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - heading "Graph" [level=3] [ref=e93]
+          - paragraph [ref=e94]: Configure schema graph visibility and interaction behavior.
+        - generic [ref=e95]:
+          - text: Focus Expand Threshold
+          - combobox [ref=e96]:
+            - generic: 15 nodes
+            - img [ref=e97]
+          - paragraph [ref=e99]: Max neighbors to show expanded when focusing an object.
+        - generic [ref=e100]:
+          - text: Edge Labels
+          - combobox [ref=e101]:
+            - generic: Auto
+            - img [ref=e102]
+          - paragraph [ref=e104]: Control edge label visibility across zoom levels.
+        - generic [ref=e105]:
+          - text: MiniMap
+          - combobox [ref=e106]:
+            - generic: "On"
+            - img [ref=e107]
+          - paragraph [ref=e109]: Show or hide the graph overview minimap.
+    - button "Close" [ref=e110]:
+      - img
+      - generic [ref=e111]: Close

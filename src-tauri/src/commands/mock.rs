@@ -190,6 +190,8 @@ fn generate_relationships(tables: &[TableNode], config: &MockConfig) -> Vec<Rela
             to: to_table.id.clone(),
             from_column: Some(fk_col_name),
             to_column: Some("Id".to_string()),
+            constraint_name: None,
+            is_disabled: false,
         });
     }
 
@@ -450,6 +452,7 @@ pub fn load_schema_mock(size: String) -> Result<SchemaGraph, String> {
         triggers,
         stored_procedures,
         scalar_functions,
+        code_dependencies: Vec::new(),
     })
 }
 

@@ -45,12 +45,13 @@ interface CreateEdgeDialogProps {
 
 const EDGE_TYPE_LABELS: Record<EdgeType, string> = {
   relationships: "Relationship",
-  triggerDependencies: "Trigger Dependency",
+  triggerReads: "Trigger Read",
   triggerWrites: "Trigger Write",
   procedureReads: "Procedure Read",
   procedureWrites: "Procedure Write",
   viewDependencies: "View Dependency",
   functionReads: "Function Read",
+  codeCalls: "Call",
 };
 
 function getColumnsForObject(
@@ -83,7 +84,6 @@ export function CreateEdgeDialog({
     removeProcedureReference,
     addTriggerReference,
     removeTriggerReference,
-    setTriggerParent,
     addFunctionReference,
     removeFunctionReference,
     updateView,
@@ -98,7 +98,6 @@ export function CreateEdgeDialog({
       removeProcedureReference: state.removeProcedureReference,
       addTriggerReference: state.addTriggerReference,
       removeTriggerReference: state.removeTriggerReference,
-      setTriggerParent: state.setTriggerParent,
       addFunctionReference: state.addFunctionReference,
       removeFunctionReference: state.removeFunctionReference,
       updateView: state.updateView,
@@ -314,14 +313,10 @@ export function CreateEdgeDialog({
       case "triggerWrites":
         removeTriggerReference(editEdge.sourceId, editEdge.targetId, "writes");
         break;
-      case "triggerDependencies": {
-        const targetKind = schema ? getNodeKind(schema, editEdge.targetId) : "unknown";
-        if (targetKind === "trigger") {
-          break;
-        }
-        removeTriggerReference(editEdge.sourceId, editEdge.targetId, "reads");
+      case "triggerReads":
+        // Reads flow table -> trigger, so the trigger is the target.
+        removeTriggerReference(editEdge.targetId, editEdge.sourceId, "reads");
         break;
-      }
       case "viewDependencies":
         if (editEdge.targetColumn && editEdge.sourceColumn) {
           removeViewColumnSource(
@@ -428,12 +423,8 @@ export function CreateEdgeDialog({
       case "triggerWrites":
         ok = addTriggerReference(fromObject, toObject, "writes");
         break;
-      case "triggerDependencies":
-        if (targetKind === "trigger") {
-          ok = setTriggerParent(toObject, fromObject);
-        } else {
-          ok = addTriggerReference(fromObject, toObject, "reads");
-        }
+      case "triggerReads":
+        ok = addTriggerReference(toObject, fromObject, "reads");
         break;
       case "viewDependencies":
         if (!resolvedFromColumn) {

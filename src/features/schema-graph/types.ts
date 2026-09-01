@@ -34,11 +34,20 @@ export interface ViewNode {
 
 // Foreign key relationship
 export interface RelationshipEdge {
-  id: string; // Unique FK identifier
+  id: string; // Unique per FK column pair ("schema.table::fk_name::col->col")
   from: string; // Source table ID ("schema.table")
   to: string; // Target table ID ("schema.table")
   fromColumn?: string; // FK column in source (optional for column-less edges)
   toColumn?: string; // Referenced column in target (optional for column-less edges)
+  constraintName?: string; // FK constraint name (shared across a composite FK's edges)
+  isDisabled?: boolean; // FK constraint is disabled on the server (NOCHECK)
+}
+
+// Code object referencing another code object (proc calling a proc, any
+// object using a function). Caller -> callee; table reads/writes are separate.
+export interface CodeDependency {
+  from: string; // Caller object ID
+  to: string; // Callee object ID
 }
 
 // Trigger definition
@@ -97,6 +106,7 @@ export interface SchemaGraph {
   triggers: Trigger[];
   storedProcedures: StoredProcedure[];
   scalarFunctions: ScalarFunction[];
+  codeDependencies?: CodeDependency[];
 }
 
 // Authentication type

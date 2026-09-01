@@ -154,9 +154,8 @@ export function StatusBar() {
               {counts.edgeBreakdown.relationships.total}
             </div>
             <div>
-              Trigger Dependencies:{" "}
-              {counts.edgeBreakdown.triggerDependencies.filtered} /{" "}
-              {counts.edgeBreakdown.triggerDependencies.total}
+              Trigger Reads: {counts.edgeBreakdown.triggerReads.filtered} /{" "}
+              {counts.edgeBreakdown.triggerReads.total}
             </div>
             <div>
               Trigger Writes: {counts.edgeBreakdown.triggerWrites.filtered} /{" "}
@@ -178,6 +177,10 @@ export function StatusBar() {
             <div>
               Function Reads: {counts.edgeBreakdown.functionReads.filtered} /{" "}
               {counts.edgeBreakdown.functionReads.total}
+            </div>
+            <div>
+              Calls: {counts.edgeBreakdown.codeCalls.filtered} /{" "}
+              {counts.edgeBreakdown.codeCalls.total}
             </div>
           </div>
         </PopoverContent>

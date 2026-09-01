@@ -8,6 +8,7 @@ export interface AppSettings {
   theme?: ThemeSetting;
   schemaFilter?: string;
   focusExpandThreshold?: number;
+  browseThreshold?: number;
   edgeLabelMode?: EdgeLabelMode;
   showMiniMap?: boolean;
   folderSources?: FolderSource[];
@@ -18,6 +19,7 @@ export interface SettingsUpdate {
   theme?: ThemeSetting;
   schemaFilter?: string;
   focusExpandThreshold?: number;
+  browseThreshold?: number;
   edgeLabelMode?: EdgeLabelMode;
   showMiniMap?: boolean;
   folderSources?: FolderSource[];

@@ -8,13 +8,13 @@ use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
 
 use crate::db::{
-    create_client, format_data_type, ConnectionError, FOREIGN_KEYS_QUERY, SCALAR_FUNCTIONS_QUERY,
-    STORED_PROCEDURES_QUERY, TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY, VIEWS_AND_COLUMNS_QUERY,
-    VIEW_COLUMN_SOURCES_QUERY,
+    create_client, format_data_type, ConnectionError, CODE_DEPENDENCIES_QUERY, FOREIGN_KEYS_QUERY,
+    SCALAR_FUNCTIONS_QUERY, STORED_PROCEDURES_QUERY, TABLES_AND_COLUMNS_QUERY, TRIGGERS_QUERY,
+    VIEWS_AND_COLUMNS_QUERY, VIEW_COLUMN_SOURCES_QUERY,
 };
 use crate::types::{
-    Column, ColumnSource, ConnectionParams, ProcedureParameter, RelationshipEdge, ScalarFunction,
-    SchemaGraph, StoredProcedure, TableNode, Trigger, ViewNode,
+    CodeDependency, Column, ColumnSource, ConnectionParams, ProcedureParameter, RelationshipEdge,
+    ScalarFunction, SchemaGraph, StoredProcedure, TableNode, Trigger, ViewNode,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -34,6 +34,13 @@ impl serde::Serialize for SchemaError {
     }
 }
 
+fn default_with_warning<T: Default>(result: Result<T, SchemaError>, what: &str) -> T {
+    result.unwrap_or_else(|e| {
+        eprintln!("Failed to load {}, continuing without them: {}", what, e);
+        T::default()
+    })
+}
+
 pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, SchemaError> {
     let mut client = create_client(params).await?;
 
@@ -49,17 +56,21 @@ pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, Schem
     // Populate view references (needs tables to be loaded first)
     load_views_with_references(&mut views, &name_to_id);
 
-    // Optional data - continue with empty if fails
-    let relationships = load_foreign_keys(&mut client).await.unwrap_or_default();
-    let triggers = load_triggers(&mut client, &name_to_id)
-        .await
-        .unwrap_or_default();
-    let stored_procedures = load_stored_procedures(&mut client, &name_to_id)
-        .await
-        .unwrap_or_default();
-    let scalar_functions = load_scalar_functions(&mut client, &name_to_id)
-        .await
-        .unwrap_or_default();
+    // Optional data - continue with empty if fails, but never silently
+    let relationships = default_with_warning(load_foreign_keys(&mut client).await, "foreign keys");
+    let triggers = default_with_warning(load_triggers(&mut client, &name_to_id).await, "triggers");
+    let stored_procedures = default_with_warning(
+        load_stored_procedures(&mut client, &name_to_id).await,
+        "stored procedures",
+    );
+    let scalar_functions = default_with_warning(
+        load_scalar_functions(&mut client, &name_to_id).await,
+        "scalar functions",
+    );
+    let code_dependencies = default_with_warning(
+        load_code_dependencies(&mut client).await,
+        "code dependencies",
+    );
 
     Ok(SchemaGraph {
         tables,
@@ -68,7 +79,42 @@ pub async fn load_schema(params: &ConnectionParams) -> Result<SchemaGraph, Schem
         triggers,
         stored_procedures,
         scalar_functions,
+        code_dependencies,
     })
+}
+
+async fn load_code_dependencies(
+    client: &mut Client<Compat<TcpStream>>,
+) -> Result<Vec<CodeDependency>, SchemaError> {
+    let mut dependencies = Vec::new();
+
+    let stream = client.query(CODE_DEPENDENCIES_QUERY, &[]).await?;
+    let mut row_stream = stream.into_row_stream();
+
+    while let Some(row) = row_stream.try_next().await? {
+        let src_schema: &str = row.get(0).unwrap_or_default();
+        let src_name: &str = row.get(1).unwrap_or_default();
+        let src_type: &str = row.get(2).unwrap_or_default();
+        let src_parent_table: &str = row.get(3).unwrap_or_default();
+        let ref_schema: &str = row.get(4).unwrap_or_default();
+        let ref_name: &str = row.get(5).unwrap_or_default();
+
+        // Trigger IDs embed the parent table (schema.table.trigger); every
+        // other code object is schema.name.
+        let from = if src_type == "TR" {
+            if src_parent_table.is_empty() {
+                continue; // database-level trigger, not represented in the graph
+            }
+            format!("{}.{}.{}", src_schema, src_parent_table, src_name)
+        } else {
+            format!("{}.{}", src_schema, src_name)
+        };
+        let to = format!("{}.{}", ref_schema, ref_name);
+
+        dependencies.push(CodeDependency { from, to });
+    }
+
+    Ok(dependencies)
 }
 
 async fn load_tables_and_columns(
@@ -267,20 +313,30 @@ async fn load_foreign_keys(
         let ref_schema: &str = row.get(4).unwrap_or_default();
         let ref_table: &str = row.get(5).unwrap_or_default();
         let ref_column: &str = row.get(6).unwrap_or_default();
+        let is_disabled: bool = row.get(7).unwrap_or_default();
 
         let from_id = format!("{}.{}", src_schema, src_table);
         let to_id = format!("{}.{}", ref_schema, ref_table);
 
         relationships.push(RelationshipEdge {
-            id: fk_name.to_string(),
+            id: build_fk_edge_id(&from_id, fk_name, src_column, ref_column),
             from: from_id,
             to: to_id,
             from_column: Some(src_column.to_string()),
             to_column: Some(ref_column.to_string()),
+            constraint_name: Some(fk_name.to_string()),
+            is_disabled,
         });
     }
 
     Ok(relationships)
+}
+
+/// Edge IDs must be unique per FK column pair: a composite FK yields one row
+/// per column pair sharing the constraint name, and constraint names are only
+/// unique per schema, so the name alone collides in both cases.
+fn build_fk_edge_id(from_id: &str, fk_name: &str, src_column: &str, ref_column: &str) -> String {
+    format!("{}::{}::{}->{}", from_id, fk_name, src_column, ref_column)
 }
 
 async fn load_triggers(
@@ -497,4 +553,29 @@ fn build_name_lookup(tables: &[TableNode], views: &[ViewNode]) -> HashMap<String
     }
 
     name_to_id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_fk_edge_id;
+
+    #[test]
+    fn composite_fk_column_pairs_get_distinct_ids() {
+        let a = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderId", "Id");
+        let b = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderVersion", "Version");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn cross_schema_same_name_fks_get_distinct_ids() {
+        let a = build_fk_edge_id("sales.Order", "FK_Order_Customer", "CustomerId", "Id");
+        let b = build_fk_edge_id("hr.Order", "FK_Order_Customer", "CustomerId", "Id");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn id_embeds_all_components() {
+        let id = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderId", "Id");
+        assert_eq!(id, "dbo.OrderLine::FK_OrderLine_Order::OrderId->Id");
+    }
 }

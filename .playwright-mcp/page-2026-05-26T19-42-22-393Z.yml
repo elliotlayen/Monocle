@@ -1,0 +1,28 @@
+- generic [ref=e40]:
+  - generic [ref=e41]:
+    - generic [ref=e42]: Monocle
+    - generic [ref=e43]:
+      - button [ref=e44]:
+        - img
+      - button [ref=e45]:
+        - img
+  - generic [ref=e46]:
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - heading "Explorer" [level=2] [ref=e51]
+        - generic [ref=e52]:
+          - button [ref=e53]:
+            - img
+          - button "Close sidebar" [ref=e54]:
+            - img
+      - generic [ref=e55]:
+        - img [ref=e56]
+        - textbox "Filter clients..." [ref=e59]
+    - generic [ref=e63]:
+      - button "Open details panel":
+        - img
+        - generic: Open details panel
+      - generic [ref=e65]:
+        - img [ref=e66]
+        - heading "Integration Explorer" [level=2] [ref=e72]
+        - paragraph [ref=e73]: Click a file in the sidebar to open it.

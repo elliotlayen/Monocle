@@ -52,4 +52,71 @@ describe("buildSchemaIndex", () => {
       true
     );
   });
+
+  it("builds id lookup maps and call-edge neighbors", () => {
+    const schema: SchemaGraph = {
+      tables: [{ id: "dbo.orders", name: "orders", schema: "dbo", columns: [] }],
+      views: [],
+      relationships: [],
+      triggers: [
+        {
+          id: "dbo.orders.trg_audit",
+          name: "trg_audit",
+          schema: "dbo",
+          tableId: "dbo.orders",
+          triggerType: "AFTER",
+          isDisabled: false,
+          firesOnInsert: true,
+          firesOnUpdate: false,
+          firesOnDelete: false,
+          definition: "",
+          referencedTables: [],
+          affectedTables: [],
+        },
+      ],
+      storedProcedures: [
+        {
+          id: "dbo.usp_process",
+          name: "usp_process",
+          schema: "dbo",
+          procedureType: "SQL_STORED_PROCEDURE",
+          parameters: [],
+          definition: "",
+          referencedTables: [],
+          affectedTables: [],
+        },
+      ],
+      scalarFunctions: [
+        {
+          id: "dbo.fn_total",
+          name: "fn_total",
+          schema: "dbo",
+          functionType: "SQL_SCALAR_FUNCTION",
+          parameters: [],
+          returnType: "int",
+          definition: "",
+          referencedTables: [],
+          affectedTables: [],
+        },
+      ],
+      codeDependencies: [{ from: "dbo.usp_process", to: "dbo.fn_total" }],
+    };
+
+    const index = buildSchemaIndex(schema);
+
+    expect(index.tableById.get("dbo.orders")?.name).toBe("orders");
+    expect(index.triggerById.get("dbo.orders.trg_audit")?.tableId).toBe(
+      "dbo.orders"
+    );
+    expect(index.procedureById.get("dbo.usp_process")?.name).toBe(
+      "usp_process"
+    );
+    expect(index.functionById.get("dbo.fn_total")?.name).toBe("fn_total");
+    expect(index.neighbors.get("dbo.usp_process")?.has("dbo.fn_total")).toBe(
+      true
+    );
+    expect(index.neighbors.get("dbo.fn_total")?.has("dbo.usp_process")).toBe(
+      true
+    );
+  });
 });

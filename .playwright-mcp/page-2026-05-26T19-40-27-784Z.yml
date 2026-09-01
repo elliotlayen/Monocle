@@ -1,0 +1,29 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - img [ref=e5]
+    - heading "Monocle" [level=1] [ref=e24]
+  - generic [ref=e25]:
+    - button "Connect to Server Cmd+N" [ref=e26]:
+      - generic [ref=e27]:
+        - img
+        - text: Connect to Server
+      - generic [ref=e28]: Cmd+N
+    - button "Canvas Mode Cmd+K" [ref=e29]:
+      - generic [ref=e30]:
+        - img
+        - text: Canvas Mode
+      - generic [ref=e31]: Cmd+K
+    - button "Integration Explorer Cmd+E" [ref=e32]:
+      - generic [ref=e33]:
+        - img
+        - text: Integration Explorer
+      - generic [ref=e34]: Cmd+E
+    - button "Settings Cmd+," [ref=e35]:
+      - generic [ref=e36]:
+        - img
+        - text: Settings
+      - generic [ref=e37]: Cmd+,
+    - button "About" [ref=e38]:
+      - generic [ref=e39]:
+        - img
+        - text: About

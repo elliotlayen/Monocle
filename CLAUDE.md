@@ -55,13 +55,23 @@ src/
     schema-graph/
       components/
         schema-graph.tsx            - Main graph view with filtering/focus
-        schema-browser-sidebar.tsx  - Sidebar for browsing schema objects
+        schema-browser-sidebar/     - Virtualized, store-connected sidebar
+          index.tsx                 - Sidebar shell (search, tree, keyboard nav)
+          sidebar-tree.ts           - Pure tree build/flatten (tested)
+          sidebar-row.tsx           - Memoized row renderer
         sidebar-toggle.tsx          - Toggle button for sidebar
-        table-node.tsx              - Custom node for tables
-        view-node.tsx               - Custom node for views
+        table-node.tsx              - Table node (thin variant over shared body)
+        view-node.tsx               - View node (thin variant over shared body)
+        table-view-node-shared.tsx  - Shared table/view node body and column rows
         trigger-node.tsx            - Custom node for triggers
         stored-procedure-node.tsx   - Custom node for procedures
         scalar-function-node.tsx    - Custom node for functions
+        layout.ts                   - Layered overview layout (Tarjan + Kahn)
+        focus-layout.ts             - Focus-mode compact neighborhood layout
+        focus-state.ts              - Focus dimming/renderable set derivation
+        aux-layout.ts               - Shared aux lane layout helpers
+        edge-state.ts               - Edge derivation, styling, equivalence
+        edge-visibility.ts          - Edge/handle renderability checks
         node-render-update.ts       - Efficient node render diffing
         zoom-band.ts                - Discrete zoom band thresholds
         detail-popover.tsx          - Popover for object details
@@ -74,6 +84,7 @@ src/
         schema-service.ts           - Tauri IPC for schema loading
       utils/
         object-filtering.ts         - Shared object filtering logic
+        browse-visibility.ts        - Browse-mode visible-set derivation
       store.ts                      - Zustand store for schema state
       types.ts                      - TypeScript types (SchemaGraph, TableNode, etc.)
     settings/
@@ -87,6 +98,7 @@ src/
         search-bar.tsx              - Fuzzy search component
         filter-info-bar.tsx         - Active filter display
         database-selector.tsx       - Database dropdown
+        focus-selector.tsx          - Focus/browse selection dropdown
       types.ts                      - Search result types
     export/
       components/
@@ -247,6 +259,9 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - Connection passwords are not stored - only connection metadata
 - The app uses React Flow's dagre layout for automatic positioning
 - Monaco Editor provides SQL syntax highlighting and intellisense (replaces prism-react-renderer)
+- Edge direction convention: FK child -> parent; reads table -> code object; writes code object -> table; calls caller -> callee. An arrow into a code object means it reads that; an arrow out of it into a table means it writes it.
+- Relationship edge IDs are unique per FK column pair (from::fk_name::col->col); never assume one edge per constraint.
+- Browse mode: databases over the configurable object threshold start with an empty canvas; the graph builds only focus roots + neighbors + expansions (see utils/browse-visibility.ts and the focus selector in the toolbar).
 
 ## Performance Patterns
 

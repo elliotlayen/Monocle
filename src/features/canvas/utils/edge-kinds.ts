@@ -42,11 +42,11 @@ export const getAllowedEdgeKinds = (
   }
 
   if (sourceIsTableLike && targetKind === "trigger") {
-    return ["triggerDependencies"];
+    return ["triggerReads"];
   }
 
   if (sourceKind === "trigger" && targetIsTableLike) {
-    return ["triggerDependencies", "triggerWrites"];
+    return ["triggerWrites"];
   }
 
   if (sourceIsTableLike && targetKind === "procedure") {

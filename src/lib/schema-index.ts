@@ -1,4 +1,11 @@
-import type { SchemaGraph } from "@/features/schema-graph/types";
+import type {
+  ScalarFunction,
+  SchemaGraph,
+  StoredProcedure,
+  TableNode,
+  Trigger,
+  ViewNode,
+} from "@/features/schema-graph/types";
 import { buildColumnHandleBase } from "@/features/schema-graph/utils/handle-ids";
 
 export interface ViewColumnSource {
@@ -14,6 +21,11 @@ export interface SchemaIndex {
   procedureSearch: Map<string, string>;
   functionSearch: Map<string, string>;
   nameToId: Map<string, string>;
+  tableById: Map<string, TableNode>;
+  viewById: Map<string, ViewNode>;
+  triggerById: Map<string, Trigger>;
+  procedureById: Map<string, StoredProcedure>;
+  functionById: Map<string, ScalarFunction>;
   viewColumnSources: Map<string, ViewColumnSource[]>;
   columnsWithHandles: Set<string>;
   fkColumnUsage: Map<string, { outgoing: number; incoming: number }>;
@@ -41,6 +53,11 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   const procedureSearch = new Map<string, string>();
   const functionSearch = new Map<string, string>();
   const nameToId = new Map<string, string>();
+  const tableById = new Map<string, TableNode>();
+  const viewById = new Map<string, ViewNode>();
+  const triggerById = new Map<string, Trigger>();
+  const procedureById = new Map<string, StoredProcedure>();
+  const functionById = new Map<string, ScalarFunction>();
   const viewColumnSources = new Map<string, ViewColumnSource[]>();
   const columnsWithHandles = new Set<string>();
   const fkColumnUsage = new Map<
@@ -61,6 +78,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   };
 
   for (const table of schema.tables) {
+    tableById.set(table.id, table);
     addNameLookup(nameToId, table.name, table.id);
     addNameLookup(nameToId, table.id, table.id);
     const columnNames = table.columns.map((col) => col.name);
@@ -71,6 +89,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   }
 
   for (const view of schema.views || []) {
+    viewById.set(view.id, view);
     addNameLookup(nameToId, view.name, view.id);
     addNameLookup(nameToId, view.id, view.id);
     const columnNames = view.columns.map((col) => col.name);
@@ -85,6 +104,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   ]);
 
   for (const trigger of schema.triggers || []) {
+    triggerById.set(trigger.id, trigger);
     triggerSearch.set(
       trigger.id,
       buildSearchText([
@@ -97,6 +117,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   }
 
   for (const procedure of schema.storedProcedures || []) {
+    procedureById.set(procedure.id, procedure);
     procedureSearch.set(
       procedure.id,
       buildSearchText([procedure.name, procedure.schema, procedure.id])
@@ -104,6 +125,7 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
   }
 
   for (const fn of schema.scalarFunctions || []) {
+    functionById.set(fn.id, fn);
     functionSearch.set(fn.id, buildSearchText([fn.name, fn.schema, fn.id]));
   }
 
@@ -179,6 +201,13 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
     for (const tableId of fn.referencedTables || []) {
       addNeighbor(fn.id, tableId);
     }
+  }
+
+  // Add code-to-code call relationships for focus feature
+  for (const dep of schema.codeDependencies || []) {
+    if (!dep.from || !dep.to || dep.from === dep.to) continue;
+    addNeighbor(dep.from, dep.to);
+    addNeighbor(dep.to, dep.from);
   }
 
   for (const view of schema.views || []) {
@@ -259,6 +288,11 @@ export function buildSchemaIndex(schema: SchemaGraph): SchemaIndex {
     procedureSearch,
     functionSearch,
     nameToId,
+    tableById,
+    viewById,
+    triggerById,
+    procedureById,
+    functionById,
     viewColumnSources,
     columnsWithHandles,
     fkColumnUsage,

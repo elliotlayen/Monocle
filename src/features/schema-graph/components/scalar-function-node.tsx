@@ -29,7 +29,7 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
       onClick={onClick}
       style={{ width: nodeWidth }}
       className={cn(
-        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-all duration-200 cursor-pointer relative",
+        "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-shadow duration-200 cursor-pointer relative",
         isFocused && "border-cyan-500 ring-2 ring-cyan-200",
         isDimmed && "opacity-40",
         !isDimmed && "hover:shadow-md"
