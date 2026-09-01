@@ -226,7 +226,7 @@ export function Toolbar({
       edgeTypeFilter: state.edgeTypeFilter,
       canvasFilePath: state.canvasFilePath,
       canvasIsDirty: state.canvasIsDirty,
-      setFocusedTable: state.setFocusedTable,
+      setFocusedTable: state.focusObject,
       clearFocus: state.clearFocus,
       toggleObjectType: state.toggleObjectType,
       toggleObjectExclusion: state.toggleObjectExclusion,

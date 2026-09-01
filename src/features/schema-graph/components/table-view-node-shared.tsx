@@ -64,6 +64,9 @@ export interface TableViewNodeCommonData {
   >;
   handleEdgeTypes?: Map<string, Set<EdgeType>>;
   onClick?: (event: React.MouseEvent) => void;
+  /** Browse mode: direct neighbors not currently on the canvas. */
+  hiddenNeighborCount?: number;
+  onExpandNeighbors?: () => void;
 }
 
 interface ColumnRenderData {
@@ -275,6 +278,8 @@ export function TableViewNodeBody({
     fkColumnLinks,
     handleEdgeTypes,
     onClick,
+    hiddenNeighborCount,
+    onExpandNeighbors,
   } = data;
   const nodeHandleBase = buildNodeHandleBase(nodeId);
   const columnRows = useMemo<ColumnRenderData[]>(
@@ -363,6 +368,22 @@ export function TableViewNodeBody({
           </span>
           <span className="text-sm font-semibold">{name}</span>
         </div>
+
+        {/* Browse mode: expand hidden neighbors */}
+        {(hiddenNeighborCount ?? 0) > 0 && onExpandNeighbors && (
+          <button
+            className="mr-1 shrink-0 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium hover:bg-white/35"
+            title={`Show ${hiddenNeighborCount} more connected object${
+              hiddenNeighborCount === 1 ? "" : "s"
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpandNeighbors();
+            }}
+          >
+            +{hiddenNeighborCount}
+          </button>
+        )}
 
         {/* Right header indicators - fixed width for alignment */}
         <div className="w-4 shrink-0 flex justify-end">

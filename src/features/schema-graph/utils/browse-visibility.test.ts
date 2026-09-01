@@ -85,7 +85,7 @@ describe("countHiddenNeighbors", () => {
       index
     )!;
     // B is visible; its neighbor C is not.
-    expect(countHiddenNeighbors("dbo.B", visible, index)).toBe(1);
-    expect(countHiddenNeighbors("dbo.A", visible, index)).toBe(0);
+    expect(countHiddenNeighbors("dbo.B", visible, index.neighbors)).toBe(1);
+    expect(countHiddenNeighbors("dbo.A", visible, index.neighbors)).toBe(0);
   });
 });

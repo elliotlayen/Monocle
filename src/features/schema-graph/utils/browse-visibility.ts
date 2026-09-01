@@ -49,10 +49,10 @@ export function computeBrowseVisibleIds(
 export function countHiddenNeighbors(
   nodeId: string,
   visibleIds: Set<string>,
-  schemaIndex: SchemaIndex
+  neighbors: Map<string, Set<string>>
 ): number {
   let hidden = 0;
-  for (const neighbor of schemaIndex.neighbors.get(nodeId) ?? []) {
+  for (const neighbor of neighbors.get(nodeId) ?? []) {
     if (!visibleIds.has(neighbor)) hidden += 1;
   }
   return hidden;

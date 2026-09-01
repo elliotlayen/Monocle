@@ -1094,15 +1094,17 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
   enterBrowseMode: () => set({ viewMode: "browse", focusedTableId: null }),
 
-  // Route an object focus request by view mode: browse mode toggles the
-  // object as a root; full view toggles the dim-focus highlight.
+  // Route an object focus request by view mode: browse mode adds the object
+  // as a root; full view sets the dim-focus highlight.
   focusObject: (id: string) => {
     const state = get();
     if (state.viewMode === "browse" && state.mode !== "canvas") {
-      state.toggleFocusRoot(id);
+      if (!state.focusRoots.has(id)) {
+        state.toggleFocusRoot(id);
+      }
       return;
     }
-    state.setFocusedTable(state.focusedTableId === id ? null : id);
+    state.setFocusedTable(id);
   },
 
   setFocusedTable: (tableId: string | null) =>

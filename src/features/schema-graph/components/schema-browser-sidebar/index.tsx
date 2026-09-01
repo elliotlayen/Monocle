@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getSchemaIndex } from "@/lib/schema-index";
+import { computeBrowseVisibleIds } from "../../utils/browse-visibility";
 import { useSchemaStore, type ObjectType } from "../../store";
 import { getFilteredObjectBuckets } from "../../utils/object-filtering";
 import type { DetailSidebarData } from "../detail-content";
@@ -48,6 +49,9 @@ function SchemaBrowserSidebarComponent({
     objectTypeFilter,
     excludedObjectIds,
     focusedTableId,
+    viewMode,
+    focusRoots,
+    expandedNodeIds,
   } = useSchemaStore(
     useShallow((state) => ({
       schema: state.schema,
@@ -58,6 +62,9 @@ function SchemaBrowserSidebarComponent({
       objectTypeFilter: state.objectTypeFilter,
       excludedObjectIds: state.excludedObjectIds,
       focusedTableId: state.focusedTableId,
+      viewMode: state.viewMode,
+      focusRoots: state.focusRoots,
+      expandedNodeIds: state.expandedNodeIds,
     }))
   );
 
@@ -117,23 +124,33 @@ function SchemaBrowserSidebarComponent({
   // the status bar, so all three agree.
   const graphVisibleIds = useMemo(() => {
     if (!schema) return null;
+    const schemaIndex = getSchemaIndex(schema);
+    const browseVisibleIds = computeBrowseVisibleIds(
+      viewMode,
+      focusRoots,
+      expandedNodeIds,
+      schemaIndex
+    );
     const schemaFilterActive = Boolean(schemaFilter) && schemaFilter !== "all";
     const filtersActive =
+      browseVisibleIds !== null ||
       graphSearchFilter.trim() !== "" ||
       schemaFilterActive ||
       objectTypeFilter.size !== 5 ||
       excludedObjectIds.size > 0 ||
       focusedTableId !== null;
     if (!filtersActive) return null;
-    return getFilteredObjectBuckets({
+    const filtered = getFilteredObjectBuckets({
       schema,
       searchFilter: graphSearchFilter,
       schemaFilter,
       objectTypeFilter,
       excludedObjectIds,
       focusedTableId,
-      schemaIndex: getSchemaIndex(schema),
+      schemaIndex,
     }).visibleNodeIds;
+    if (!browseVisibleIds) return filtered;
+    return new Set([...filtered].filter((id) => browseVisibleIds.has(id)));
   }, [
     schema,
     graphSearchFilter,
@@ -141,6 +158,9 @@ function SchemaBrowserSidebarComponent({
     objectTypeFilter,
     excludedObjectIds,
     focusedTableId,
+    viewMode,
+    focusRoots,
+    expandedNodeIds,
   ]);
 
   const forceExpand =
@@ -226,8 +246,14 @@ function SchemaBrowserSidebarComponent({
     [onItemClick]
   );
 
+  // The crosshair/double-click toggles: browse mode adds or removes the
+  // object as a root, full view sets or clears the dim-focus highlight.
   const handleItemFocus = useCallback((itemId: string) => {
     const state = useSchemaStore.getState();
+    if (state.viewMode === "browse" && state.mode !== "canvas") {
+      state.toggleFocusRoot(itemId);
+      return;
+    }
     state.setFocusedTable(state.focusedTableId === itemId ? null : itemId);
   }, []);
 
@@ -403,7 +429,9 @@ function SchemaBrowserSidebarComponent({
                     row={row}
                     isActive={virtualRow.index === activeIndex}
                     isFocusedObject={
-                      row.kind === "item" && row.item.id === focusedTableId
+                      row.kind === "item" &&
+                      (row.item.id === focusedTableId ||
+                        focusRoots.has(row.item.id))
                     }
                     onToggleCategory={toggleCategory}
                     onToggleSchema={toggleSchema}

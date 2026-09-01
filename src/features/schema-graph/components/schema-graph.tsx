@@ -56,6 +56,7 @@ import {
 import { DetailPopover } from "./detail-popover";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { useDetailPopover } from "../hooks/use-detail-popover";
 import type { DetailSidebarData } from "./detail-content";
 import {
@@ -94,6 +95,10 @@ import {
 } from "./edge-state";
 import { getFilteredObjectBuckets } from "../utils/object-filtering";
 import { computeFocusState } from "./focus-state";
+import {
+  computeBrowseVisibleIds,
+  countHiddenNeighbors,
+} from "../utils/browse-visibility";
 import {
   buildEdgeHoverCardContent,
   type EdgeHoverEndpoint,
@@ -272,6 +277,7 @@ interface ConvertOptions {
     event: React.MouseEvent
   ) => void;
   onFunctionClick?: (fn: ScalarFunction, event: React.MouseEvent) => void;
+  onExpandNeighbors?: (nodeId: string) => void;
 }
 
 interface EdgeEditState {
@@ -303,10 +309,17 @@ function buildBaseNodes(
   >,
   nodeHeights: Map<string, number>,
   nodeWidths: Map<string, number>,
-  mainDependencyEdges: DirectedEdge[]
+  mainDependencyEdges: DirectedEdge[],
+  // Browse mode: only build (and lay out) this subset; null renders everything.
+  includeIds: Set<string> | null,
+  neighbors: Map<string, Set<string>>
 ): Node[] {
-  const tables = schema.tables;
-  const views = schema.views || [];
+  if (includeIds && includeIds.size === 0) return [];
+  const includes = (id: string) => !includeIds || includeIds.has(id);
+  const tables = schema.tables.filter((table) => includes(table.id));
+  const views = (schema.views || []).filter((view) => includes(view.id));
+  const hiddenNeighborCount = (id: string) =>
+    includeIds ? countHiddenNeighbors(id, includeIds, neighbors) : 0;
   const mainNodeIds = [...tables.map((table) => table.id), ...views.map((view) => view.id)];
   const overviewMaxLanes = getOverviewMainMaxLanes(mainNodeIds.length);
   const layered = layoutLayeredLeftToRight({
@@ -338,7 +351,9 @@ function buildBaseNodes(
     parentIdsByBand.get(bandId)!.push(nodeId);
   });
 
-  const triggerEntries = schema.triggers || [];
+  const triggerEntries = (schema.triggers || []).filter((trigger) =>
+    includes(trigger.id)
+  );
   const childIdsByParent = new Map<string, string[]>();
   triggerEntries.forEach((trigger) => {
     if (!childIdsByParent.has(trigger.tableId)) {
@@ -390,6 +405,8 @@ function buildBaseNodes(
         fkColumnUsage,
         fkColumnLinks,
         handleEdgeTypes: undefined,
+        hiddenNeighborCount: hiddenNeighborCount(table.id),
+        onExpandNeighbors: () => options?.onExpandNeighbors?.(table.id),
         onClick: (e: React.MouseEvent) => options?.onTableClick?.(table, e),
       },
     };
@@ -412,6 +429,8 @@ function buildBaseNodes(
         fkColumnUsage,
         fkColumnLinks,
         handleEdgeTypes: undefined,
+        hiddenNeighborCount: hiddenNeighborCount(view.id),
+        onExpandNeighbors: () => options?.onExpandNeighbors?.(view.id),
         onClick: (e: React.MouseEvent) => options?.onViewClick?.(view, e),
       },
     };
@@ -452,8 +471,14 @@ function buildBaseNodes(
     orphanTriggerCols
   );
 
-  const procedureIds = (schema.storedProcedures || []).map((proc) => proc.id);
-  const functionIds = (schema.scalarFunctions || []).map((fn) => fn.id);
+  const procedures = (schema.storedProcedures || []).filter((proc) =>
+    includes(proc.id)
+  );
+  const scalarFunctions = (schema.scalarFunctions || []).filter((fn) =>
+    includes(fn.id)
+  );
+  const procedureIds = procedures.map((proc) => proc.id);
+  const functionIds = scalarFunctions.map((fn) => fn.id);
   const procedureCols = estimateOverviewAuxCols(
     procedureIds,
     nodeHeights,
@@ -480,7 +505,7 @@ function buildBaseNodes(
     functionCols
   );
 
-  const triggerNodes: Node[] = (schema.triggers || []).map((trigger) => ({
+  const triggerNodes: Node[] = triggerEntries.map((trigger) => ({
     id: trigger.id,
     type: "triggerNode",
     position: bottomPositions.get(trigger.id) ?? { x: 0, y: 0 },
@@ -492,7 +517,7 @@ function buildBaseNodes(
     },
   }));
 
-  const procedureNodes: Node[] = (schema.storedProcedures || []).map(
+  const procedureNodes: Node[] = procedures.map(
     (procedure) => ({
       id: procedure.id,
       type: "storedProcedureNode",
@@ -507,7 +532,7 @@ function buildBaseNodes(
     })
   );
 
-  const functionNodes: Node[] = (schema.scalarFunctions || []).map((fn) => ({
+  const functionNodes: Node[] = scalarFunctions.map((fn) => ({
     id: fn.id,
     type: "scalarFunctionNode",
     position: bottomPositions.get(fn.id) ?? { x: 0, y: 0 },
@@ -758,6 +783,11 @@ function SchemaGraphInner({
     sidebarOpen,
     setSidebarOpen,
     toggleSidebar,
+    viewMode,
+    focusRoots,
+    expandedNodeIds,
+    expandNodeNeighbors,
+    showFullGraph,
     focusExpandThreshold,
     edgeLabelMode,
     showMiniMap,
@@ -781,6 +811,11 @@ function SchemaGraphInner({
       sidebarOpen: state.sidebarOpen,
       setSidebarOpen: state.setSidebarOpen,
       toggleSidebar: state.toggleSidebar,
+      viewMode: state.viewMode,
+      focusRoots: state.focusRoots,
+      expandedNodeIds: state.expandedNodeIds,
+      expandNodeNeighbors: state.expandNodeNeighbors,
+      showFullGraph: state.showFullGraph,
       focusExpandThreshold: state.focusExpandThreshold,
       edgeLabelMode: state.edgeLabelMode,
       showMiniMap: state.showMiniMap,
@@ -1232,6 +1267,7 @@ function SchemaGraphInner({
         handleProcedureClick(procedure, event),
       onFunctionClick: (fn: ScalarFunction, event: React.MouseEvent) =>
         handleFunctionClick(fn, event),
+      onExpandNeighbors: (nodeId: string) => expandNodeNeighbors(nodeId),
     }),
     [
       handleTableClick,
@@ -1239,10 +1275,23 @@ function SchemaGraphInner({
       handleTriggerClick,
       handleProcedureClick,
       handleFunctionClick,
+      expandNodeNeighbors,
     ]
   );
 
   const schemaIndex = useMemo(() => getSchemaIndex(schema), [schema]);
+  const browseVisibleIds = useMemo(
+    () =>
+      canvasMode
+        ? null
+        : computeBrowseVisibleIds(
+            viewMode,
+            focusRoots,
+            expandedNodeIds,
+            schemaIndex
+          ),
+    [canvasMode, viewMode, focusRoots, expandedNodeIds, schemaIndex]
+  );
   const objectTextColorById = useMemo(() => {
     const colors = new Map<string, string>();
     schema.tables.forEach((table) => {
@@ -1287,7 +1336,9 @@ function SchemaGraphInner({
       schemaIndex.fkColumnLinks,
       nodeHeights,
       nodeWidths,
-      mainDependencyEdges
+      mainDependencyEdges,
+      browseVisibleIds,
+      schemaIndex.neighbors
     );
     // Canvas mode flags node data; stored positions are applied in the patch
     // effect so a drag does not re-run the full layout.
@@ -1311,6 +1362,7 @@ function SchemaGraphInner({
     nodeHeights,
     nodeWidths,
     mainDependencyEdges,
+    browseVisibleIds,
     canvasMode,
   ]);
   const baseEdges = useMemo(
@@ -1464,9 +1516,40 @@ function SchemaGraphInner({
     ]
   );
 
+  // Browse mode: the graph only shows roots, their neighbors, and expansions.
+  const effectiveVisibility = useMemo(() => {
+    if (!browseVisibleIds) return visibility;
+    const inBrowse = <T extends { id: string }>(objects: T[]) =>
+      objects.filter((object) => browseVisibleIds.has(object.id));
+    const tables = inBrowse(visibility.tables);
+    const views = inBrowse(visibility.views);
+    const triggers = inBrowse(visibility.triggers);
+    const storedProcedures = inBrowse(visibility.storedProcedures);
+    const scalarFunctions = inBrowse(visibility.scalarFunctions);
+    return {
+      tables,
+      views,
+      triggers,
+      storedProcedures,
+      scalarFunctions,
+      tableIds: new Set(tables.map((table) => table.id)),
+      viewIds: new Set(views.map((view) => view.id)),
+      visibleNodeIds: new Set(
+        [
+          ...tables,
+          ...views,
+          ...triggers,
+          ...storedProcedures,
+          ...scalarFunctions,
+        ].map((object) => object.id)
+      ),
+    };
+  }, [visibility, browseVisibleIds]);
+
   const focusState = useMemo(
-    () => computeFocusState(visibility, focusedTableId ?? null, schemaIndex),
-    [visibility, focusedTableId, schemaIndex]
+    () =>
+      computeFocusState(effectiveVisibility, focusedTableId ?? null, schemaIndex),
+    [effectiveVisibility, focusedTableId, schemaIndex]
   );
 
   // Edge derivation is cheap (O(edges)) and re-runs on hover/selection, but
@@ -1509,7 +1592,7 @@ function SchemaGraphInner({
       renderableNodeIds,
       visibleNonDimmedCount,
     } = focusState;
-    const visibleNodeIds = visibility.visibleNodeIds;
+    const visibleNodeIds = effectiveVisibility.visibleNodeIds;
     const isNeighbor = (nodeId: string) => focusedNeighbors.has(nodeId);
     const moderateThreshold = Math.ceil(focusExpandThreshold * 1.67);
     const handleEdgeTypes = edgeDerivation.handleEdgeTypes;
@@ -1689,7 +1772,7 @@ function SchemaGraphInner({
       focusLayoutLockedRef.current = false;
     }
   }, [
-    visibility,
+    effectiveVisibility,
     focusState,
     focusedTableId,
     focusExpandThreshold,
@@ -1827,6 +1910,21 @@ function SchemaGraphInner({
             visible={!sidebarOpen}
           />
           {reactFlowContent}
+          {viewMode === "browse" && !canvasMode && focusRoots.size === 0 && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+              <div className="pointer-events-auto max-w-md space-y-3 rounded-lg border bg-background/95 px-8 py-6 text-center shadow-sm">
+                <h3 className="text-sm font-semibold">Browse mode</h3>
+                <p className="text-sm text-muted-foreground">
+                  This database is large, so nothing is rendered yet. Pick an
+                  object in the sidebar (double-click or the crosshair) to
+                  explore its relationships, then expand outward from there.
+                </p>
+                <Button variant="outline" size="sm" onClick={showFullGraph}>
+                  Show full graph anyway
+                </Button>
+              </div>
+            </div>
+          )}
           {hoverCard && (
             <div
               style={{
