@@ -12,7 +12,7 @@ import {
   sortRowsById,
   shouldToggleSectionFromKey,
   stopSectionHeaderToggle,
-} from "./toolbar";
+} from "./toolbar-helpers";
 
 describe("toolbar objects filter helpers", () => {
   it("starts with all sections collapsed", () => {
