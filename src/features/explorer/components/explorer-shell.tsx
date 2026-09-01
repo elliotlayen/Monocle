@@ -17,6 +17,7 @@ import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
 import { useExplorerStore } from "../store";
+import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
 
 interface ExplorerShellProps {
   onHome: () => void;
@@ -27,6 +28,8 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
   const {
     sidebarOpen,
     setSidebarOpen,
+    sidebarWidth,
+    setSidebarWidth,
     tabs,
     scanStatus,
     pendingScanRequest,
@@ -37,6 +40,8 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
     useShallow((state) => ({
       sidebarOpen: state.sidebarOpen,
       setSidebarOpen: state.setSidebarOpen,
+      sidebarWidth: state.sidebarWidth,
+      setSidebarWidth: state.setSidebarWidth,
       tabs: state.tabs,
       scanStatus: state.scanStatus,
       pendingScanRequest: state.pendingScanRequest,
@@ -44,6 +49,13 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
       confirmPendingScan: state.confirmPendingScan,
       dismissPendingScan: state.dismissPendingScan,
     }))
+  );
+
+  // Width state lives here so the floating content panel can track the
+  // sidebar edge live during drag-resize.
+  const { width, isDragging, startDrag } = useExplorerSidebar(
+    sidebarWidth,
+    setSidebarWidth
   );
 
   const hasOpenTabs = tabs.length > 0;
@@ -57,7 +69,7 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
     <div className="flex flex-col h-screen">
       <ExplorerNavBar onHome={onHome} onOpenSettings={onOpenSettings} />
       <div className="flex flex-row flex-1 overflow-hidden">
-        <ExplorerSidebar />
+        <ExplorerSidebar width={width} isDragging={isDragging} startDrag={startDrag} />
         {!sidebarOpen && (
           <button
             className="flex-shrink-0 flex items-center justify-center w-8 border-r hover:bg-muted transition-colors"

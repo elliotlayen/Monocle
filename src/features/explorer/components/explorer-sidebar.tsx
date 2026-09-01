@@ -25,19 +25,26 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { useExplorerStore, parseSearchTermsFrontend } from "../store";
-import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
 import { useSearch } from "../hooks/use-search";
 import { FolderTree } from "./folder-tree";
 import { SearchBar } from "./search-bar";
 import { SearchResults } from "./search-results";
 import type { DateRange } from "react-day-picker";
 
-export function ExplorerSidebar() {
+interface ExplorerSidebarProps {
+  width: number;
+  isDragging: boolean;
+  startDrag: (e: React.MouseEvent) => void;
+}
+
+export function ExplorerSidebar({
+  width,
+  isDragging,
+  startDrag,
+}: ExplorerSidebarProps) {
   const {
     sidebarOpen,
-    sidebarWidth,
     setSidebarOpen,
-    setSidebarWidth,
     dateSortOrder,
     toggleDateSort,
     dateRange,
@@ -56,9 +63,7 @@ export function ExplorerSidebar() {
   } = useExplorerStore(
     useShallow((state) => ({
       sidebarOpen: state.sidebarOpen,
-      sidebarWidth: state.sidebarWidth,
       setSidebarOpen: state.setSidebarOpen,
-      setSidebarWidth: state.setSidebarWidth,
       dateSortOrder: state.dateSortOrder,
       toggleDateSort: state.toggleDateSort,
       dateRange: state.dateRange,
@@ -82,11 +87,6 @@ export function ExplorerSidebar() {
 
   // Subscribe to search events (searchResultHub, searchProgressHub)
   const { cancelContentSearch, clearSearchResults } = useSearch();
-
-  const { width, isDragging, startDrag } = useExplorerSidebar(
-    sidebarWidth,
-    setSidebarWidth
-  );
 
   // Load sources on mount
   useEffect(() => {
@@ -148,7 +148,7 @@ export function ExplorerSidebar() {
       {/* Inner container with fixed width to prevent content reflow */}
       <div
         className="flex flex-col h-full"
-        style={{ width: sidebarOpen ? width : sidebarWidth }}
+        style={{ width: sidebarOpen ? width : width }}
       >
         {/* Header */}
         <div className="flex-shrink-0 border-b p-3">
