@@ -1284,19 +1284,16 @@ function SchemaGraphInner({
       nodeHeights,
       nodeWidths
     );
-    // In canvas mode, override positions from stored positions and pass canvasMode to node data
+    // Canvas mode flags node data; stored positions are applied in the patch
+    // effect so a drag does not re-run the full layout.
     if (canvasMode) {
-      return nodes.map((node) => {
-        const storedPos = storedNodePositions[node.id];
-        return {
-          ...node,
-          position: storedPos ?? node.position,
-          data: {
-            ...(node.data as Record<string, unknown>),
-            canvasMode: true,
-          },
-        };
-      });
+      return nodes.map((node) => ({
+        ...node,
+        data: {
+          ...(node.data as Record<string, unknown>),
+          canvasMode: true,
+        },
+      }));
     }
     return nodes;
   }, [
@@ -1309,7 +1306,6 @@ function SchemaGraphInner({
     nodeHeights,
     nodeWidths,
     canvasMode,
-    storedNodePositions,
   ]);
   const baseEdges = useMemo(
     () => buildBaseEdges(schema, schemaIndex.viewColumnSources),
@@ -1607,7 +1603,9 @@ function SchemaGraphInner({
 
         // Apply compact position when in focus mode, or restore original when exiting
         let position = node.position; // Keep current position by default (preserves user drag)
-        if (shouldUseCompactLayout && compactPositions?.has(node.id)) {
+        if (canvasMode) {
+          position = storedNodePositions[node.id] ?? node.position;
+        } else if (shouldUseCompactLayout && compactPositions?.has(node.id)) {
           position = compactPositions.get(node.id)!;
         } else if (
           justExitedFocus &&
@@ -1695,6 +1693,8 @@ function SchemaGraphInner({
     nodeWidths,
     mainDependencyEdges,
     edgeDerivation.handleEdgeTypes,
+    canvasMode,
+    storedNodePositions,
     setEdges,
     setNodes,
     fitView,
