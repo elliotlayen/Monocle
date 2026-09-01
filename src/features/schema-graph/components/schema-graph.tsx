@@ -1374,6 +1374,20 @@ function SchemaGraphInner({
   useTauriEvent(menuDeleteSelectionHub.subscribe, handleDeleteSelectionMenu);
 
   // Canvas mode: keyboard handler for Delete/Backspace
+  // Latest delete behavior lives in a ref so the window listener registers
+  // once per mode instead of re-registering on every node or selection change.
+  const deleteKeyActionRef = useRef<() => void>(() => {});
+  deleteKeyActionRef.current = () => {
+    if (selectedEdgeIds.size > 0) {
+      handleDeleteSelectedEdges();
+      return;
+    }
+    const selectedNodes = nodes.filter((n) => n.selected);
+    if (selectedNodes.length > 0) {
+      handleDeleteSelected(selectedNodes);
+    }
+  };
+
   useEffect(() => {
     if (!canvasMode) return;
     const handler = (e: KeyboardEvent) => {
@@ -1384,25 +1398,12 @@ function SchemaGraphInner({
         ) {
           return;
         }
-        if (selectedEdgeIds.size > 0) {
-          handleDeleteSelectedEdges();
-          return;
-        }
-        const selectedNodes = nodes.filter((n) => n.selected);
-        if (selectedNodes.length > 0) {
-          handleDeleteSelected(selectedNodes);
-        }
+        deleteKeyActionRef.current();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [
-    canvasMode,
-    nodes,
-    selectedEdgeIds,
-    handleDeleteSelected,
-    handleDeleteSelectedEdges,
-  ]);
+  }, [canvasMode]);
 
   useEffect(() => {
     setNodes(baseNodes);
