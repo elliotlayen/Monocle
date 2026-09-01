@@ -17,7 +17,7 @@ export function FileTabBar() {
 
   return (
     <div
-      className="flex items-center h-9 bg-muted border-b overflow-x-auto overflow-y-hidden"
+      className="flex h-8 items-center overflow-x-auto overflow-y-hidden border-b bg-muted/40"
       style={{ scrollbarWidth: "none" }}
       aria-label={`${tabs.length} files open${tabs.length > 0 ? `, viewing ${tabs.find((t) => t.id === activeTabId)?.fileName ?? ""}` : ""}`}
     >

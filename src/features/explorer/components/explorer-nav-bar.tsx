@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { LogOut, Settings, ScanSearch, Loader2 } from "lucide-react";
+import { MonocleLogo } from "@/features/connection/components/monocle-logo";
 import { useExplorerStore } from "../store";
 
 interface ExplorerNavBarProps {
@@ -42,21 +43,19 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
   };
 
   return (
-    <div className="relative z-20 flex items-center gap-3 px-3 py-2 bg-background border-b border-border">
-      <span
-        className="font-semibold text-base"
-      >
-        Monocle
-      </span>
+    <div className="relative z-20 flex h-11 items-center gap-3 border-b border-border bg-background px-3">
+      <div className="flex items-center gap-2">
+        <MonocleLogo className="h-4 w-4" />
+        <span className="text-xs font-semibold tracking-wide">Monocle</span>
+      </div>
       <div className="flex-1" />
       <div className="flex items-center gap-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-9 px-2"
                 disabled={!canScan}
                 onClick={handleScanClick}
               >
@@ -76,9 +75,8 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-9 px-2"
                 onClick={onOpenSettings}
               >
                 <Settings className="w-4 h-4" />
@@ -89,9 +87,9 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="destructive"
+                variant="ghost"
                 size="sm"
-                className="h-9 px-2"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={onHome}
               >
                 <LogOut className="w-4 h-4" />

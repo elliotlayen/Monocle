@@ -3,6 +3,7 @@ import { useShallow } from "zustand/shallow";
 import { ArrowUpDown, CalendarIcon, Filter, PanelLeftClose } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -139,7 +140,8 @@ export function ExplorerSidebar() {
     <div
       className={cn(
         "relative flex-shrink-0 border-r bg-background overflow-hidden",
-        !isDragging && "transition-[width] duration-300 ease-in-out"
+        !isDragging &&
+          "transition-[width] duration-[var(--duration-slow)] ease-[var(--ease-out)]"
       )}
       style={{ width: sidebarOpen ? width : 0 }}
     >
@@ -151,7 +153,9 @@ export function ExplorerSidebar() {
         {/* Header */}
         <div className="flex-shrink-0 border-b p-3">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold">Explorer</h2>
+            <h2 className="pl-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Explorer
+            </h2>
             <div className="flex items-center gap-1">
               <TooltipProvider>
                 <Tooltip>
@@ -159,10 +163,10 @@ export function ExplorerSidebar() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="h-6 w-6"
                       onClick={toggleDateSort}
                     >
-                      <ArrowUpDown className="h-4 w-4" />
+                      <ArrowUpDown className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -184,11 +188,12 @@ export function ExplorerSidebar() {
                           variant="ghost"
                           size="icon"
                           className={cn(
-                            "h-7 w-7",
-                            hasDateFilter && "bg-accent"
+                            "h-6 w-6",
+                            hasDateFilter &&
+                              "bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/20 hover:text-accent-blue"
                           )}
                         >
-                          <Filter className="h-4 w-4" />
+                          <Filter className="h-3.5 w-3.5" />
                         </Button>
                       </DialogTrigger>
                     </TooltipTrigger>
@@ -213,7 +218,7 @@ export function ExplorerSidebar() {
                   </div>
                   <div className="flex flex-col gap-4 p-6 overflow-y-auto">
                     <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium">Date range</label>
+                      <Label>Date range</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -252,11 +257,11 @@ export function ExplorerSidebar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-6 w-6"
                 onClick={() => setSidebarOpen(false)}
                 title="Close sidebar"
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
@@ -285,8 +290,8 @@ export function ExplorerSidebar() {
       {/* Resize handle */}
       <div
         className={cn(
-          "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border",
-          isDragging && "bg-primary/20"
+          "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent-blue/40",
+          isDragging && "bg-accent-blue/30"
         )}
         onMouseDown={startDrag}
       />

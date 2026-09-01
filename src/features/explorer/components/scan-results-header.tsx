@@ -33,7 +33,7 @@ export function ScanResultsHeader({
   const folderName = result.folderPath.split(/[/\\]/).pop() ?? result.folderPath;
 
   return (
-    <div className="flex items-center gap-2 px-4 h-10 border-b bg-muted/50">
+    <div className="flex h-9 items-center gap-2 border-b bg-muted/40 px-3">
       {/* Left section */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <FileSearch className="h-4 w-4 flex-shrink-0 text-muted-foreground" />

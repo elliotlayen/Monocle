@@ -65,10 +65,10 @@ export function FileTab({
       <ContextMenuTrigger asChild>
         <div
           className={cn(
-            "group flex items-center gap-1.5 px-4 h-full text-sm border-r border-border cursor-pointer whitespace-nowrap select-none",
+            "group flex h-full cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-r border-border px-3 text-xs transition-colors duration-[var(--duration-fast)]",
             isActive
-              ? "bg-background border-b-2 border-b-primary"
-              : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              ? "bg-background text-foreground shadow-[inset_0_-2px_0_0_var(--accent-blue)]"
+              : "bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           )}
           onClick={onActivate}
           onMouseDown={handleMiddleClick}
@@ -77,7 +77,7 @@ export function FileTab({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="text-sm truncate max-w-[160px]">
+                <span className="max-w-[160px] truncate text-xs">
                   {tab.fileName}
                 </span>
               </TooltipTrigger>

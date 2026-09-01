@@ -17,11 +17,11 @@ export function ExplorerEmptyState({ onOpenSettings }: ExplorerEmptyStateProps) 
   const hasSources = folderSources.length > 0;
 
   return (
-    <div className="flex h-full items-center justify-center">
+    <div className="dot-grid flex h-full items-center justify-center">
       <div className="flex flex-col items-center gap-3 text-center">
         <FolderSync className="mb-1 h-10 w-10 text-muted-foreground" />
-        <h2 className="text-xl font-semibold">Integration Explorer</h2>
-        <p className="max-w-sm text-sm text-muted-foreground">
+        <h2 className="text-base font-semibold tracking-wide">Integration Explorer</h2>
+        <p className="max-w-sm text-xs text-muted-foreground">
           {hasSources
             ? "Click a file in the sidebar to open it."
             : "Add a folder source in Settings to get started."}

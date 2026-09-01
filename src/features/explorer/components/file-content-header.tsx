@@ -36,7 +36,7 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
     : formatFileSize(tab.fileSize);
 
   return (
-    <div className="flex items-center gap-2 px-4 h-10 border-b bg-muted/50">
+    <div className="flex h-9 items-center gap-2 border-b bg-muted/40 px-3">
       {/* Left section */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
         {fileIcon}
