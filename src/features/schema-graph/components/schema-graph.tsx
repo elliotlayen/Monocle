@@ -291,10 +291,6 @@ interface EdgeHoverCardState {
 
 function buildBaseNodes(
   schema: SchemaGraphType,
-  viewColumnSources: Map<
-    string,
-    { columnName: string; sourceTableId: string; sourceColumn: string }[]
-  >,
   options: ConvertOptions,
   columnsWithHandles: Set<string>,
   fkColumnUsage: Map<string, { outgoing: number; incoming: number }>,
@@ -303,7 +299,8 @@ function buildBaseNodes(
     { direction: "outgoing" | "incoming"; tableId: string; column: string }[]
   >,
   nodeHeights: Map<string, number>,
-  nodeWidths: Map<string, number>
+  nodeWidths: Map<string, number>,
+  mainDependencyEdges: DirectedEdge[]
 ): Node[] {
   const tables = schema.tables;
   const views = schema.views || [];
@@ -311,7 +308,7 @@ function buildBaseNodes(
   const overviewMaxLanes = getOverviewMainMaxLanes(mainNodeIds.length);
   const layered = layoutLayeredLeftToRight({
     nodeIds: mainNodeIds,
-    edges: buildMainDirectedEdges(schema, viewColumnSources),
+    edges: mainDependencyEdges,
     layerGapX: OVERVIEW_LAYER_GAP_X,
     laneGapX: OVERVIEW_LAYER_LANE_GAP_X,
     gapY: GAP_Y,
@@ -1276,13 +1273,13 @@ function SchemaGraphInner({
   const baseNodes = useMemo(() => {
     const nodes = buildBaseNodes(
       schema,
-      schemaIndex.viewColumnSources,
       options,
       schemaIndex.columnsWithHandles,
       schemaIndex.fkColumnUsage,
       schemaIndex.fkColumnLinks,
       nodeHeights,
-      nodeWidths
+      nodeWidths,
+      mainDependencyEdges
     );
     // Canvas mode flags node data; stored positions are applied in the patch
     // effect so a drag does not re-run the full layout.
@@ -1305,6 +1302,7 @@ function SchemaGraphInner({
     schemaIndex.fkColumnLinks,
     nodeHeights,
     nodeWidths,
+    mainDependencyEdges,
     canvasMode,
   ]);
   const baseEdges = useMemo(
