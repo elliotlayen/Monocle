@@ -1,6 +1,6 @@
 [package]
 name = "monocle"
-version = "0.3.3"
+version = "0.4.0"
 description = "SQL Server Schema Visualizer"
 authors = ["you"]
 edition = "2021"
