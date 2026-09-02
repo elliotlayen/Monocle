@@ -5,8 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:
     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -42,6 +41,7 @@
   --color-object-triggers: var(--object-triggers);
   --color-object-procedures: var(--object-procedures);
   --color-object-functions: var(--object-functions);
+  --color-object-on-color: var(--object-on-color);
 }
 
 :root {
@@ -68,11 +68,12 @@
   --accent-blue: oklch(0.55 0.19 259);
   --warning: oklch(0.6 0.13 75);
   --success: oklch(0.55 0.13 160);
-  --object-tables: oklch(0.5 0.05 250);
+  --object-tables: oklch(0.52 0.11 250);
   --object-views: oklch(0.55 0.12 165);
   --object-triggers: oklch(0.6 0.12 75);
   --object-procedures: oklch(0.52 0.17 300);
   --object-functions: oklch(0.55 0.09 210);
+  --object-on-color: oklch(0.985 0.002 255);
   --edge-relationships: oklch(0.55 0.17 259);
   --edge-trigger-reads: oklch(0.6 0.12 75);
   --edge-trigger-writes: oklch(0.55 0.2 25);
@@ -86,8 +87,7 @@
   --panel-border: oklch(0 0 0 / 0.08);
   --panel-blur: 14px;
   --panel-shadow:
-    0 12px 32px oklch(0 0 0 / 0.12),
-    inset 0 1px 0 oklch(1 0 0 / 0.6);
+    0 12px 32px oklch(0 0 0 / 0.12), inset 0 1px 0 oklch(1 0 0 / 0.6);
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -126,11 +126,12 @@
   --accent-blue: oklch(0.66 0.17 259);
   --warning: oklch(0.76 0.13 75);
   --success: oklch(0.72 0.14 160);
-  --object-tables: oklch(0.68 0.05 250);
+  --object-tables: oklch(0.7 0.11 250);
   --object-views: oklch(0.72 0.13 165);
   --object-triggers: oklch(0.76 0.13 75);
   --object-procedures: oklch(0.67 0.17 300);
   --object-functions: oklch(0.73 0.1 210);
+  --object-on-color: oklch(0.16 0.006 255);
   --edge-relationships: oklch(0.66 0.15 259);
   --edge-trigger-reads: oklch(0.76 0.13 75);
   --edge-trigger-writes: oklch(0.68 0.18 25);
@@ -143,8 +144,7 @@
   --panel-bg: oklch(0.19 0.006 255 / 0.92);
   --panel-border: oklch(1 0 0 / 0.08);
   --panel-shadow:
-    0 12px 32px oklch(0 0 0 / 0.45),
-    inset 0 1px 0 oklch(1 0 0 / 0.04);
+    0 12px 32px oklch(0 0 0 / 0.45), inset 0 1px 0 oklch(1 0 0 / 0.04);
 
   --minimap-mask: rgba(255, 255, 255, 0.15);
   --minimap-mask-hover: rgba(255, 255, 255, 0.25);
