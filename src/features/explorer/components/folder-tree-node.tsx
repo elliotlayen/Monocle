@@ -197,19 +197,10 @@ function FolderTreeRowInner({
           isSource && "font-semibold",
           dimClass
         )}
+        title={dateLabel ?? undefined}
       >
         {row.name}
       </span>
-      {dateLabel && (
-        <span
-          className={cn(
-            "text-xs text-muted-foreground flex-shrink-0 truncate",
-            dimClass
-          )}
-        >
-          {dateLabel}
-        </span>
-      )}
       {isSource && row.tag && (
         <Badge variant="secondary" className="text-xs flex-shrink-0">
           {row.tag}
