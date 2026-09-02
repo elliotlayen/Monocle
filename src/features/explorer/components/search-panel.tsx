@@ -12,6 +12,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -177,18 +184,24 @@ export function SearchPanel() {
       <div className="flex flex-col gap-2 p-3">
         {/* Row 1: location, filename query, saved searches, history */}
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="h-[26px] max-w-52 rounded-md border bg-muted px-1.5 text-[11px]"
-            aria-label="Location"
+          <Select
             value={activeSource?.id ?? ""}
-            onChange={(e) => setSearchSource(e.target.value)}
+            onValueChange={setSearchSource}
           >
-            {folderSources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              aria-label="Location"
+              className="h-[26px] w-auto max-w-52 gap-1.5 border-border bg-muted px-2 text-[11px]"
+            >
+              <SelectValue placeholder="Location" />
+            </SelectTrigger>
+            <SelectContent>
+              {folderSources.map((source) => (
+                <SelectItem key={source.id} value={source.id}>
+                  {source.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="relative min-w-52 flex-1">
             <FileCode className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
