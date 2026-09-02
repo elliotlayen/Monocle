@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/shallow";
 import {
   SchemaGraph,
   ConnectionParams,
@@ -16,6 +17,8 @@ import { databaseService } from "@/features/connection/services/database-service
 import {
   settingsService,
   isNodeStyle,
+  isEdgeLabelMode,
+  isDetailViewMode,
   DEFAULT_NODE_STYLE,
   type AppSettings,
   type DetailViewMode,
@@ -53,7 +56,7 @@ export type EdgeType =
   | "viewDependencies"
   | "functionReads";
 
-interface SchemaStore {
+export interface SchemaStore {
   // State
   schema: SchemaGraph | null;
   isLoading: boolean;
@@ -66,6 +69,12 @@ interface SchemaStore {
   showMiniMap: boolean;
   detailViewMode: DetailViewMode;
   nodeStyle: NodeStyle;
+  // Canvas Mode keeps its own display settings; read them through
+  // selectGraphDisplay / selectNodeStyle rather than by field.
+  canvasNodeStyle: NodeStyle;
+  canvasEdgeLabelMode: EdgeLabelMode;
+  canvasShowMiniMap: boolean;
+  canvasDetailViewMode: DetailViewMode;
 
   // Canvas mode state
   mode: "connected" | "canvas" | "explorer";
@@ -120,6 +129,10 @@ interface SchemaStore {
   setShowMiniMap: (show: boolean) => void;
   setDetailViewMode: (mode: DetailViewMode) => void;
   setNodeStyle: (style: NodeStyle) => void;
+  setCanvasNodeStyle: (style: NodeStyle) => void;
+  setCanvasEdgeLabelMode: (mode: EdgeLabelMode) => void;
+  setCanvasShowMiniMap: (show: boolean) => void;
+  setCanvasDetailViewMode: (mode: DetailViewMode) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -513,6 +526,10 @@ export const createInitialSchemaState = () => ({
   showMiniMap: true,
   detailViewMode: "inspector" as DetailViewMode,
   nodeStyle: DEFAULT_NODE_STYLE,
+  canvasNodeStyle: DEFAULT_NODE_STYLE,
+  canvasEdgeLabelMode: "auto" as EdgeLabelMode,
+  canvasShowMiniMap: true,
+  canvasDetailViewMode: "inspector" as DetailViewMode,
   focusedTableId: null,
   sidebarOpen: true,
   viewMode: "full" as const,
@@ -1039,6 +1056,18 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     if (isNodeStyle(settings.nodeStyle)) {
       updates.nodeStyle = settings.nodeStyle;
     }
+    if (isNodeStyle(settings.canvasNodeStyle)) {
+      updates.canvasNodeStyle = settings.canvasNodeStyle;
+    }
+    if (isEdgeLabelMode(settings.canvasEdgeLabelMode)) {
+      updates.canvasEdgeLabelMode = settings.canvasEdgeLabelMode;
+    }
+    if (typeof settings.canvasShowMiniMap === "boolean") {
+      updates.canvasShowMiniMap = settings.canvasShowMiniMap;
+    }
+    if (isDetailViewMode(settings.canvasDetailViewMode)) {
+      updates.canvasDetailViewMode = settings.canvasDetailViewMode;
+    }
 
     if (Object.keys(updates).length > 0) {
       set(updates);
@@ -1078,6 +1107,34 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   setNodeStyle: (style: NodeStyle) => {
     set({ nodeStyle: style });
     settingsService.saveSettings({ nodeStyle: style }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setCanvasNodeStyle: (style: NodeStyle) => {
+    set({ canvasNodeStyle: style });
+    settingsService.saveSettings({ canvasNodeStyle: style }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setCanvasEdgeLabelMode: (mode: EdgeLabelMode) => {
+    set({ canvasEdgeLabelMode: mode });
+    settingsService.saveSettings({ canvasEdgeLabelMode: mode }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setCanvasShowMiniMap: (show: boolean) => {
+    set({ canvasShowMiniMap: show });
+    settingsService.saveSettings({ canvasShowMiniMap: show }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setCanvasDetailViewMode: (mode: DetailViewMode) => {
+    set({ canvasDetailViewMode: mode });
+    settingsService.saveSettings({ canvasDetailViewMode: mode }).catch(() => {
       // Ignore persistence errors
     });
   },
@@ -2350,3 +2407,46 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   },
 }));
 
+// ---------------------------------------------------------------------------
+// Mode-scoped display settings. Schema Browser and Canvas Mode persist their
+// own node style, edge labels, minimap, and details placement; consumers pick
+// the active set by canvasMode instead of reading the fields directly.
+
+export interface GraphDisplaySettings {
+  nodeStyle: NodeStyle;
+  edgeLabelMode: EdgeLabelMode;
+  showMiniMap: boolean;
+  detailViewMode: DetailViewMode;
+}
+
+export function selectGraphDisplay(
+  state: SchemaStore,
+  canvasMode?: boolean
+): GraphDisplaySettings {
+  return canvasMode
+    ? {
+        nodeStyle: state.canvasNodeStyle,
+        edgeLabelMode: state.canvasEdgeLabelMode,
+        showMiniMap: state.canvasShowMiniMap,
+        detailViewMode: state.canvasDetailViewMode,
+      }
+    : {
+        nodeStyle: state.nodeStyle,
+        edgeLabelMode: state.edgeLabelMode,
+        showMiniMap: state.showMiniMap,
+        detailViewMode: state.detailViewMode,
+      };
+}
+
+export function selectNodeStyle(canvasMode?: boolean) {
+  return (state: SchemaStore): NodeStyle =>
+    canvasMode ? state.canvasNodeStyle : state.nodeStyle;
+}
+
+export function useGraphDisplaySettings(
+  canvasMode?: boolean
+): GraphDisplaySettings {
+  return useSchemaStore(
+    useShallow((state) => selectGraphDisplay(state, canvasMode))
+  );
+}

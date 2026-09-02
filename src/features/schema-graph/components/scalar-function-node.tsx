@@ -11,7 +11,7 @@ import {
 } from "./table-view-node-shared";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
 import { getNodeStyleSpec } from "./node-style";
-import { useSchemaStore } from "../store";
+import { useSchemaStore, selectNodeStyle } from "../store";
 import { cn } from "@/lib/utils";
 
 interface ScalarFunctionNodeData {
@@ -36,7 +36,7 @@ function ScalarFunctionNodeComponent({ data }: NodeProps) {
   } = data as unknown as ScalarFunctionNodeData;
   const nodeHandleBase = buildNodeHandleBase(fn.id);
   const handleClass = nodeHandleClass(canvasMode);
-  const nodeStyle = useSchemaStore((state) => state.nodeStyle);
+  const nodeStyle = useSchemaStore(selectNodeStyle(canvasMode));
   const styleSpec = getNodeStyleSpec(nodeStyle, "scalarFunctions", isCompact);
 
   return (

@@ -11,7 +11,7 @@ import {
 } from "./table-view-node-shared";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
 import { getNodeStyleSpec } from "./node-style";
-import { useSchemaStore } from "../store";
+import { useSchemaStore, selectNodeStyle } from "../store";
 import { cn } from "@/lib/utils";
 
 interface StoredProcedureNodeData {
@@ -36,7 +36,7 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
   } = data as unknown as StoredProcedureNodeData;
   const nodeHandleBase = buildNodeHandleBase(procedure.id);
   const handleClass = nodeHandleClass(canvasMode);
-  const nodeStyle = useSchemaStore((state) => state.nodeStyle);
+  const nodeStyle = useSchemaStore(selectNodeStyle(canvasMode));
   const styleSpec = getNodeStyleSpec(nodeStyle, "storedProcedures", isCompact);
 
   const inputParams = procedure.parameters.filter((p) => !p.isOutput);

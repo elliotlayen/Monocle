@@ -33,6 +33,14 @@ pub struct AppSettings {
     pub detail_view_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub node_style: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_node_style: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_edge_label_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_show_mini_map: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_detail_view_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub folder_sources: Vec<FolderSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -57,6 +65,10 @@ pub struct AppSettingsUpdate {
     pub show_mini_map: Option<bool>,
     pub detail_view_mode: Option<String>,
     pub node_style: Option<String>,
+    pub canvas_node_style: Option<String>,
+    pub canvas_edge_label_mode: Option<String>,
+    pub canvas_show_mini_map: Option<bool>,
+    pub canvas_detail_view_mode: Option<String>,
     pub folder_sources: Option<Vec<FolderSource>>,
     pub explorer_sidebar_width: Option<f64>,
     pub explorer_node_style: Option<String>,
@@ -132,6 +144,18 @@ impl AppState {
         if let Some(node_style) = update.node_style {
             settings.node_style = Some(node_style);
         }
+        if let Some(canvas_node_style) = update.canvas_node_style {
+            settings.canvas_node_style = Some(canvas_node_style);
+        }
+        if let Some(canvas_edge_label_mode) = update.canvas_edge_label_mode {
+            settings.canvas_edge_label_mode = Some(canvas_edge_label_mode);
+        }
+        if let Some(canvas_show_mini_map) = update.canvas_show_mini_map {
+            settings.canvas_show_mini_map = Some(canvas_show_mini_map);
+        }
+        if let Some(canvas_detail_view_mode) = update.canvas_detail_view_mode {
+            settings.canvas_detail_view_mode = Some(canvas_detail_view_mode);
+        }
         if let Some(folder_sources) = update.folder_sources {
             settings.folder_sources = folder_sources;
         }
@@ -187,6 +211,10 @@ mod tests {
                 show_mini_map: Some(true),
                 detail_view_mode: Some("drawer".to_string()),
                 node_style: Some("solid".to_string()),
+                canvas_node_style: Some("tinted".to_string()),
+                canvas_edge_label_mode: Some("never".to_string()),
+                canvas_show_mini_map: Some(false),
+                canvas_detail_view_mode: Some("inspector".to_string()),
                 folder_sources: None,
                 explorer_sidebar_width: None,
                 explorer_node_style: Some("capsule".to_string()),
@@ -202,6 +230,10 @@ mod tests {
         assert_eq!(settings.show_mini_map, Some(true));
         assert_eq!(settings.detail_view_mode.as_deref(), Some("drawer"));
         assert_eq!(settings.node_style.as_deref(), Some("solid"));
+        assert_eq!(settings.canvas_node_style.as_deref(), Some("tinted"));
+        assert_eq!(settings.canvas_edge_label_mode.as_deref(), Some("never"));
+        assert_eq!(settings.canvas_show_mini_map, Some(false));
+        assert_eq!(settings.canvas_detail_view_mode.as_deref(), Some("inspector"));
         assert_eq!(settings.explorer_node_style.as_deref(), Some("capsule"));
     }
 

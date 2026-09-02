@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSchemaStore, createInitialSchemaState } from "./store";
+import {
+  useSchemaStore,
+  createInitialSchemaState,
+  selectGraphDisplay,
+  selectNodeStyle,
+} from "./store";
 import { schemaService } from "./services/schema-service";
 import { settingsService } from "@/features/settings/services/settings-service";
 
@@ -529,4 +534,84 @@ describe("useSchemaStore.hydrateSettings", () => {
     });
   });
 
+  it("hydrates canvas display settings independently of the schema ones", () => {
+    useSchemaStore.getState().hydrateSettings({
+      nodeStyle: "solid",
+      canvasNodeStyle: "tinted",
+      canvasEdgeLabelMode: "never",
+      canvasShowMiniMap: false,
+      canvasDetailViewMode: "drawer",
+    });
+
+    const state = useSchemaStore.getState();
+    expect(state.nodeStyle).toBe("solid");
+    expect(state.canvasNodeStyle).toBe("tinted");
+    expect(state.canvasEdgeLabelMode).toBe("never");
+    expect(state.canvasShowMiniMap).toBe(false);
+    expect(state.canvasDetailViewMode).toBe("drawer");
+    expect(state.edgeLabelMode).toBe("auto");
+    expect(state.showMiniMap).toBe(true);
+    expect(state.detailViewMode).toBe("inspector");
+  });
+
+  it("keeps canvas defaults when persisted canvas values are invalid", () => {
+    useSchemaStore.getState().hydrateSettings({
+      nodeStyle: "surface",
+      canvasNodeStyle: "neon" as never,
+      canvasEdgeLabelMode: "sometimes" as never,
+      canvasDetailViewMode: "popover" as never,
+    });
+
+    const state = useSchemaStore.getState();
+    expect(state.canvasNodeStyle).toBe("adaptive");
+    expect(state.canvasEdgeLabelMode).toBe("auto");
+    expect(state.canvasDetailViewMode).toBe("inspector");
+  });
+
+  it("persists each canvas setting under its own key", () => {
+    const store = useSchemaStore.getState();
+    store.setCanvasNodeStyle("solid");
+    store.setCanvasEdgeLabelMode("always");
+    store.setCanvasShowMiniMap(false);
+    store.setCanvasDetailViewMode("drawer");
+
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      canvasNodeStyle: "solid",
+    });
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      canvasEdgeLabelMode: "always",
+    });
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      canvasShowMiniMap: false,
+    });
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      canvasDetailViewMode: "drawer",
+    });
+    expect(useSchemaStore.getState().nodeStyle).toBe("adaptive");
+  });
+
+  it("selects the display set for the active mode", () => {
+    useSchemaStore.getState().hydrateSettings({
+      nodeStyle: "solid",
+      showMiniMap: false,
+      canvasNodeStyle: "tinted",
+      canvasShowMiniMap: true,
+    });
+    const state = useSchemaStore.getState();
+
+    expect(selectGraphDisplay(state, false)).toEqual({
+      nodeStyle: "solid",
+      edgeLabelMode: "auto",
+      showMiniMap: false,
+      detailViewMode: "inspector",
+    });
+    expect(selectGraphDisplay(state, true)).toEqual({
+      nodeStyle: "tinted",
+      edgeLabelMode: "auto",
+      showMiniMap: true,
+      detailViewMode: "inspector",
+    });
+    expect(selectNodeStyle(false)(state)).toBe("solid");
+    expect(selectNodeStyle(true)(state)).toBe("tinted");
+  });
 });

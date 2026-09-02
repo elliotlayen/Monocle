@@ -1,7 +1,12 @@
 import { memo, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { Column } from "../types";
-import { EdgeType, ObjectType, useSchemaStore } from "../store";
+import {
+  EdgeType,
+  ObjectType,
+  useSchemaStore,
+  selectNodeStyle,
+} from "../store";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 import {
@@ -367,7 +372,7 @@ export function TableViewNodeBody({
   );
 
   const nodeLevelHandleClass = nodeHandleClass(canvasMode);
-  const nodeStyle = useSchemaStore((state) => state.nodeStyle);
+  const nodeStyle = useSchemaStore(selectNodeStyle(canvasMode));
   const styleSpec = getNodeStyleSpec(nodeStyle, variant.objectType, isCompact);
 
   return (

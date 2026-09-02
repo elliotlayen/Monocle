@@ -25,7 +25,12 @@ import {
   StoredProcedure,
   ScalarFunction,
 } from "../types";
-import { ObjectType, EdgeType, useSchemaStore } from "../store";
+import {
+  ObjectType,
+  EdgeType,
+  useSchemaStore,
+  useGraphDisplaySettings,
+} from "../store";
 import { OBJECT_COLORS } from "@/constants/edge-colors";
 import { getSchemaIndex } from "@/lib/schema-index";
 import { useShallow } from "zustand/shallow";
@@ -802,9 +807,6 @@ function SchemaGraphInner({
     expandNodeNeighbors,
     showFullGraph,
     focusExpandThreshold,
-    edgeLabelMode,
-    showMiniMap,
-    detailViewMode,
     nodePositions: storedNodePositions,
     updateNodePosition,
     removeTable,
@@ -831,9 +833,6 @@ function SchemaGraphInner({
       expandNodeNeighbors: state.expandNodeNeighbors,
       showFullGraph: state.showFullGraph,
       focusExpandThreshold: state.focusExpandThreshold,
-      edgeLabelMode: state.edgeLabelMode,
-      showMiniMap: state.showMiniMap,
-      detailViewMode: state.detailViewMode,
       nodePositions: state.nodePositions,
       updateNodePosition: state.updateNodePosition,
       removeTable: state.removeTable,
@@ -848,6 +847,8 @@ function SchemaGraphInner({
       removeViewColumnSource: state.removeViewColumnSource,
     }))
   );
+  const { edgeLabelMode, showMiniMap, detailViewMode } =
+    useGraphDisplaySettings(canvasMode);
 
   // React Flow hook for programmatic viewport control
   const { fitView, setViewport, getViewport, zoomIn, zoomOut } = useReactFlow();

@@ -21,6 +21,14 @@ export function isNodeStyle(value: unknown): value is NodeStyle {
   );
 }
 
+export function isEdgeLabelMode(value: unknown): value is EdgeLabelMode {
+  return value === "auto" || value === "never" || value === "always";
+}
+
+export function isDetailViewMode(value: unknown): value is DetailViewMode {
+  return value === "inspector" || value === "drawer";
+}
+
 /** Integration Explorer XML tree node looks; independent of the graph styles. */
 export type ExplorerNodeStyle = "soft" | "capsule" | "outline" | "depth";
 
@@ -50,6 +58,10 @@ export interface AppSettings {
   showMiniMap?: boolean;
   detailViewMode?: DetailViewMode;
   nodeStyle?: NodeStyle;
+  canvasNodeStyle?: NodeStyle;
+  canvasEdgeLabelMode?: EdgeLabelMode;
+  canvasShowMiniMap?: boolean;
+  canvasDetailViewMode?: DetailViewMode;
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
   explorerNodeStyle?: ExplorerNodeStyle;
@@ -64,6 +76,10 @@ export interface SettingsUpdate {
   showMiniMap?: boolean;
   detailViewMode?: DetailViewMode;
   nodeStyle?: NodeStyle;
+  canvasNodeStyle?: NodeStyle;
+  canvasEdgeLabelMode?: EdgeLabelMode;
+  canvasShowMiniMap?: boolean;
+  canvasDetailViewMode?: DetailViewMode;
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
   explorerNodeStyle?: ExplorerNodeStyle;
