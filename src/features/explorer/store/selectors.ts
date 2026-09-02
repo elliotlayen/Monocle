@@ -1,11 +1,181 @@
 import type {
+  FilenameResultFile,
   FolderSource,
+  SearchResultFile,
   TreeNode,
   ValidationProblem,
   ValidationStatus,
 } from "../types";
 import { formatDateFolder } from "../utils/date-format";
 import type { DateRange } from "./store-types";
+
+// ---------------------------------------------------------------- scope
+
+/**
+ * Toggle a folder in the search scope. Checking a parent covers its whole
+ * subtree, so redundant descendants are dropped and a path already covered
+ * by a scoped ancestor is a no-op removal target only.
+ */
+export function togglePathInScope(
+  scopePaths: Set<string>,
+  path: string
+): Set<string> {
+  const next = new Set(scopePaths);
+  if (next.has(path)) {
+    next.delete(path);
+    return next;
+  }
+  for (const existing of next) {
+    if (
+      existing.startsWith(path + "/") ||
+      existing.startsWith(path + "\\")
+    ) {
+      next.delete(existing);
+    }
+  }
+  const covered = [...next].some(
+    (p) => path.startsWith(p + "/") || path.startsWith(p + "\\")
+  );
+  if (!covered) next.add(path);
+  return next;
+}
+
+/** Empty scope means the whole location is in scope. */
+export function isPathInScope(
+  scopePaths: Set<string>,
+  path: string
+): boolean {
+  if (scopePaths.size === 0) return true;
+  for (const scoped of scopePaths) {
+    if (
+      path === scoped ||
+      path.startsWith(scoped + "/") ||
+      path.startsWith(scoped + "\\")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export interface TintRunFlags {
+  inScope: boolean;
+  runStart: boolean;
+  runEnd: boolean;
+}
+
+/**
+ * Per-row scope flags for the connected-tint treatment: corners round only
+ * where a contiguous run of in-scope rows starts or ends. Computed in JS so
+ * it stays correct under virtualization. With an empty scope, nothing tints.
+ */
+export function tintRunFlags(
+  rows: TreeRow[],
+  scopePaths: Set<string>
+): TintRunFlags[] {
+  const scopeActive = scopePaths.size > 0;
+  const inScope = rows.map(
+    (row) =>
+      scopeActive &&
+      row.kind === "node" &&
+      isPathInScope(scopePaths, row.path)
+  );
+  return inScope.map((current, i) => ({
+    inScope: current,
+    runStart: current && (i === 0 || !inScope[i - 1]),
+    runEnd: current && (i === rows.length - 1 || !inScope[i + 1]),
+  }));
+}
+
+// ---------------------------------------------------------------- matches
+
+export interface NameMatchOptions {
+  regex: boolean;
+  caseSensitive: boolean;
+}
+
+/** Frontend mirror of the backend NameMatcher semantics. */
+export function matchesName(
+  name: string,
+  query: string,
+  options: NameMatchOptions
+): boolean {
+  const q = query.trim();
+  if (!q) return false;
+  if (options.regex) {
+    try {
+      return new RegExp(q, options.caseSensitive ? "" : "i").test(name);
+    } catch {
+      return false;
+    }
+  }
+  return options.caseSensitive
+    ? name.includes(q)
+    : name.toLowerCase().includes(q.toLowerCase());
+}
+
+/** Instant filename matches from nodes already loaded in the tree. */
+export function loadedFilenameMatches(input: {
+  loadedFileIndex: Map<string, string>;
+  treeNodes: Map<string, TreeNode>;
+  scopePaths: Set<string>;
+  query: string;
+  options: NameMatchOptions;
+  limit?: number;
+}): FilenameResultFile[] {
+  const { loadedFileIndex, treeNodes, scopePaths, query, options } = input;
+  const limit = input.limit ?? 50;
+  const matches: FilenameResultFile[] = [];
+  if (!query.trim()) return matches;
+
+  for (const id of loadedFileIndex.keys()) {
+    if (matches.length >= limit) break;
+    const node = treeNodes.get(id);
+    if (!node || node.type === "source") continue;
+    if (!matchesName(node.name, query, options)) continue;
+    if (!isPathInScope(scopePaths, node.path)) continue;
+    matches.push({
+      path: node.path,
+      name: node.name,
+      isDir: node.isDir,
+      parentFolder: node.path.slice(
+        0,
+        Math.max(0, node.path.length - node.name.length - 1)
+      ),
+    });
+  }
+  matches.sort((a, b) => a.name.localeCompare(b.name));
+  return matches;
+}
+
+/**
+ * Files appearing in the active result set, path -> short label for the
+ * Browse tree's match indicators.
+ */
+export function resultsMatchIndex(input: {
+  lastRun: "filename" | "content" | null;
+  searchResults: SearchResultFile[];
+  filenameResults: FilenameResultFile[];
+  loadedMatches: FilenameResultFile[];
+}): Map<string, string> {
+  const index = new Map<string, string>();
+  if (input.lastRun === "content") {
+    for (const result of input.searchResults) {
+      index.set(
+        result.filePath,
+        `${result.matchCount} match${result.matchCount === 1 ? "" : "es"}`
+      );
+    }
+  } else if (input.lastRun === "filename") {
+    for (const result of input.loadedMatches) {
+      if (!result.isDir) index.set(result.path, "match");
+    }
+    for (const result of input.filenameResults) {
+      if (!result.isDir) index.set(result.path, "match");
+    }
+  }
+  return index;
+}
 
 export interface TreeNodeRow {
   kind: "node";

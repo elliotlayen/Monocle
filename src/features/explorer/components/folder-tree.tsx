@@ -444,7 +444,7 @@ export function FolderTree() {
               onClick={() => {
                 const store = useExplorerStore.getState();
                 store.setSelectedPath(menuTarget.path);
-                store.setSearchScope("selected");
+                store.setScopeTo(menuTarget.path);
                 store.setActiveView("search");
               }}
             >

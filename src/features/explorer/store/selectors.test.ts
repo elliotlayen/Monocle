@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { flattenTree, type FlattenTreeInput, type TreeRow } from "./selectors";
+import {
+  flattenTree,
+  isPathInScope,
+  matchesName,
+  resultsMatchIndex,
+  tintRunFlags,
+  togglePathInScope,
+  type FlattenTreeInput,
+  type TreeRow,
+} from "./selectors";
 import type { TreeNode, ValidationStatus } from "../types";
 
 function node(partial: Partial<TreeNode> & Pick<TreeNode, "id">): TreeNode {
@@ -242,5 +251,163 @@ describe("flattenTree", () => {
     const rows = flattenTree(input);
     const sourceRow = rows[0];
     expect(sourceRow.kind === "node" && sourceRow.tag).toBe("prod");
+  });
+});
+
+describe("togglePathInScope", () => {
+  it("adds and removes a path", () => {
+    let scope = togglePathInScope(new Set(), "/root/a");
+    expect([...scope]).toEqual(["/root/a"]);
+    scope = togglePathInScope(scope, "/root/a");
+    expect(scope.size).toBe(0);
+  });
+
+  it("checking a parent drops redundant descendants", () => {
+    const scope = togglePathInScope(
+      new Set(["/root/a/inbound", "/root/b"]),
+      "/root/a"
+    );
+    expect([...scope].sort()).toEqual(["/root/a", "/root/b"]);
+  });
+
+  it("a path covered by a scoped ancestor is not added", () => {
+    const scope = togglePathInScope(new Set(["/root/a"]), "/root/a/inbound");
+    expect([...scope]).toEqual(["/root/a"]);
+  });
+});
+
+describe("isPathInScope", () => {
+  it("treats an empty scope as everything in scope", () => {
+    expect(isPathInScope(new Set(), "/anything")).toBe(true);
+  });
+
+  it("matches exact paths and descendants only", () => {
+    const scope = new Set(["/root/a"]);
+    expect(isPathInScope(scope, "/root/a")).toBe(true);
+    expect(isPathInScope(scope, "/root/a/inbound/x.xml")).toBe(true);
+    expect(isPathInScope(scope, "/root/ab")).toBe(false);
+    expect(isPathInScope(scope, "/root/b")).toBe(false);
+  });
+});
+
+describe("tintRunFlags", () => {
+  const nodeRow = (path: string): TreeRow => ({
+    kind: "node",
+    key: path,
+    id: path,
+    path,
+    name: path,
+    depth: 1,
+    type: "folder",
+    isDir: true,
+    isExpanded: false,
+    loadState: "idle",
+    sourceId: "s",
+    badge: undefined,
+    inFavorites: false,
+    childCount: undefined,
+    isFavorite: undefined,
+    tag: undefined,
+  });
+  const header: TreeRow = {
+    kind: "favorites-header",
+    key: "h",
+    sourceId: "s",
+    depth: 1,
+    collapsed: false,
+  };
+
+  it("returns no tint when the scope is empty", () => {
+    const flags = tintRunFlags([nodeRow("/a"), nodeRow("/b")], new Set());
+    expect(flags.every((f) => !f.inScope)).toBe(true);
+  });
+
+  it("marks run boundaries for a single contiguous run", () => {
+    const rows = [nodeRow("/x"), nodeRow("/a"), nodeRow("/a/1"), nodeRow("/y")];
+    const flags = tintRunFlags(rows, new Set(["/a"]));
+    expect(flags.map((f) => f.inScope)).toEqual([false, true, true, false]);
+    expect(flags[1]).toEqual({ inScope: true, runStart: true, runEnd: false });
+    expect(flags[2]).toEqual({ inScope: true, runStart: false, runEnd: true });
+  });
+
+  it("handles disjoint runs and list edges", () => {
+    const rows = [nodeRow("/a"), nodeRow("/x"), header, nodeRow("/b")];
+    const flags = tintRunFlags(rows, new Set(["/a", "/b"]));
+    expect(flags[0]).toEqual({ inScope: true, runStart: true, runEnd: true });
+    expect(flags[2].inScope).toBe(false);
+    expect(flags[3]).toEqual({ inScope: true, runStart: true, runEnd: true });
+  });
+});
+
+describe("matchesName", () => {
+  it("substring, case, and regex modes", () => {
+    expect(
+      matchesName("ORD_1.xml", "ord", { regex: false, caseSensitive: false })
+    ).toBe(true);
+    expect(
+      matchesName("ORD_1.xml", "ord", { regex: false, caseSensitive: true })
+    ).toBe(false);
+    expect(
+      matchesName("ORD_1.xml", "^ord_\\d", { regex: true, caseSensitive: false })
+    ).toBe(true);
+    expect(
+      matchesName("ORD_1.xml", "[bad", { regex: true, caseSensitive: false })
+    ).toBe(false);
+    expect(
+      matchesName("ORD_1.xml", "  ", { regex: false, caseSensitive: false })
+    ).toBe(false);
+  });
+});
+
+describe("resultsMatchIndex", () => {
+  const fileResult = (path: string): { path: string; name: string; isDir: boolean; parentFolder: string } => ({
+    path,
+    name: path.split("/").pop() ?? path,
+    isDir: false,
+    parentFolder: "/root",
+  });
+
+  it("labels content results with match counts", () => {
+    const index = resultsMatchIndex({
+      lastRun: "content",
+      searchResults: [
+        {
+          filePath: "/root/a.xml",
+          fileName: "a.xml",
+          parentFolder: "/root",
+          matchCount: 3,
+          matches: [],
+          operationId: "op",
+        },
+      ],
+      filenameResults: [],
+      loadedMatches: [],
+    });
+    expect(index.get("/root/a.xml")).toBe("3 matches");
+  });
+
+  it("labels filename results from loaded and streamed sets, skipping dirs", () => {
+    const index = resultsMatchIndex({
+      lastRun: "filename",
+      searchResults: [],
+      filenameResults: [
+        fileResult("/root/b.xml"),
+        { ...fileResult("/root/dir"), isDir: true },
+      ],
+      loadedMatches: [fileResult("/root/a.xml")],
+    });
+    expect(index.get("/root/a.xml")).toBe("match");
+    expect(index.get("/root/b.xml")).toBe("match");
+    expect(index.has("/root/dir")).toBe(false);
+  });
+
+  it("is empty with no active run", () => {
+    const index = resultsMatchIndex({
+      lastRun: null,
+      searchResults: [],
+      filenameResults: [],
+      loadedMatches: [],
+    });
+    expect(index.size).toBe(0);
   });
 });

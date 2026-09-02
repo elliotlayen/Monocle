@@ -393,7 +393,15 @@ describe("explorer store - scan and search performance state", () => {
       }
     );
 
-    await useExplorerStore.getState().startContentSearch(["/root"], "scope");
+    useExplorerStore.setState({
+      contentQuery: "alpha",
+      folderSources: [
+        { id: "src-1", path: "/root", label: "Root", tag: "", favorites: [] },
+      ],
+      searchSourceId: "src-1",
+      scopePaths: new Set(),
+    });
+    await useExplorerStore.getState().startContentSearch();
 
     const state = useExplorerStore.getState();
     expect(state.searchResults.map((r) => r.filePath)).toEqual([
@@ -401,6 +409,11 @@ describe("explorer store - scan and search performance state", () => {
       "/b/z.xml",
     ]);
     expect(state.searchStatus).toBe("completed");
+    expect(state.lastRun).toBe("content");
+    expect(state.searchHistory[0]).toEqual({
+      query: "alpha",
+      mode: "content",
+    });
   });
 
   it("clears search result dedupe state", () => {
