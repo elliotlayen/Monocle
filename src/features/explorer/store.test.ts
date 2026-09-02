@@ -491,6 +491,115 @@ describe("explorer store - scan and search performance state", () => {
   });
 });
 
+describe("explorer store - loadSources reconciliation", () => {
+  const source = {
+    id: "source-1",
+    path: "/root",
+    label: "Root",
+    tag: "local",
+    favorites: [],
+  };
+
+  const loadedTree = () =>
+    new Map([
+      [
+        "source-1",
+        {
+          id: "source-1",
+          path: "/root",
+          name: "Root",
+          type: "source" as const,
+          children: null,
+          loadState: "loaded" as const,
+          isDir: true,
+        },
+      ],
+      [
+        "/root/Nested",
+        {
+          id: "/root/Nested",
+          path: "/root/Nested",
+          name: "Nested",
+          parentId: "source-1",
+          type: "folder" as const,
+          children: null,
+          loadState: "idle" as const,
+          isDir: true,
+        },
+      ],
+    ]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useExplorerStore.setState({
+      folderSources: [source],
+      treeNodes: loadedTree(),
+      expandedIds: new Set(["source-1"]),
+      activeOperations: new Map(),
+    });
+  });
+
+  it("preserves loaded subtrees and expansion across repeated loads", async () => {
+    vi.mocked(settingsService.getSettings).mockResolvedValueOnce({
+      folderSources: [source],
+    });
+
+    await useExplorerStore.getState().loadSources();
+
+    const state = useExplorerStore.getState();
+    expect(state.treeNodes.get("/root/Nested")).toBeDefined();
+    expect(state.treeNodes.get("source-1")?.loadState).toBe("loaded");
+    expect(state.expandedIds.has("source-1")).toBe(true);
+    expect(state.filenameSearchIndex.get("/root/Nested")).toBe("nested");
+  });
+
+  it("drops nodes of removed sources and adds new sources fresh", async () => {
+    const added = {
+      id: "source-2",
+      path: "/other",
+      label: "Other",
+      tag: "",
+      favorites: [],
+    };
+    vi.mocked(settingsService.getSettings).mockResolvedValueOnce({
+      folderSources: [added],
+    });
+
+    await useExplorerStore.getState().loadSources();
+
+    const state = useExplorerStore.getState();
+    expect(state.treeNodes.has("source-1")).toBe(false);
+    expect(state.treeNodes.has("/root/Nested")).toBe(false);
+    expect(state.treeNodes.get("source-2")?.loadState).toBe("idle");
+    expect(state.expandedIds.size).toBe(0);
+  });
+
+  it("starts a repointed source fresh even when the id is unchanged", async () => {
+    vi.mocked(settingsService.getSettings).mockResolvedValueOnce({
+      folderSources: [{ ...source, path: "/moved" }],
+    });
+
+    await useExplorerStore.getState().loadSources();
+
+    const state = useExplorerStore.getState();
+    expect(state.treeNodes.get("source-1")?.path).toBe("/moved");
+    expect(state.treeNodes.get("source-1")?.loadState).toBe("idle");
+    expect(state.treeNodes.has("/root/Nested")).toBe(false);
+  });
+
+  it("applies a renamed label without resetting the subtree", async () => {
+    vi.mocked(settingsService.getSettings).mockResolvedValueOnce({
+      folderSources: [{ ...source, label: "Renamed" }],
+    });
+
+    await useExplorerStore.getState().loadSources();
+
+    const state = useExplorerStore.getState();
+    expect(state.treeNodes.get("source-1")?.name).toBe("Renamed");
+    expect(state.treeNodes.get("/root/Nested")).toBeDefined();
+  });
+});
+
 describe("explorer store - node style setting", () => {
   beforeEach(() => {
     useExplorerStore.setState({ explorerNodeStyle: "soft" });

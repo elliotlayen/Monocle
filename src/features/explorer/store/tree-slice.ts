@@ -90,6 +90,68 @@ function buildFilenameSearchIndex(
   return index;
 }
 
+function belongsToSource(nodeId: string, source: FolderSource): boolean {
+  return (
+    nodeId === source.path ||
+    nodeId.startsWith(source.path + "/") ||
+    nodeId.startsWith(source.path + "\\")
+  );
+}
+
+/**
+ * Rebuild the tree for a new source list while keeping the loaded subtrees,
+ * expansion state, and in-flight operations of sources that are unchanged
+ * (same id and path). Sources that were added or repointed start fresh;
+ * nodes of removed sources are dropped.
+ */
+function reconcileTreeWithSources(
+  prev: Pick<TreeSlice, "treeNodes" | "expandedIds" | "activeOperations">,
+  sources: FolderSource[]
+): Pick<
+  TreeSlice,
+  "treeNodes" | "expandedIds" | "activeOperations" | "filenameSearchIndex"
+> {
+  const treeNodes = new Map<string, TreeNode>();
+
+  for (const source of sources) {
+    // Carry a source's subtree over only when its loaded root still points
+    // at the same path; a repointed source must start fresh.
+    const existingRoot = prev.treeNodes.get(source.id);
+    const prevRoot =
+      existingRoot && existingRoot.path === source.path
+        ? existingRoot
+        : undefined;
+
+    if (prevRoot) {
+      treeNodes.set(source.id, { ...prevRoot, name: source.label });
+      for (const [id, node] of prev.treeNodes) {
+        if (id !== source.id && belongsToSource(id, source)) {
+          treeNodes.set(id, node);
+        }
+      }
+    } else {
+      treeNodes.set(source.id, buildSourceNode(source));
+    }
+  }
+
+  const expandedIds = new Set<string>();
+  for (const id of prev.expandedIds) {
+    if (treeNodes.has(id)) expandedIds.add(id);
+  }
+
+  const activeOperations = new Map<string, string>();
+  for (const [nodeId, opId] of prev.activeOperations) {
+    if (treeNodes.has(nodeId)) activeOperations.set(nodeId, opId);
+  }
+
+  return {
+    treeNodes,
+    expandedIds,
+    activeOperations,
+    filenameSearchIndex: buildFilenameSearchIndex(treeNodes),
+  };
+}
+
 export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   folderSources: [],
   treeNodes: new Map(),
@@ -111,17 +173,11 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
         ? settings.explorerNodeStyle
         : DEFAULT_EXPLORER_NODE_STYLE;
 
-      const treeNodes = new Map<string, TreeNode>();
-      for (const source of sources) {
-        treeNodes.set(source.id, buildSourceNode(source));
-      }
-
+      // Idempotent: loaded subtrees, expansion, and open state survive
+      // remounts (mode switches). Only changed sources start fresh.
       set({
         folderSources: sources,
-        treeNodes,
-        filenameSearchIndex: buildFilenameSearchIndex(treeNodes),
-        expandedIds: new Set(),
-        activeOperations: new Map(),
+        ...reconcileTreeWithSources(get(), sources),
         sidebarWidth,
         explorerNodeStyle,
       });
@@ -312,18 +368,9 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
     try {
       await settingsService.saveSettings({ folderSources });
 
-      // Rebuild root tree nodes from updated sources
-      const treeNodes = new Map<string, TreeNode>();
-      for (const source of folderSources) {
-        treeNodes.set(source.id, buildSourceNode(source));
-      }
-
-      set({
-        treeNodes,
-        filenameSearchIndex: buildFilenameSearchIndex(treeNodes),
-        expandedIds: new Set(),
-        activeOperations: new Map(),
-      });
+      // Reconcile instead of resetting: reorders and label edits keep
+      // loaded subtrees; added or repointed sources start fresh.
+      set(reconcileTreeWithSources(get(), folderSources));
     } catch {
       // Silently handle save failure
     }
