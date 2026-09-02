@@ -188,11 +188,7 @@ export function SearchPanel() {
           </span>
         );
       })
-    ) : (
-      <span className="inline-flex h-6 items-center rounded-md border bg-muted px-2 text-[10.5px] text-muted-foreground">
-        whole location
-      </span>
-    );
+    ) : null;
 
   return (
     <div className="panel-glass relative z-30 flex-shrink-0 overflow-visible">
@@ -398,7 +394,6 @@ export function SearchPanel() {
           className="flex flex-wrap items-center gap-1.5"
           id="explorer-scope-row"
         >
-          <span className="text-[10px] text-muted-foreground">in</span>
           <Popover
             onOpenChange={(open) => {
               if (!open) return;
@@ -418,13 +413,17 @@ export function SearchPanel() {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-[10.5px] transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
+                  "inline-flex h-6 w-36 items-center gap-1.5 rounded-md border px-2 text-[10.5px] transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
                   scopePaths.size > 0
-                    ? "border-accent-blue text-accent-blue"
+                    ? "border-accent-blue/40 bg-accent-blue/10 text-foreground"
                     : "border-border bg-muted text-muted-foreground hover:text-foreground"
                 )}
               >
-                <ListFilter className="h-3 w-3" /> Choose folders
+                <ListFilter className="h-3 w-3 flex-shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {scopePaths.size > 0 ? "Choose folders" : "All folders"}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-50" />
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80 p-0">
