@@ -129,11 +129,12 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
         searchSummary: null,
         searchStatus: "idle",
         activeSearchTerms: null,
-        filterText: searchQuery,
       });
+      get().setFilterText(searchQuery);
     } else if (mode === "filename") {
       // Switching to filename: sync query to filterText
-      set({ searchMode: mode, filterText: searchQuery });
+      set({ searchMode: mode });
+      get().setFilterText(searchQuery);
     } else {
       set({ searchMode: mode });
     }
@@ -142,7 +143,8 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
   setSearchQuery: (text: string) => {
     const { searchMode } = get();
     if (searchMode === "filename") {
-      set({ searchQuery: text, filterText: text });
+      set({ searchQuery: text });
+      get().setFilterText(text);
     } else {
       set({ searchQuery: text });
       if (!text) {

@@ -8,6 +8,7 @@ import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
 import { disambiguateTabNames } from "../utils/tab-disambiguator";
 import { parseXml } from "../utils/xml-parser";
+import { appendBounded, VALIDATION_CACHE_MAX } from "./bounded-cache";
 import type { SliceCreator } from "./store-types";
 
 export interface TabsSlice {
@@ -124,13 +125,21 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
         ...(parseError ? { viewMode: "source" as const } : {}),
       };
 
-      // Update validation cache with new Map instance
-      const nextCache = new Map(get().validationCache);
-      nextCache.set(filePath, {
-        problems: result.problems,
-        encoding: result.encoding,
-        hasBom: result.hasBom,
-      });
+      // Update validation cache (bounded, oldest entries evicted)
+      const nextCache = appendBounded(
+        get().validationCache,
+        [
+          [
+            filePath,
+            {
+              problems: result.problems,
+              encoding: result.encoding,
+              hasBom: result.hasBom,
+            },
+          ] as const,
+        ],
+        VALIDATION_CACHE_MAX
+      );
 
       // Auto-show problems panel if issues found (D-02)
       const hasProblems = result.problems.length > 0;

@@ -8,6 +8,7 @@ import type {
 import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
 import { computeAggregateBadges } from "../utils/badge-aggregation";
+import { appendBounded, VALIDATION_CACHE_MAX } from "./bounded-cache";
 import { recomputeTabNames } from "./tabs-slice";
 import type { SliceCreator } from "./store-types";
 
@@ -76,15 +77,22 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
         operationId
       );
 
-      // Update validation cache with all file results
-      const nextCache = new Map(get().validationCache);
-      for (const file of result.files) {
-        nextCache.set(file.filePath, {
-          problems: file.problems,
-          encoding: file.encoding,
-          hasBom: file.hasBom,
-        });
-      }
+      // Update validation cache with all file results (bounded)
+      const nextCache = appendBounded(
+        get().validationCache,
+        result.files.map(
+          (file) =>
+            [
+              file.filePath,
+              {
+                problems: file.problems,
+                encoding: file.encoding,
+                hasBom: file.hasBom,
+              },
+            ] as const
+        ),
+        VALIDATION_CACHE_MAX
+      );
 
       // Compute folder badge cache
       const folderBadges = computeAggregateBadges(result.files, folderPath);

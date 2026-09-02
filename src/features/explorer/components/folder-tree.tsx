@@ -11,7 +11,7 @@ export function FolderTree() {
   const {
     folderSources,
     treeNodes,
-    filenameSearchIndex,
+    loadedFileIndex,
     expandedIds,
     filterText,
     dateSortOrder,
@@ -28,7 +28,7 @@ export function FolderTree() {
     useShallow((state) => ({
       folderSources: state.folderSources,
       treeNodes: state.treeNodes,
-      filenameSearchIndex: state.filenameSearchIndex,
+      loadedFileIndex: state.loadedFileIndex,
       expandedIds: state.expandedIds,
       filterText: state.filterText,
       dateSortOrder: state.dateSortOrder,
@@ -86,7 +86,7 @@ export function FolderTree() {
       }
     };
 
-    for (const [id, lowerName] of filenameSearchIndex) {
+    for (const [id, lowerName] of loadedFileIndex) {
       if (!lowerName.includes(lowerFilter)) continue;
       const node = treeNodes.get(id);
       if (!node) continue;
@@ -95,7 +95,7 @@ export function FolderTree() {
     }
 
     return ids;
-  }, [filenameSearchIndex, filterText, treeNodes]);
+  }, [loadedFileIndex, filterText, treeNodes]);
 
   const visibleRoots = useMemo(() => {
     if (!visibleNodeIds) return rootNodes;

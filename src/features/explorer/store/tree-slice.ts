@@ -16,7 +16,7 @@ export interface TreeSlice {
   filterText: string;
   dateSortOrder: "newest" | "oldest";
   dateRange: DateRange;
-  filenameSearchIndex: Map<string, string>;
+  loadedFileIndex: Map<string, string>;
   selectedPath: string | null;
   focusedPath: string | null;
 
@@ -81,7 +81,7 @@ function buildSourceNode(source: FolderSource): TreeNode {
   };
 }
 
-function buildFilenameSearchIndex(
+function buildLoadedFileIndex(
   treeNodes: Map<string, TreeNode>
 ): Map<string, string> {
   const index = new Map<string, string>();
@@ -110,7 +110,7 @@ function reconcileTreeWithSources(
   sources: FolderSource[]
 ): Pick<
   TreeSlice,
-  "treeNodes" | "expandedIds" | "activeOperations" | "filenameSearchIndex"
+  "treeNodes" | "expandedIds" | "activeOperations" | "loadedFileIndex"
 > {
   const treeNodes = new Map<string, TreeNode>();
 
@@ -149,9 +149,11 @@ function reconcileTreeWithSources(
     treeNodes,
     expandedIds,
     activeOperations,
-    filenameSearchIndex: buildFilenameSearchIndex(treeNodes),
+    loadedFileIndex: buildLoadedFileIndex(treeNodes),
   };
 }
+
+let filterDebounce: ReturnType<typeof setTimeout> | null = null;
 
 export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   folderSources: [],
@@ -161,7 +163,7 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   filterText: "",
   dateSortOrder: "newest",
   dateRange: null,
-  filenameSearchIndex: new Map<string, string>(),
+  loadedFileIndex: new Map<string, string>(),
   selectedPath: null,
   focusedPath: null,
 
@@ -238,9 +240,15 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
       const currentOps = new Map(get().activeOperations);
       currentOps.delete(nodeId);
 
+      // Incremental index update: only the new children gained names.
+      const nextIndex = new Map(get().loadedFileIndex);
+      for (const child of children) {
+        nextIndex.set(child.id, child.name.toLowerCase());
+      }
+
       set({
         treeNodes: currentNodes,
-        filenameSearchIndex: buildFilenameSearchIndex(currentNodes),
+        loadedFileIndex: nextIndex,
         expandedIds: currentExpanded,
         activeOperations: currentOps,
       });
@@ -257,9 +265,9 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
       const currentOps = new Map(get().activeOperations);
       currentOps.delete(nodeId);
 
+      // No index update: only loadState changed, no names were added.
       set({
         treeNodes: currentNodes,
-        filenameSearchIndex: buildFilenameSearchIndex(currentNodes),
         activeOperations: currentOps,
       });
     }
@@ -299,15 +307,29 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
     const nextOps = new Map(activeOperations);
     nextOps.delete(nodeId);
 
+    // No index update: cancelled nodes keep their names; stale entries are
+    // harmless (index only widens filename-filter coverage).
     set({
       treeNodes: nextNodes,
-      filenameSearchIndex: buildFilenameSearchIndex(nextNodes),
       expandedIds: nextExpanded,
       activeOperations: nextOps,
     });
   },
 
-  setFilterText: (text: string) => set({ filterText: text }),
+  setFilterText: (text: string) => {
+    // Debounce the filter the tree derives visibility from; clearing is
+    // instant so escape/clear feels immediate.
+    if (filterDebounce) clearTimeout(filterDebounce);
+    if (!text.trim()) {
+      filterDebounce = null;
+      set({ filterText: text });
+      return;
+    }
+    filterDebounce = setTimeout(() => {
+      filterDebounce = null;
+      set({ filterText: text });
+    }, 150);
+  },
 
   toggleDateSort: () =>
     set((state) => ({
@@ -356,10 +378,10 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
         }
       }
 
+      // No index update: favorites don't change names.
       set({
         folderSources: updatedSources,
         treeNodes: nextNodes,
-        filenameSearchIndex: buildFilenameSearchIndex(nextNodes),
       });
     } catch {
       showToast({

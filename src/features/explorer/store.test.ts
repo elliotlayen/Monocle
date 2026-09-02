@@ -474,7 +474,7 @@ describe("explorer store - scan and search performance state", () => {
           },
         ],
       ]),
-      filenameSearchIndex: new Map([["source-1", "root"]]),
+      loadedFileIndex: new Map([["source-1", "root"]]),
       expandedIds: new Set(),
       activeOperations: new Map(),
     });
@@ -484,10 +484,10 @@ describe("explorer store - scan and search performance state", () => {
     const state = useExplorerStore.getState();
     expect(state.treeNodes.get("/root/Config.xml")?.parentId).toBe("source-1");
     expect(state.treeNodes.get("/root/Nested")?.parentId).toBe("source-1");
-    expect(state.filenameSearchIndex.get("/root/Config.xml")).toBe(
+    expect(state.loadedFileIndex.get("/root/Config.xml")).toBe(
       "config.xml"
     );
-    expect(state.filenameSearchIndex.get("/root/Nested")).toBe("nested");
+    expect(state.loadedFileIndex.get("/root/Nested")).toBe("nested");
   });
 });
 
@@ -550,7 +550,7 @@ describe("explorer store - loadSources reconciliation", () => {
     expect(state.treeNodes.get("/root/Nested")).toBeDefined();
     expect(state.treeNodes.get("source-1")?.loadState).toBe("loaded");
     expect(state.expandedIds.has("source-1")).toBe(true);
-    expect(state.filenameSearchIndex.get("/root/Nested")).toBe("nested");
+    expect(state.loadedFileIndex.get("/root/Nested")).toBe("nested");
   });
 
   it("drops nodes of removed sources and adds new sources fresh", async () => {
