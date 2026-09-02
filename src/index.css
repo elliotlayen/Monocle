@@ -260,3 +260,11 @@ html.dark {
 .react-flow__minimap:hover .react-flow__minimap-mask {
   fill: var(--minimap-mask-hover) !important;
 }
+
+/* Monaco renders its find-widget button tooltips through an in-editor
+   context view; in a short editor the tooltip lands on top of the button
+   it describes and flickers as it steals the pointer. These tooltips are
+   informational only - let clicks pass through to the button beneath. */
+.monaco-editor .context-view .monaco-hover {
+  pointer-events: none;
+}

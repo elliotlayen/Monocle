@@ -139,6 +139,11 @@ export const XmlSourceView = forwardRef<XmlSourceViewHandle, XmlSourceViewProps>
       scrollbar: {
         alwaysConsumeMouseWheel: false,
       },
+      // Render hovers and other overflow widgets position:fixed so they can
+      // escape the editor bounds. Without this, the find widget's own
+      // "Close (Escape)" hover gets clamped inside the editor, lands on top
+      // of the close button, and flickers as it steals the pointer.
+      fixedOverflowWidgets: true,
       ariaLabel: "File source view",
     }),
     []
