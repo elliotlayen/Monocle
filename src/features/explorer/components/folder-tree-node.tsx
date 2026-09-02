@@ -236,7 +236,7 @@ function FolderTreeRowInner({
         >
           {scoped ? (
             <>
-              scope <X className="h-2 w-2" />
+              <X className="h-2 w-2" /> scope
             </>
           ) : (
             "+ scope"
