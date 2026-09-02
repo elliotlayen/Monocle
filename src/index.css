@@ -261,10 +261,18 @@ html.dark {
   fill: var(--minimap-mask-hover) !important;
 }
 
-/* Monaco renders its find-widget button tooltips through an in-editor
-   context view; in a short editor the tooltip lands on top of the button
-   it describes and flickers as it steals the pointer. These tooltips are
-   informational only - let clicks pass through to the button beneath. */
-.monaco-editor .context-view .monaco-hover {
+/* Monaco renders its find-widget button tooltips ("Close (Escape)", ...)
+   as workbench hovers through a context view confined to the editor DOM.
+   Because our editors sit near the top of a clipped panel, the hover gets
+   clamped directly on top of the button it describes, stealing the pointer
+   and flickering, and clicks land on the hover instead of the button.
+   The buttons keep their aria-labels; suppress the hovers entirely. */
+.monaco-hover.workbench-hover {
+  display: none !important;
+}
+
+/* Belt and suspenders: any other hover routed through a context view is
+   informational only - never let it swallow the pointer. */
+.context-view .monaco-hover {
   pointer-events: none;
 }
