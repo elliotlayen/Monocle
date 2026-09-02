@@ -66,6 +66,7 @@
   --ring: oklch(0.55 0.17 259);
 
   --accent-blue: oklch(0.55 0.19 259);
+  --accent-on-color: oklch(1 0 0);
   --warning: oklch(0.6 0.13 75);
   --success: oklch(0.55 0.13 160);
   --object-tables: oklch(0.52 0.11 250);
@@ -124,6 +125,7 @@
   --ring: oklch(0.66 0.17 259);
 
   --accent-blue: oklch(0.66 0.17 259);
+  --accent-on-color: oklch(1 0 0);
   --warning: oklch(0.76 0.13 75);
   --success: oklch(0.72 0.14 160);
   --object-tables: oklch(0.7 0.11 250);
@@ -151,6 +153,75 @@
   --scrollbar-track: oklch(0.205 0.006 255);
   --scrollbar-thumb: oklch(0.38 0.006 255);
   --scrollbar-thumb-hover: oklch(0.48 0.006 255);
+}
+
+/* Accent color (data-accent on <html>; "blue" is the default above).
+   Each accent redefines the accent token (named --accent-blue for
+   historical reasons), the focus ring, and the on-accent foreground.
+   Light values first; the .dark overrides must come after so they win
+   at equal specificity when both attributes are on <html>. */
+:root[data-accent="purple"] {
+  --accent-blue: oklch(0.55 0.19 295);
+  --ring: oklch(0.55 0.19 295);
+}
+:root[data-accent="pink"] {
+  --accent-blue: oklch(0.57 0.19 345);
+  --ring: oklch(0.57 0.19 345);
+}
+:root[data-accent="red"] {
+  --accent-blue: oklch(0.55 0.19 25);
+  --ring: oklch(0.55 0.19 25);
+}
+:root[data-accent="orange"] {
+  --accent-blue: oklch(0.6 0.16 55);
+  --ring: oklch(0.6 0.16 55);
+}
+:root[data-accent="yellow"] {
+  --accent-blue: oklch(0.65 0.13 95);
+  --ring: oklch(0.65 0.13 95);
+  --accent-on-color: oklch(0.2 0.02 95);
+}
+:root[data-accent="green"] {
+  --accent-blue: oklch(0.55 0.15 150);
+  --ring: oklch(0.55 0.15 150);
+}
+
+.dark[data-accent="purple"] {
+  --accent-blue: oklch(0.67 0.17 300);
+  --ring: oklch(0.67 0.17 300);
+}
+.dark[data-accent="pink"] {
+  --accent-blue: oklch(0.68 0.17 345);
+  --ring: oklch(0.68 0.17 345);
+}
+.dark[data-accent="red"] {
+  --accent-blue: oklch(0.68 0.18 25);
+  --ring: oklch(0.68 0.18 25);
+}
+.dark[data-accent="orange"] {
+  --accent-blue: oklch(0.72 0.15 55);
+  --ring: oklch(0.72 0.15 55);
+  --accent-on-color: oklch(0.2 0.02 55);
+}
+.dark[data-accent="yellow"] {
+  --accent-blue: oklch(0.8 0.15 95);
+  --ring: oklch(0.8 0.15 95);
+  --accent-on-color: oklch(0.2 0.02 95);
+}
+.dark[data-accent="green"] {
+  --accent-blue: oklch(0.7 0.15 150);
+  --ring: oklch(0.7 0.15 150);
+}
+
+/* System follows the OS accent color where the webview supports the
+   AccentColor keyword (macOS WKWebView); elsewhere the default blue
+   stands because this block never applies. */
+@supports (color: AccentColor) {
+  :root[data-accent="system"],
+  .dark[data-accent="system"] {
+    --accent-blue: AccentColor;
+    --ring: AccentColor;
+  }
 }
 
 @layer base {

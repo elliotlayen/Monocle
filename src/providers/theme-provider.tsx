@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { settingsService } from "@/features/settings/services/settings-service";
+import {
+  settingsService,
+  isAccentColor,
+  DEFAULT_ACCENT_COLOR,
+  type AccentColor,
+} from "@/features/settings/services/settings-service";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -12,11 +17,17 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  accent: AccentColor;
+  setAccent: (accent: AccentColor) => void;
 };
+
+const ACCENT_STORAGE_KEY = "monocle-accent";
 
 const initialState: ThemeProviderState = {
   theme: "system",
   setTheme: () => null,
+  accent: DEFAULT_ACCENT_COLOR,
+  setAccent: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
@@ -30,6 +41,10 @@ export function ThemeProvider({
   const [theme, setThemeState] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
+  const [accent, setAccentState] = useState<AccentColor>(() => {
+    const saved = localStorage.getItem(ACCENT_STORAGE_KEY);
+    return isAccentColor(saved) ? saved : DEFAULT_ACCENT_COLOR;
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -49,12 +64,23 @@ export function ThemeProvider({
     root.classList.add(theme);
   }, [theme]);
 
+  // The accent applies as a data attribute; per-accent CSS in index.css
+  // covers both themes declaratively, so theme flips need no JS here.
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (accent === DEFAULT_ACCENT_COLOR) {
+      delete root.dataset.accent;
+    } else {
+      root.dataset.accent = accent;
+    }
+  }, [accent]);
+
   useEffect(() => {
     let isMounted = true;
     settingsService
       .getSettings()
       .then((settings) => {
-        if (!isMounted || !settings.theme) return;
+        if (!isMounted) return;
         if (
           settings.theme === "dark" ||
           settings.theme === "light" ||
@@ -62,6 +88,10 @@ export function ThemeProvider({
         ) {
           localStorage.setItem(storageKey, settings.theme);
           setThemeState(settings.theme);
+        }
+        if (isAccentColor(settings.accentColor)) {
+          localStorage.setItem(ACCENT_STORAGE_KEY, settings.accentColor);
+          setAccentState(settings.accentColor);
         }
       })
       .catch(() => {
@@ -93,6 +123,14 @@ export function ThemeProvider({
       localStorage.setItem(storageKey, theme);
       setThemeState(theme);
       settingsService.saveSettings({ theme }).catch(() => {
+        // Ignore settings persistence failures
+      });
+    },
+    accent,
+    setAccent: (accent: AccentColor) => {
+      localStorage.setItem(ACCENT_STORAGE_KEY, accent);
+      setAccentState(accent);
+      settingsService.saveSettings({ accentColor: accent }).catch(() => {
         // Ignore settings persistence failures
       });
     },
