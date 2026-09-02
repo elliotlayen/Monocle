@@ -152,6 +152,27 @@ export interface SearchResultsBatchPayload {
   errors: SearchErrorFile[];
 }
 
+// Filename search types
+
+export interface FilenameResultFile {
+  path: string;
+  name: string;
+  isDir: boolean;
+  parentFolder: string;
+}
+
+export interface FilenameResultsBatchPayload {
+  operationId: string;
+  results: FilenameResultFile[];
+}
+
+export interface FilenameSearchSummary {
+  query: string;
+  totalMatched: number;
+  truncated: boolean;
+  cancelled: boolean;
+}
+
 export interface SearchSummary {
   query: string;
   scopeLabel: string;

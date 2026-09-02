@@ -50,6 +50,7 @@ export function useTauriEvent<T>(
 
 // Event hubs (add as needed when backend emits events)
 import type {
+  FilenameResultsBatchPayload,
   ScanProgressPayload,
   SearchProgressPayload,
   SearchResultsBatchPayload,
@@ -62,6 +63,9 @@ export const searchResultsBatchHub =
   createEventHub<SearchResultsBatchPayload>("search-results-batch");
 export const searchProgressHub =
   createEventHub<SearchProgressPayload>("search-progress");
+export const filenameResultsBatchHub = createEventHub<FilenameResultsBatchPayload>(
+  "filename-results-batch"
+);
 
 // Menu event hubs for cross-component communication
 export const menuToggleSidebarHub = createEventHub<void>("menu:toggle-sidebar");

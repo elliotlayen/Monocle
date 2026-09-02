@@ -187,12 +187,7 @@ WHERE o.type = 'FN'
 ORDER BY s.name, o.name, p.parameter_id
 "#;
 
-pub fn format_data_type(
-    type_name: &str,
-    max_length: i16,
-    precision: u8,
-    scale: u8,
-) -> String {
+pub fn format_data_type(type_name: &str, max_length: i16, precision: u8, scale: u8) -> String {
     match type_name {
         "varchar" | "char" | "nchar" => {
             if max_length == -1 {

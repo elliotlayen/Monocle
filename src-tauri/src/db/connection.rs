@@ -23,7 +23,9 @@ pub enum ConnectionError {
     },
 }
 
-pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
+pub async fn create_client(
+    params: &ConnectionParams,
+) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
     let mut config = Config::new();
 
     // Parse server and port (format: "server", "server,port", "server:port", or "server\instance")
@@ -70,7 +72,9 @@ pub async fn create_client(params: &ConnectionParams) -> Result<Client<tokio_uti
 }
 
 /// Create a client connected to the master database for listing databases
-pub async fn create_server_client(params: &ServerConnectionParams) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
+pub async fn create_server_client(
+    params: &ServerConnectionParams,
+) -> Result<Client<tokio_util::compat::Compat<TcpStream>>, ConnectionError> {
     let mut config = Config::new();
 
     // Parse server and port (format: "server", "server,port", "server:port", or "server\instance")

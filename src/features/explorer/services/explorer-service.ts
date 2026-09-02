@@ -1,5 +1,11 @@
 import { tauri } from "@/services/tauri";
-import type { DirEntry, FileContent, ScanSummary, SearchSummary } from "../types";
+import type {
+  DirEntry,
+  FileContent,
+  FilenameSearchSummary,
+  ScanSummary,
+  SearchSummary,
+} from "../types";
 import type { AppSettings } from "@/features/settings/services/settings-service";
 
 export const explorerService = {
@@ -42,4 +48,16 @@ export const explorerService = {
     operationId: string
   ): Promise<SearchSummary> =>
     tauri.contentSearch(query, folderPaths, filePattern, scopeLabel, operationId),
+
+  filenameSearch: (
+    query: string,
+    folderPaths: string,
+    filePattern: string,
+    operationId: string
+  ): Promise<FilenameSearchSummary> =>
+    tauri.filenameSearch(query, folderPaths, filePattern, operationId),
+
+  // Shares the backend cancellation map with cancelScan (see above).
+  cancelFilenameSearch: (operationId: string): Promise<void> =>
+    tauri.cancelScan(operationId),
 };

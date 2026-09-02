@@ -218,10 +218,7 @@ async fn load_views_and_columns(
 /// Load view column sources from SQL Server dependency metadata.
 /// This is optional enrichment - errors are silently ignored to handle databases
 /// with broken object references (views referencing non-existent columns/tables).
-async fn load_view_column_sources(
-    client: &mut Client<Compat<TcpStream>>,
-    views: &mut [ViewNode],
-) {
+async fn load_view_column_sources(client: &mut Client<Compat<TcpStream>>, views: &mut [ViewNode]) {
     let mut column_sources: HashMap<String, HashMap<String, Vec<ColumnSource>>> = HashMap::new();
 
     // Query can fail if views reference non-existent objects
@@ -256,12 +253,9 @@ async fn load_view_column_sources(
                         .or_default()
                         .entry(view_column.to_string())
                         .or_default();
-                    if !entry
-                        .iter()
-                        .any(|source| {
-                            source.table == source_table_name && source.column == source_column
-                        })
-                    {
+                    if !entry.iter().any(|source| {
+                        source.table == source_table_name && source.column == source_column
+                    }) {
                         entry.push(ColumnSource {
                             table: source_table_name,
                             column: source_column.to_string(),
@@ -404,7 +398,8 @@ async fn load_stored_procedures(
         let procedure_id = format!("{}.{}", schema_name, procedure_name);
 
         let procedure = procedures.entry(procedure_id.clone()).or_insert_with(|| {
-            let (referenced_tables, affected_tables) = extract_table_references(definition, name_to_id);
+            let (referenced_tables, affected_tables) =
+                extract_table_references(definition, name_to_id);
             StoredProcedure {
                 id: procedure_id,
                 name: procedure_name.to_string(),
@@ -451,7 +446,8 @@ async fn load_scalar_functions(
         let function_id = format!("{}.{}", schema_name, function_name);
 
         let function = functions.entry(function_id.clone()).or_insert_with(|| {
-            let (referenced_tables, affected_tables) = extract_table_references(definition, name_to_id);
+            let (referenced_tables, affected_tables) =
+                extract_table_references(definition, name_to_id);
             ScalarFunction {
                 id: function_id,
                 name: function_name.to_string(),
@@ -537,7 +533,10 @@ fn extract_table_references(
         }
     }
 
-    (read_refs.into_iter().collect(), write_refs.into_iter().collect())
+    (
+        read_refs.into_iter().collect(),
+        write_refs.into_iter().collect(),
+    )
 }
 
 fn build_name_lookup(tables: &[TableNode], views: &[ViewNode]) -> HashMap<String, String> {
@@ -562,7 +561,12 @@ mod tests {
     #[test]
     fn composite_fk_column_pairs_get_distinct_ids() {
         let a = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderId", "Id");
-        let b = build_fk_edge_id("dbo.OrderLine", "FK_OrderLine_Order", "OrderVersion", "Version");
+        let b = build_fk_edge_id(
+            "dbo.OrderLine",
+            "FK_OrderLine_Order",
+            "OrderVersion",
+            "Version",
+        );
         assert_ne!(a, b);
     }
 

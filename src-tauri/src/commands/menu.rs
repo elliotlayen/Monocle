@@ -10,10 +10,7 @@ pub struct MenuUiState {
 }
 
 #[tauri::command]
-pub fn set_menu_ui_state_cmd(
-    app_handle: AppHandle,
-    state: MenuUiState,
-) -> Result<(), String> {
+pub fn set_menu_ui_state_cmd(app_handle: AppHandle, state: MenuUiState) -> Result<(), String> {
     crate::menu::set_menu_ui_state(
         &app_handle,
         state.is_canvas_mode,

@@ -99,7 +99,10 @@ pub fn setup_menu<R: Runtime>(app: &App<R>) -> Result<Menu<R>, tauri::Error> {
             )
             .separator()
             .item(&PredefinedMenuItem::hide(app_handle, Some("Hide Monocle"))?)
-            .item(&PredefinedMenuItem::hide_others(app_handle, Some("Hide Others"))?)
+            .item(&PredefinedMenuItem::hide_others(
+                app_handle,
+                Some("Hide Others"),
+            )?)
             .item(&PredefinedMenuItem::show_all(app_handle, Some("Show All"))?)
             .separator()
             .item(&PredefinedMenuItem::quit(app_handle, Some("Quit Monocle"))?)
@@ -124,7 +127,10 @@ pub fn setup_menu<R: Runtime>(app: &App<R>) -> Result<Menu<R>, tauri::Error> {
             .item(&PredefinedMenuItem::cut(app_handle, Some("Cut"))?)
             .item(&PredefinedMenuItem::copy(app_handle, Some("Copy"))?)
             .item(&PredefinedMenuItem::paste(app_handle, Some("Paste"))?)
-            .item(&PredefinedMenuItem::select_all(app_handle, Some("Select All"))?)
+            .item(&PredefinedMenuItem::select_all(
+                app_handle,
+                Some("Select All"),
+            )?)
             .separator()
             .item(
                 &MenuItemBuilder::with_id(MENU_DELETE_SELECTION, "Delete Selection")
@@ -175,9 +181,7 @@ pub fn setup_menu<R: Runtime>(app: &App<R>) -> Result<Menu<R>, tauri::Error> {
             .build()?;
 
         let help_menu = SubmenuBuilder::new(app_handle, "Help")
-            .item(
-                &MenuItemBuilder::with_id(MENU_DOCUMENTATION, "Documentation").build(app_handle)?,
-            )
+            .item(&MenuItemBuilder::with_id(MENU_DOCUMENTATION, "Documentation").build(app_handle)?)
             .build()?;
 
         let menu = MenuBuilder::new(app_handle)
@@ -253,7 +257,10 @@ pub fn setup_menu<R: Runtime>(app: &App<R>) -> Result<Menu<R>, tauri::Error> {
             .item(&PredefinedMenuItem::cut(app_handle, Some("Cut"))?)
             .item(&PredefinedMenuItem::copy(app_handle, Some("Copy"))?)
             .item(&PredefinedMenuItem::paste(app_handle, Some("Paste"))?)
-            .item(&PredefinedMenuItem::select_all(app_handle, Some("Select All"))?)
+            .item(&PredefinedMenuItem::select_all(
+                app_handle,
+                Some("Select All"),
+            )?)
             .separator()
             .item(
                 &MenuItemBuilder::with_id(MENU_DELETE_SELECTION, "Delete Selection")
@@ -305,9 +312,7 @@ pub fn setup_menu<R: Runtime>(app: &App<R>) -> Result<Menu<R>, tauri::Error> {
 
         let help_menu = SubmenuBuilder::new(app_handle, "Help")
             .item(&MenuItemBuilder::with_id(MENU_ABOUT, "About Monocle").build(app_handle)?)
-            .item(
-                &MenuItemBuilder::with_id(MENU_DOCUMENTATION, "Documentation").build(app_handle)?,
-            )
+            .item(&MenuItemBuilder::with_id(MENU_DOCUMENTATION, "Documentation").build(app_handle)?)
             .separator()
             .item(
                 &MenuItemBuilder::with_id(MENU_CHECK_UPDATES, "Check for Updates...")

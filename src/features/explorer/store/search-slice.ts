@@ -5,6 +5,8 @@ import type {
   SearchErrorFile,
   SearchProgressPayload,
   SearchSummary,
+  FilenameResultFile,
+  FilenameSearchSummary,
 } from "../types";
 import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
@@ -31,10 +33,23 @@ export interface SearchSlice {
   searchOperationId: string | null;
   activeSearchTerms: string[] | null;
 
+  // Filename (on-disk) search state
+  filenameStatus: SearchStatus;
+  filenameResults: FilenameResultFile[];
+  filenameResultPathSet: Set<string>;
+  filenameSummary: FilenameSearchSummary | null;
+  filenameOperationId: string | null;
+
   setSearchMode: (mode: SearchMode) => void;
   setSearchQuery: (text: string) => void;
   setSearchScope: (scope: SearchScope) => void;
   setSearchFilePattern: (pattern: string) => void;
+  startFilenameSearch: (folderPaths: string[]) => Promise<void>;
+  appendFilenameResults: (
+    operationId: string,
+    results: FilenameResultFile[]
+  ) => void;
+  clearFilenameSearch: () => void;
   startContentSearch: (
     folderPaths: string[],
     scopeLabel: string
@@ -118,43 +133,27 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
   searchOperationId: null,
   activeSearchTerms: null,
 
+  filenameStatus: "idle",
+  filenameResults: [],
+  filenameResultPathSet: new Set<string>(),
+  filenameSummary: null,
+  filenameOperationId: null,
+
   setSearchMode: (mode: SearchMode) => {
-    const { searchMode: currentMode, searchResults, searchQuery } = get();
-    if (
-      currentMode === "content" &&
-      mode === "filename" &&
-      searchResults.length > 0
-    ) {
-      // Switching from content to filename with results: clear search state, sync query to filterText
-      set({
-        searchMode: mode,
-        searchResults: [],
-        searchErrors: [],
-        searchResultPathSet: new Set<string>(),
-        searchErrorPathSet: new Set<string>(),
-        searchSummary: null,
-        searchStatus: "idle",
-        activeSearchTerms: null,
-      });
-      get().setFilterText(searchQuery);
-    } else if (mode === "filename") {
-      // Switching to filename: sync query to filterText
-      set({ searchMode: mode });
-      get().setFilterText(searchQuery);
-    } else {
-      set({ searchMode: mode });
+    if (mode === get().searchMode) return;
+    set({ searchMode: mode });
+    if (mode === "content") {
+      get().clearFilenameSearch();
     }
   },
 
   setSearchQuery: (text: string) => {
-    const { searchMode } = get();
-    if (searchMode === "filename") {
-      set({ searchQuery: text });
-      get().setFilterText(text);
-    } else {
-      set({ searchQuery: text });
-      if (!text) {
+    set({ searchQuery: text });
+    if (!text) {
+      if (get().searchMode === "content") {
         get().clearSearchResults();
+      } else {
+        get().clearFilenameSearch();
       }
     }
   },
@@ -289,5 +288,82 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
 
   setActiveSearchTerms: (terms: string[] | null) => {
     set({ activeSearchTerms: terms });
+  },
+
+  startFilenameSearch: async (folderPaths: string[]) => {
+    const previousOp = get().filenameOperationId;
+    if (previousOp) {
+      explorerService.cancelFilenameSearch(previousOp).catch(() => {});
+    }
+
+    const query = get().searchQuery.trim();
+    if (!query) {
+      get().clearFilenameSearch();
+      return;
+    }
+
+    const operationId = crypto.randomUUID();
+    set({
+      filenameStatus: "searching",
+      filenameOperationId: operationId,
+      filenameResults: [],
+      filenameResultPathSet: new Set<string>(),
+      filenameSummary: null,
+    });
+
+    try {
+      const summary = await explorerService.filenameSearch(
+        query,
+        JSON.stringify(folderPaths),
+        get().searchFilePattern,
+        operationId
+      );
+      // Ignore completions from superseded operations
+      if (get().filenameOperationId !== operationId) return;
+      set({
+        filenameStatus: summary.cancelled ? "cancelled" : "completed",
+        filenameSummary: summary,
+        filenameOperationId: null,
+      });
+    } catch {
+      if (get().filenameOperationId !== operationId) return;
+      set({ filenameStatus: "idle", filenameOperationId: null });
+      showToast({
+        type: "error",
+        title: "Filename search failed",
+        message: "An error occurred while searching file names",
+        duration: 5000,
+      });
+    }
+  },
+
+  appendFilenameResults: (operationId, results) => {
+    if (results.length === 0) return;
+    if (get().filenameOperationId !== operationId) return;
+
+    set((state) => {
+      const seen = new Set(state.filenameResultPathSet);
+      const next = [...state.filenameResults];
+      for (const result of results) {
+        if (seen.has(result.path)) continue;
+        seen.add(result.path);
+        next.push(result);
+      }
+      return { filenameResults: next, filenameResultPathSet: seen };
+    });
+  },
+
+  clearFilenameSearch: () => {
+    const previousOp = get().filenameOperationId;
+    if (previousOp) {
+      explorerService.cancelFilenameSearch(previousOp).catch(() => {});
+    }
+    set({
+      filenameStatus: "idle",
+      filenameResults: [],
+      filenameResultPathSet: new Set<string>(),
+      filenameSummary: null,
+      filenameOperationId: null,
+    });
   },
 });

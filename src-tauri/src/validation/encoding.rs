@@ -20,7 +20,7 @@ pub fn detect_and_decode(raw_bytes: &[u8]) -> DecodeResult {
     // Check for BOM before decoding (encoding_rs removes BOM during decode)
     let has_bom = raw_bytes.starts_with(&[0xEF, 0xBB, 0xBF])       // UTF-8 BOM
         || raw_bytes.starts_with(&[0xFF, 0xFE])                      // UTF-16 LE BOM
-        || raw_bytes.starts_with(&[0xFE, 0xFF]);                     // UTF-16 BE BOM
+        || raw_bytes.starts_with(&[0xFE, 0xFF]); // UTF-16 BE BOM
 
     // Try UTF-8 decode first (fast path for most files).
     // encoding_rs::UTF_8.decode() handles BOM sniffing and removes BOM bytes.
@@ -39,9 +39,7 @@ pub fn detect_and_decode(raw_bytes: &[u8]) -> DecodeResult {
     if had_errors {
         // UTF-8 decoding produced replacement characters.
         // Use chardetng to detect the actual encoding.
-        let mut detector = chardetng::EncodingDetector::new(
-            chardetng::Iso2022JpDetection::Deny,
-        );
+        let mut detector = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Deny);
         detector.feed(raw_bytes, true);
         // Deny UTF-8 since we know UTF-8 decoding failed
         let detected = detector.guess(None, chardetng::Utf8Detection::Deny);
@@ -107,8 +105,7 @@ mod tests {
         let input: Vec<u8> = vec![
             b'H', b'e', b'l', b'l', b'o', b' ',
             0x93, // left double quotation mark in Windows-1252
-            b'w', b'o', b'r', b'l', b'd',
-            0x94, // right double quotation mark in Windows-1252
+            b'w', b'o', b'r', b'l', b'd', 0x94, // right double quotation mark in Windows-1252
         ];
         let result = detect_and_decode(&input);
         // Should detect as a non-UTF8 encoding and transcode

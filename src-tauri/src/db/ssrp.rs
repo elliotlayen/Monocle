@@ -184,8 +184,7 @@ mod tests {
 
     #[test]
     fn resolve_browser_addrs_parses_ip() {
-        let ipv4 =
-            resolve_browser_addrs("192.168.1.1").expect("expected IPv4 address to resolve");
+        let ipv4 = resolve_browser_addrs("192.168.1.1").expect("expected IPv4 address to resolve");
         assert_eq!(ipv4, vec!["192.168.1.1:1434".parse().unwrap()]);
 
         let loopback =

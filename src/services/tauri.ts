@@ -11,6 +11,7 @@ import type {
 import type {
   DirEntry,
   FileContent,
+  FilenameSearchSummary,
   ScanSummary,
   SearchSummary,
 } from "@/features/explorer/types";
@@ -88,6 +89,20 @@ export const tauri = {
       folderPaths,
       filePattern,
       scopeLabel,
+      operationId,
+    }),
+
+  // Filename search commands
+  filenameSearch: (
+    query: string,
+    folderPaths: string,
+    filePattern: string,
+    operationId: string
+  ) =>
+    invokeCommand<FilenameSearchSummary>("filename_search_cmd", {
+      query,
+      folderPaths,
+      filePattern,
       operationId,
     }),
 };

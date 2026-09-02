@@ -172,10 +172,18 @@ impl AppState {
         Ok(updated)
     }
 
-    pub fn toggle_favorite(&self, source_id: &str, client_name: &str) -> Result<AppSettings, String> {
+    pub fn toggle_favorite(
+        &self,
+        source_id: &str,
+        client_name: &str,
+    ) -> Result<AppSettings, String> {
         let mut settings = self.settings.lock().map_err(|e| e.to_string())?;
 
-        if let Some(source) = settings.folder_sources.iter_mut().find(|s| s.id == source_id) {
+        if let Some(source) = settings
+            .folder_sources
+            .iter_mut()
+            .find(|s| s.id == source_id)
+        {
             if let Some(pos) = source.favorites.iter().position(|f| f == client_name) {
                 source.favorites.remove(pos);
             } else {
@@ -188,7 +196,6 @@ impl AppState {
         self.save_settings()?;
         Ok(updated)
     }
-
 }
 
 #[cfg(test)]
@@ -233,7 +240,10 @@ mod tests {
         assert_eq!(settings.canvas_node_style.as_deref(), Some("tinted"));
         assert_eq!(settings.canvas_edge_label_mode.as_deref(), Some("never"));
         assert_eq!(settings.canvas_show_mini_map, Some(false));
-        assert_eq!(settings.canvas_detail_view_mode.as_deref(), Some("inspector"));
+        assert_eq!(
+            settings.canvas_detail_view_mode.as_deref(),
+            Some("inspector")
+        );
         assert_eq!(settings.explorer_node_style.as_deref(), Some("capsule"));
     }
 
@@ -289,11 +299,19 @@ mod tests {
             .expect("update settings");
 
         // Toggle on
-        let updated = state.toggle_favorite("src-1", "ClientX").expect("toggle on");
-        assert!(updated.folder_sources[0].favorites.contains(&"ClientX".to_string()));
+        let updated = state
+            .toggle_favorite("src-1", "ClientX")
+            .expect("toggle on");
+        assert!(updated.folder_sources[0]
+            .favorites
+            .contains(&"ClientX".to_string()));
 
         // Toggle off
-        let updated = state.toggle_favorite("src-1", "ClientX").expect("toggle off");
-        assert!(!updated.folder_sources[0].favorites.contains(&"ClientX".to_string()));
+        let updated = state
+            .toggle_favorite("src-1", "ClientX")
+            .expect("toggle off");
+        assert!(!updated.folder_sources[0]
+            .favorites
+            .contains(&"ClientX".to_string()));
     }
 }

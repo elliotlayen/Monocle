@@ -19,7 +19,7 @@ export interface UiSlice {
   setActiveView: (view: ExplorerView) => void;
 }
 
-export const createUiSlice: SliceCreator<UiSlice> = (set, get) => ({
+export const createUiSlice: SliceCreator<UiSlice> = (set) => ({
   sidebarOpen: true,
   sidebarWidth: 280,
   explorerNodeStyle: DEFAULT_EXPLORER_NODE_STYLE,
@@ -29,13 +29,6 @@ export const createUiSlice: SliceCreator<UiSlice> = (set, get) => ({
 
   setActiveView: (view: ExplorerView) => {
     set({ activeView: view, sidebarOpen: true });
-    // Keep searchMode in sync so content-search scoping (checkboxes,
-    // result panes) stays gated correctly during the transition period.
-    if (view === "search") {
-      get().setSearchMode("content");
-    } else if (view === "explorer") {
-      get().setSearchMode("filename");
-    }
   },
 
   setSidebarWidth: (width: number) => {

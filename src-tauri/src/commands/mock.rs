@@ -62,9 +62,26 @@ impl MockConfig {
 const SCHEMAS: [&str; 4] = ["dbo", "sales", "inventory", "hr"];
 
 const TABLE_PREFIXES: [&str; 20] = [
-    "Customer", "Order", "Product", "Category", "Employee", "Department", "Invoice", "Payment",
-    "Shipment", "Supplier", "Warehouse", "Stock", "Account", "Transaction", "Report", "Log",
-    "Audit", "Config", "Setting", "User",
+    "Customer",
+    "Order",
+    "Product",
+    "Category",
+    "Employee",
+    "Department",
+    "Invoice",
+    "Payment",
+    "Shipment",
+    "Supplier",
+    "Warehouse",
+    "Stock",
+    "Account",
+    "Transaction",
+    "Report",
+    "Log",
+    "Audit",
+    "Config",
+    "Setting",
+    "User",
 ];
 
 const TABLE_SUFFIXES: [&str; 10] = [
@@ -72,10 +89,36 @@ const TABLE_SUFFIXES: [&str; 10] = [
 ];
 
 const COLUMN_NAMES: [&str; 30] = [
-    "Id", "Name", "Description", "Status", "Type", "Code", "Value", "Amount", "Quantity", "Price",
-    "Date", "CreatedAt", "UpdatedAt", "DeletedAt", "IsActive", "IsDeleted", "Priority", "Sequence",
-    "Notes", "Comments", "Email", "Phone", "Address", "City", "Country", "PostalCode", "Rating",
-    "Score", "Level", "Version",
+    "Id",
+    "Name",
+    "Description",
+    "Status",
+    "Type",
+    "Code",
+    "Value",
+    "Amount",
+    "Quantity",
+    "Price",
+    "Date",
+    "CreatedAt",
+    "UpdatedAt",
+    "DeletedAt",
+    "IsActive",
+    "IsDeleted",
+    "Priority",
+    "Sequence",
+    "Notes",
+    "Comments",
+    "Email",
+    "Phone",
+    "Address",
+    "City",
+    "Country",
+    "PostalCode",
+    "Rating",
+    "Score",
+    "Level",
+    "Version",
 ];
 
 const DATA_TYPES: [&str; 10] = [
@@ -231,7 +274,8 @@ fn generate_views(tables: &[TableNode], config: &MockConfig) -> Vec<ViewNode> {
             let source_table_idx =
                 source_table_indices[simple_hash(i * 1000 + c, 22) % source_table_indices.len()];
             let source_table = &tables[source_table_idx];
-            let source_column = &source_table.columns[simple_hash(i * 1000 + c, 23) % source_table.columns.len()];
+            let source_column =
+                &source_table.columns[simple_hash(i * 1000 + c, 23) % source_table.columns.len()];
 
             columns.push(Column {
                 name: format!("{}_{}_{}", source_table.name, source_column.name, c + 1),
@@ -315,7 +359,15 @@ fn generate_triggers(tables: &[TableNode], config: &MockConfig) -> Vec<Trigger> 
 
 fn generate_procedures(tables: &[TableNode], config: &MockConfig) -> Vec<StoredProcedure> {
     let mut procedures = Vec::with_capacity(config.procedures);
-    let proc_prefixes = ["Get", "Update", "Delete", "Insert", "Calculate", "Process", "Validate"];
+    let proc_prefixes = [
+        "Get",
+        "Update",
+        "Delete",
+        "Insert",
+        "Calculate",
+        "Process",
+        "Validate",
+    ];
 
     for i in 0..config.procedures {
         let schema_idx = i % SCHEMAS.len();
@@ -380,14 +432,14 @@ fn generate_procedures(tables: &[TableNode], config: &MockConfig) -> Vec<StoredP
 
 fn generate_functions(tables: &[TableNode], config: &MockConfig) -> Vec<ScalarFunction> {
     let mut functions = Vec::with_capacity(config.functions);
-    let fn_prefixes = ["fn_Get", "fn_Calculate", "fn_Format", "fn_Validate", "fn_Convert"];
-    let return_types = [
-        "int",
-        "decimal(18,2)",
-        "nvarchar(100)",
-        "bit",
-        "datetime2",
+    let fn_prefixes = [
+        "fn_Get",
+        "fn_Calculate",
+        "fn_Format",
+        "fn_Validate",
+        "fn_Convert",
     ];
+    let return_types = ["int", "decimal(18,2)", "nvarchar(100)", "bit", "datetime2"];
 
     for i in 0..config.functions {
         let schema_idx = i % SCHEMAS.len();
@@ -636,8 +688,7 @@ mod tests {
                 object_ids.insert(function.id.clone());
             }
 
-            let edges =
-                collect_generated_edges(&relationships, &triggers, &procedures, &functions);
+            let edges = collect_generated_edges(&relationships, &triggers, &procedures, &functions);
 
             let mut seen_edge_ids = HashSet::new();
             for (edge_id, source, target) in edges {

@@ -803,6 +803,188 @@ pub async fn content_search_cmd(
     Ok(result)
 }
 
+// -- Filename search --
+
+/// Filename searches stop after this many matches; refine the query instead.
+const FILENAME_SEARCH_RESULT_CAP: u32 = 500;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilenameResultPayload {
+    pub path: String,
+    pub name: String,
+    pub is_dir: bool,
+    pub parent_folder: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilenameResultsBatchPayload {
+    pub operation_id: String,
+    pub results: Vec<FilenameResultPayload>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilenameSearchSummary {
+    pub query: String,
+    pub total_matched: u32,
+    pub truncated: bool,
+    pub cancelled: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn filename_search_worker(
+    app: AppHandle,
+    paths: Vec<String>,
+    pattern: Pattern,
+    query: String,
+    operation_id: String,
+    cancel_token: CancellationToken,
+) -> FilenameSearchSummary {
+    let query_lower = query.to_lowercase();
+    let mut pending: Vec<FilenameResultPayload> = Vec::new();
+    let mut last_emit = Instant::now();
+    let mut total: u32 = 0;
+    let mut truncated = false;
+    let mut cancelled = false;
+
+    let flush =
+        |pending: &mut Vec<FilenameResultPayload>, last_emit: &mut Instant, force: bool| {
+            if pending.is_empty() {
+                return;
+            }
+            let batch_full = pending.len() >= SEARCH_RESULT_BATCH_SIZE;
+            if !force && !batch_full && last_emit.elapsed() < SEARCH_RESULT_BATCH_INTERVAL {
+                return;
+            }
+            let payload = FilenameResultsBatchPayload {
+                operation_id: operation_id.clone(),
+                results: std::mem::take(pending),
+            };
+            let _ = app.emit("filename-results-batch", payload);
+            *last_emit = Instant::now();
+        };
+
+    'roots: for root in &paths {
+        match std::fs::metadata(root) {
+            Ok(m) if m.is_dir() => {}
+            _ => continue,
+        }
+
+        let mut builder = WalkBuilder::new(root);
+        builder
+            .hidden(false)
+            .parents(false)
+            .ignore(false)
+            .git_ignore(false)
+            .git_global(false)
+            .git_exclude(false)
+            .follow_links(false);
+
+        for entry_result in builder.build() {
+            if cancel_token.is_cancelled() {
+                cancelled = true;
+                break 'roots;
+            }
+            let entry = match entry_result {
+                Ok(entry) => entry,
+                Err(_) => continue,
+            };
+            if entry.depth() == 0 {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str() else {
+                continue;
+            };
+            let is_dir = entry
+                .file_type()
+                .map(|file_type| file_type.is_dir())
+                .unwrap_or(false);
+            if !name.to_lowercase().contains(&query_lower) {
+                continue;
+            }
+            // The file pattern gates files only; folders match on name alone.
+            if !is_dir && !pattern.matches(name) {
+                continue;
+            }
+
+            total = total.saturating_add(1);
+            pending.push(FilenameResultPayload {
+                path: entry.path().to_string_lossy().to_string(),
+                name: name.to_string(),
+                is_dir,
+                parent_folder: entry
+                    .path()
+                    .parent()
+                    .map(|parent| parent.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+            });
+            flush(&mut pending, &mut last_emit, false);
+
+            if total >= FILENAME_SEARCH_RESULT_CAP {
+                truncated = true;
+                break 'roots;
+            }
+        }
+    }
+
+    flush(&mut pending, &mut last_emit, true);
+
+    FilenameSearchSummary {
+        query,
+        total_matched: total,
+        truncated,
+        cancelled: cancelled || cancel_token.is_cancelled(),
+    }
+}
+
+#[tauri::command]
+pub async fn filename_search_cmd(
+    app: AppHandle,
+    query: String,
+    folder_paths: String,
+    file_pattern: String,
+    operation_id: String,
+    explorer_state: State<'_, ExplorerState>,
+) -> Result<FilenameSearchSummary, String> {
+    if query.trim().is_empty() {
+        return Err("Search query is empty".to_string());
+    }
+
+    let paths: Vec<String> = serde_json::from_str(&folder_paths)
+        .map_err(|e| format!("Invalid folder_paths JSON: {}", e))?;
+
+    let pattern = Pattern::new(&file_pattern)
+        .map_err(|e| format!("Invalid file pattern '{}': {}", file_pattern, e))?;
+
+    let cancel_token = CancellationToken::new();
+    let token_clone = cancel_token.clone();
+
+    {
+        let mut listings = explorer_state
+            .active_listings
+            .lock()
+            .map_err(|e| e.to_string())?;
+        listings.insert(operation_id.clone(), cancel_token);
+    }
+
+    let op_id = operation_id.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        filename_search_worker(app, paths, pattern, query, operation_id, token_clone)
+    })
+    .await
+    .map_err(|e| format!("Filename search task failed: {}", e))?;
+
+    // Clean up active listing
+    if let Ok(mut listings) = explorer_state.active_listings.lock() {
+        listings.remove(&op_id);
+    }
+
+    Ok(result)
+}
+
 // -- Bulk scan types and commands --
 
 #[derive(Clone, Serialize)]
