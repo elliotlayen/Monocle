@@ -26,7 +26,7 @@ interface FileTypePickerProps {
 
 /**
  * Checkbox dropdown over the supported file types; composes the glob
- * pattern the store and backend keep working with. "All files" mirrors the
+ * pattern the store and backend keep working with. "All types" mirrors the
  * type checkboxes: it checks (and greys out) when every type is checked,
  * and checking it checks every type. A legacy hand-typed pattern shows as
  * a custom entry until a type is picked.
@@ -100,7 +100,7 @@ export function FileTypePicker({
           onSelect={(e) => e.preventDefault()}
           onCheckedChange={() => onChange("*")}
         >
-          All files
+          All types
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>

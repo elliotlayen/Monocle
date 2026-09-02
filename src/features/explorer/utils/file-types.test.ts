@@ -66,8 +66,8 @@ describe("fileTypeSummary", () => {
     expect(fileTypeSummary("*.xml,*.json,*.csv")).toBe("XML +2");
   });
 
-  it("labels all files and passes custom globs through", () => {
-    expect(fileTypeSummary("*")).toBe("All files");
+  it("labels all types and passes custom globs through", () => {
+    expect(fileTypeSummary("*")).toBe("All types");
     expect(fileTypeSummary("ORD_*.xml")).toBe("ORD_*.xml");
   });
 });

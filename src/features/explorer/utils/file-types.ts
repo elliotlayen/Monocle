@@ -61,7 +61,7 @@ export function typeIdsToPattern(ids: string[]): string {
 export function fileTypeSummary(pattern: string): string {
   const ids = patternToTypeIds(pattern);
   if (!ids) return pattern;
-  if (coversAllTypes(ids)) return "All files";
+  if (coversAllTypes(ids)) return "All types";
   const labels = FILE_TYPE_OPTIONS.filter((o) => ids.includes(o.id)).map(
     (o) => o.label
   );
