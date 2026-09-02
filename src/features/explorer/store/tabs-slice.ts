@@ -1,3 +1,4 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import type {
   FileTab,
   ViewMode,
@@ -6,6 +7,7 @@ import type {
 } from "../types";
 import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
+import { formatFileSize } from "../utils/file-size-format";
 import { disambiguateTabNames } from "../utils/tab-disambiguator";
 import { parseXml } from "../utils/xml-parser";
 import { appendBounded, VALIDATION_CACHE_MAX } from "./bounded-cache";
@@ -13,6 +15,11 @@ import type { SliceCreator } from "./store-types";
 
 /** Most-recently-opened file paths kept for quick-open. */
 const RECENT_FILES_MAX = 50;
+
+/** Files above this open in source view only, after confirmation. */
+const LARGE_FILE_CONFIRM_BYTES = 5 * 1024 * 1024;
+/** Files above this are refused (matches the backend scan cap). */
+const MAX_OPEN_FILE_BYTES = 50 * 1024 * 1024;
 
 export interface TabsSlice {
   tabs: FileTab[];
@@ -83,6 +90,32 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
     const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
     const isXml = /\.xml$/i.test(fileName);
 
+    // Size-gate before pulling content over the wire. A failed stat falls
+    // through; read_file_cmd will surface any real error.
+    let sourceOnly = false;
+    try {
+      const stat = await explorerService.fileStat(filePath);
+      if (stat.size > MAX_OPEN_FILE_BYTES) {
+        showToast({
+          type: "error",
+          title: "File too large to open",
+          message: `${fileName} is ${formatFileSize(stat.size)}; the limit is ${formatFileSize(MAX_OPEN_FILE_BYTES)}`,
+          duration: 5000,
+        });
+        return;
+      }
+      if (stat.size > LARGE_FILE_CONFIRM_BYTES) {
+        const proceed = await confirm(
+          `${fileName} is ${formatFileSize(stat.size)}. Open it in source view only? The XML tree and formatting are disabled for large files.`,
+          { title: "Large file", kind: "warning" }
+        );
+        if (!proceed) return;
+        sourceOnly = true;
+      }
+    } catch {
+      // Stat is a best-effort optimization; proceed without it.
+    }
+
     // Create new tab with loading state
     const newTab: FileTab = {
       id: filePath,
@@ -100,6 +133,7 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
       problems: [],
       encoding: "",
       hasBom: false,
+      sourceOnly,
     };
 
     const updatedTabs = recomputeTabNames([...tabs, newTab]);
@@ -116,7 +150,7 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
       if (tabIndex === -1) return;
 
       let parseError = false;
-      if (isXml) {
+      if (isXml && !sourceOnly) {
         const parseResult = parseXml(result.content);
         parseError = parseResult.error !== null;
       }

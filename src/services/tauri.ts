@@ -11,6 +11,7 @@ import type {
 import type {
   DirEntry,
   FileContent,
+  FileStat,
   FilenameSearchSummary,
   ScanSummary,
   SearchSummary,
@@ -65,6 +66,7 @@ export const tauri = {
     invokeCommand<AppSettings>("toggle_favorite_cmd", { sourceId, clientName }),
   readFile: (path: string) =>
     invokeCommand<FileContent>("read_file_cmd", { path }),
+  fileStat: (path: string) => invokeCommand<FileStat>("file_stat_cmd", { path }),
 
   // Bulk scan commands
   bulkScan: (folderPath: string, filePattern: string, operationId: string) =>

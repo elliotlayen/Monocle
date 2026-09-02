@@ -2,6 +2,7 @@ import { tauri } from "@/services/tauri";
 import type {
   DirEntry,
   FileContent,
+  FileStat,
   FilenameSearchSummary,
   ScanSummary,
   SearchSummary,
@@ -24,6 +25,8 @@ export const explorerService = {
   ): Promise<AppSettings> => tauri.toggleFavorite(sourceId, clientName),
 
   readFile: (path: string): Promise<FileContent> => tauri.readFile(path),
+
+  fileStat: (path: string): Promise<FileStat> => tauri.fileStat(path),
 
   bulkScan: (
     folderPath: string,

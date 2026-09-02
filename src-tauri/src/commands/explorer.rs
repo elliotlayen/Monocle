@@ -163,6 +163,29 @@ pub async fn read_file_cmd(path: String) -> Result<FileContent, String> {
     .map_err(|e| format!("File read task failed: {}", e))?
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileStat {
+    pub size: u64,
+    pub is_dir: bool,
+}
+
+/// Cheap metadata lookup so the frontend can size-gate file opens before
+/// pulling content over the wire.
+#[tauri::command]
+pub async fn file_stat_cmd(path: String) -> Result<FileStat, String> {
+    tokio::task::spawn_blocking(move || {
+        std::fs::metadata(&path)
+            .map(|m| FileStat {
+                size: m.len(),
+                is_dir: m.is_dir(),
+            })
+            .map_err(|e| format!("Failed to stat '{}': {}", path, e))
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?
+}
+
 #[tauri::command]
 pub async fn check_path_reachable(path: String) -> Result<bool, String> {
     let result = tokio::task::spawn_blocking(move || std::fs::metadata(&path).is_ok())

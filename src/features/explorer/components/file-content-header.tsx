@@ -46,7 +46,8 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
         </span>
       </div>
 
-      {/* Format XML toggle -- visible for XML files, disabled in tree view */}
+      {/* Format XML toggle -- visible for XML files, disabled in tree view
+          and for large source-only files */}
       {tab.isXml && onToggleFormat && (
         <TooltipProvider>
           <Tooltip>
@@ -57,16 +58,29 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
                 className={cn(
                   "h-7 w-7",
                   isFormatted && tab.viewMode === "source" && "bg-accent",
-                  tab.viewMode !== "source" && "opacity-40 cursor-not-allowed"
+                  (tab.viewMode !== "source" || tab.sourceOnly) &&
+                    "opacity-40 cursor-not-allowed"
                 )}
-                onClick={tab.viewMode === "source" ? onToggleFormat : undefined}
-                disabled={tab.viewMode !== "source"}
+                onClick={
+                  tab.viewMode === "source" && !tab.sourceOnly
+                    ? onToggleFormat
+                    : undefined
+                }
+                disabled={tab.viewMode !== "source" || tab.sourceOnly}
               >
                 <WrapText className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{tab.viewMode !== "source" ? "Format XML (source view only)" : isFormatted ? "Show raw XML" : "Format XML (line numbers refer to original)"}</p>
+              <p>
+                {tab.sourceOnly
+                  ? "Formatting is disabled for large files"
+                  : tab.viewMode !== "source"
+                    ? "Format XML (source view only)"
+                    : isFormatted
+                      ? "Show raw XML"
+                      : "Format XML (line numbers refer to original)"}
+              </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -147,23 +161,29 @@ export function FileContentHeader({ tab, isFormatted, onToggleFormat, onExpandAl
                     tab.viewMode === "tree"
                       ? "bg-background shadow-sm"
                       : "text-muted-foreground hover:text-foreground",
-                    tab.parseError && tab.viewMode !== "tree" && "opacity-50 cursor-not-allowed"
+                    (tab.parseError || tab.sourceOnly) &&
+                      tab.viewMode !== "tree" &&
+                      "opacity-50 cursor-not-allowed"
                   )}
                   onClick={() => {
-                    if (!tab.parseError) {
+                    if (!tab.parseError && !tab.sourceOnly) {
                       setViewMode(tab.id, "tree");
                     }
                   }}
-                  disabled={tab.parseError}
+                  disabled={tab.parseError || tab.sourceOnly}
                   aria-pressed={tab.viewMode === "tree"}
                 >
                   <TreePine className="h-3.5 w-3.5" />
                   Tree
                 </button>
               </TooltipTrigger>
-              {tab.parseError && (
+              {(tab.parseError || tab.sourceOnly) && (
                 <TooltipContent>
-                  <p>Unable to parse XML</p>
+                  <p>
+                    {tab.sourceOnly
+                      ? "Tree view is disabled for large files"
+                      : "Unable to parse XML"}
+                  </p>
                 </TooltipContent>
               )}
             </Tooltip>

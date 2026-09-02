@@ -16,10 +16,18 @@ vi.mock("./services/explorer-service", () => ({
       encoding: "UTF-8",
       hasBom: false,
     }),
+    fileStat: vi.fn().mockResolvedValue({ size: 7, isDir: false }),
     bulkScan: vi.fn(),
     cancelScan: vi.fn(),
     contentSearch: vi.fn(),
+    filenameSearch: vi.fn(),
+    cancelFilenameSearch: vi.fn(),
+    cancelContentSearch: vi.fn(),
   },
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  confirm: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/features/settings/services/settings-service", async () => {

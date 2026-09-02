@@ -50,6 +50,11 @@ export interface FileContent {
   hasBom: boolean;
 }
 
+export interface FileStat {
+  size: number;
+  isDir: boolean;
+}
+
 export interface FileTab {
   id: string;
   filePath: string;
@@ -68,6 +73,8 @@ export interface FileTab {
   encoding: string;
   hasBom: boolean;
   isScanResult?: boolean;
+  /** Large files open in source view only (no XML tree, no formatting). */
+  sourceOnly?: boolean;
 }
 
 // Bulk scan types
