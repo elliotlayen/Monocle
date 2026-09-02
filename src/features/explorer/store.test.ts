@@ -717,3 +717,99 @@ describe("explorer store - node style setting", () => {
     });
   });
 });
+
+describe("explorer store - revealSearchResults", () => {
+  const makeNode = (
+    id: string,
+    path: string,
+    type: "source" | "folder",
+    name: string
+  ) => ({
+    id,
+    path,
+    name,
+    type,
+    children: [] as never[],
+    loadState: "loaded" as const,
+    isDir: true,
+  });
+
+  const seedTree = () => {
+    const nodes = new Map();
+    nodes.set("s1", makeNode("s1", "/root", "source", "Root"));
+    nodes.set("/root/a", makeNode("/root/a", "/root/a", "folder", "a"));
+    nodes.set("/root/a/b", makeNode("/root/a/b", "/root/a/b", "folder", "b"));
+    useExplorerStore.setState({
+      folderSources: [
+        { id: "s1", path: "/root", label: "Root", tag: "", favorites: [] },
+      ],
+      treeNodes: nodes,
+      expandedIds: new Set(),
+      selectedPath: null,
+      loadedFileIndex: new Map(),
+      scopePaths: new Set(),
+    });
+  };
+
+  it("expands ancestors of content results without changing selection", async () => {
+    seedTree();
+    useExplorerStore.setState({
+      lastRun: "content",
+      searchResults: [
+        {
+          filePath: "/root/a/b/f.xml",
+          fileName: "f.xml",
+          parentFolder: "/root/a/b",
+          matchCount: 1,
+          matches: [],
+          operationId: "op",
+        },
+      ],
+      filenameResults: [],
+    });
+
+    await useExplorerStore.getState().revealSearchResults();
+
+    const { expandedIds, selectedPath } = useExplorerStore.getState();
+    expect(expandedIds.has("s1")).toBe(true);
+    expect(expandedIds.has("/root/a")).toBe(true);
+    expect(expandedIds.has("/root/a/b")).toBe(true);
+    expect(selectedPath).toBe(null);
+  });
+
+  it("expands ancestors of streamed filename results", async () => {
+    seedTree();
+    useExplorerStore.setState({
+      lastRun: "filename",
+      filenameQuery: "f",
+      searchResults: [],
+      filenameResults: [
+        {
+          path: "/root/a/b/f.xml",
+          name: "f.xml",
+          isDir: false,
+          parentFolder: "/root/a/b",
+        },
+      ],
+    });
+
+    await useExplorerStore.getState().revealSearchResults();
+
+    const { expandedIds } = useExplorerStore.getState();
+    expect(expandedIds.has("/root/a")).toBe(true);
+    expect(expandedIds.has("/root/a/b")).toBe(true);
+  });
+
+  it("does nothing when no search has run", async () => {
+    seedTree();
+    useExplorerStore.setState({
+      lastRun: null,
+      searchResults: [],
+      filenameResults: [],
+    });
+
+    await useExplorerStore.getState().revealSearchResults();
+
+    expect(useExplorerStore.getState().expandedIds.size).toBe(0);
+  });
+});

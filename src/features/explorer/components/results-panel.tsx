@@ -162,7 +162,11 @@ export function ResultsPanel({
                 : "text-muted-foreground hover:text-foreground"
             )}
             aria-pressed={showBrowse}
-            onClick={() => setResultsPanelMode("browse")}
+            onClick={() => {
+              setResultsPanelMode("browse");
+              // Expose the files behind the current results in the tree.
+              void useExplorerStore.getState().revealSearchResults();
+            }}
           >
             Browse
           </button>

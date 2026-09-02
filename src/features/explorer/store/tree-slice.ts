@@ -7,6 +7,10 @@ import {
   DEFAULT_EXPLORER_NODE_STYLE,
 } from "@/features/settings/services/settings-service";
 import type { DateRange, SliceCreator } from "./store-types";
+import { loadedFilenameMatches } from "./selectors";
+
+/** Most result files whose ancestor folders auto-expand on Browse switch. */
+const REVEAL_RESULTS_LIMIT = 30;
 
 export interface TreeSlice {
   folderSources: FolderSource[];
@@ -37,6 +41,10 @@ export interface TreeSlice {
   setFocusedPath: (path: string | null) => void;
   /** Expand every ancestor of a path (loading as needed) and select it. */
   revealPath: (path: string) => Promise<void>;
+  /** Expand ancestors of a path (loading as needed) without selecting. */
+  expandAncestors: (path: string) => Promise<void>;
+  /** Expand the tree to expose every file in the active search results. */
+  revealSearchResults: () => Promise<void>;
 }
 
 function buildChildNodes(
@@ -428,6 +436,11 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   setFocusedPath: (path: string | null) => set({ focusedPath: path }),
 
   revealPath: async (path: string) => {
+    await get().expandAncestors(path);
+    set({ selectedPath: path });
+  },
+
+  expandAncestors: async (path: string) => {
     const { folderSources } = get();
     const source = folderSources.find((s) => belongsToSource(path, s));
     if (!source) return;
@@ -458,7 +471,39 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
         if (get().treeNodes.get(id)?.loadState !== "loaded") return;
       }
     }
+  },
 
-    set({ selectedPath: path });
+  revealSearchResults: async () => {
+    const state = get();
+    const paths = new Set<string>();
+    if (state.lastRun === "content") {
+      for (const result of state.searchResults) paths.add(result.filePath);
+    } else if (state.lastRun === "filename") {
+      for (const result of state.filenameResults) {
+        if (!result.isDir) paths.add(result.path);
+      }
+      // Matches from already-loaded files count as results too; make sure
+      // their folders open even when the disk search returned nothing new.
+      const loaded = loadedFilenameMatches({
+        loadedFileIndex: state.loadedFileIndex,
+        treeNodes: state.treeNodes,
+        scopePaths: state.scopePaths,
+        query: state.filenameQuery,
+        options: {
+          regex: state.searchRegex,
+          caseSensitive: state.searchCaseSensitive,
+        },
+      });
+      for (const match of loaded) {
+        if (!match.isDir) paths.add(match.path);
+      }
+    }
+
+    let revealed = 0;
+    for (const path of paths) {
+      if (revealed >= REVEAL_RESULTS_LIMIT) break;
+      revealed += 1;
+      await get().expandAncestors(path);
+    }
   },
 });
