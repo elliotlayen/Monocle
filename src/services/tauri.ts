@@ -69,10 +69,18 @@ export const tauri = {
   fileStat: (path: string) => invokeCommand<FileStat>("file_stat_cmd", { path }),
 
   // Bulk scan commands
-  bulkScan: (folderPath: string, filePattern: string, operationId: string) =>
+  bulkScan: (
+    folderPath: string,
+    filePattern: string,
+    dateFrom: string | null,
+    dateTo: string | null,
+    operationId: string
+  ) =>
     invokeCommand<ScanSummary>("bulk_scan_cmd", {
       folderPath,
       filePattern,
+      dateFrom,
+      dateTo,
       operationId,
     }),
   cancelScan: (operationId: string) =>
@@ -107,12 +115,20 @@ export const tauri = {
     query: string,
     folderPaths: string,
     filePattern: string,
+    regex: boolean,
+    caseSensitive: boolean,
+    dateFrom: string | null,
+    dateTo: string | null,
     operationId: string
   ) =>
     invokeCommand<FilenameSearchSummary>("filename_search_cmd", {
       query,
       folderPaths,
       filePattern,
+      regex,
+      caseSensitive,
+      dateFrom,
+      dateTo,
       operationId,
     }),
 };

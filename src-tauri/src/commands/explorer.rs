@@ -950,16 +950,69 @@ pub struct FilenameSearchSummary {
     pub cancelled: bool,
 }
 
+/// Matches file/folder names for filename search.
+enum NameMatcher {
+    Substring {
+        /// Pre-lowercased unless case-sensitive.
+        query: String,
+        case_sensitive: bool,
+    },
+    Pattern(Regex),
+}
+
+impl NameMatcher {
+    fn matches(&self, name: &str) -> bool {
+        match self {
+            NameMatcher::Substring {
+                query,
+                case_sensitive,
+            } => {
+                if *case_sensitive {
+                    name.contains(query.as_str())
+                } else {
+                    name.to_lowercase().contains(query.as_str())
+                }
+            }
+            NameMatcher::Pattern(pattern) => pattern.is_match(name),
+        }
+    }
+}
+
+fn build_name_matcher(
+    query: &str,
+    regex: bool,
+    case_sensitive: bool,
+) -> Result<NameMatcher, String> {
+    if regex {
+        let pattern = RegexBuilder::new(query)
+            .case_insensitive(!case_sensitive)
+            .build()
+            .map_err(|e| format!("Invalid regular expression: {}", e))?;
+        Ok(NameMatcher::Pattern(pattern))
+    } else {
+        Ok(NameMatcher::Substring {
+            query: if case_sensitive {
+                query.to_string()
+            } else {
+                query.to_lowercase()
+            },
+            case_sensitive,
+        })
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn filename_search_worker(
     app: AppHandle,
     paths: Vec<String>,
     pattern: Pattern,
+    matcher: NameMatcher,
     query: String,
+    date_from: Option<String>,
+    date_to: Option<String>,
     operation_id: String,
     cancel_token: CancellationToken,
 ) -> FilenameSearchSummary {
-    let query_lower = query.to_lowercase();
     let mut pending: Vec<FilenameResultPayload> = Vec::new();
     let mut last_emit = Instant::now();
     let mut total: u32 = 0;
@@ -997,6 +1050,21 @@ fn filename_search_worker(
             .git_global(false)
             .git_exclude(false)
             .follow_links(false);
+        let (from, to) = (date_from.clone(), date_to.clone());
+        builder.filter_entry(move |entry| {
+            if entry.depth() == 0 {
+                return true;
+            }
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            if !is_dir {
+                return true;
+            }
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| date_segment_in_range(name, &from, &to))
+                .unwrap_or(true)
+        });
 
         for entry_result in builder.build() {
             if cancel_token.is_cancelled() {
@@ -1017,7 +1085,7 @@ fn filename_search_worker(
                 .file_type()
                 .map(|file_type| file_type.is_dir())
                 .unwrap_or(false);
-            if !name.to_lowercase().contains(&query_lower) {
+            if !matcher.matches(name) {
                 continue;
             }
             // The file pattern gates files only; folders match on name alone.
@@ -1056,17 +1124,23 @@ fn filename_search_worker(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn filename_search_cmd(
     app: AppHandle,
     query: String,
     folder_paths: String,
     file_pattern: String,
+    regex: bool,
+    case_sensitive: bool,
+    date_from: Option<String>,
+    date_to: Option<String>,
     operation_id: String,
     explorer_state: State<'_, ExplorerState>,
 ) -> Result<FilenameSearchSummary, String> {
     if query.trim().is_empty() {
         return Err("Search query is empty".to_string());
     }
+    let matcher = build_name_matcher(&query, regex, case_sensitive)?;
 
     let paths: Vec<String> = serde_json::from_str(&folder_paths)
         .map_err(|e| format!("Invalid folder_paths JSON: {}", e))?;
@@ -1088,7 +1162,17 @@ pub async fn filename_search_cmd(
     let op_id = operation_id.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        filename_search_worker(app, paths, pattern, query, operation_id, token_clone)
+        filename_search_worker(
+            app,
+            paths,
+            pattern,
+            matcher,
+            query,
+            date_from,
+            date_to,
+            operation_id,
+            token_clone,
+        )
     })
     .await
     .map_err(|e| format!("Filename search task failed: {}", e))?;
@@ -1243,6 +1327,8 @@ pub async fn bulk_scan_cmd(
     app: AppHandle,
     folder_path: String,
     file_pattern: String,
+    date_from: Option<String>,
+    date_to: Option<String>,
     operation_id: String,
     explorer_state: State<'_, ExplorerState>,
 ) -> Result<ScanSummary, String> {
@@ -1342,7 +1428,20 @@ pub async fn bulk_scan_cmd(
                 *last_batch_emit_time = std::time::Instant::now();
             };
 
-        for entry_result in WalkDir::new(&folder_path_clone).into_iter() {
+        let (from, to) = (date_from.clone(), date_to.clone());
+        let walker = WalkDir::new(&folder_path_clone)
+            .into_iter()
+            .filter_entry(move |entry| {
+                if entry.depth() == 0 || !entry.file_type().is_dir() {
+                    return true;
+                }
+                entry
+                    .file_name()
+                    .to_str()
+                    .map(|name| date_segment_in_range(name, &from, &to))
+                    .unwrap_or(true)
+            });
+        for entry_result in walker {
             if token_clone.is_cancelled() {
                 cancelled = true;
                 break;
@@ -1660,6 +1759,21 @@ mod tests {
     #[test]
     fn test_invalid_regex_is_rejected() {
         assert!(build_regex_matcher("[unclosed", false).is_err());
+        assert!(build_name_matcher("[unclosed", true, false).is_err());
+    }
+
+    #[test]
+    fn test_name_matcher_modes() {
+        let plain = build_name_matcher("Order", false, false).unwrap();
+        assert!(plain.matches("my_ORDER_file.xml"));
+
+        let cased = build_name_matcher("Order", false, true).unwrap();
+        assert!(cased.matches("Order_1.xml"));
+        assert!(!cased.matches("my_ORDER_file.xml"));
+
+        let pattern = build_name_matcher(r"^ORD_\d{8}", true, false).unwrap();
+        assert!(pattern.matches("ord_20260901_1042.xml"));
+        assert!(!pattern.matches("SHP_20260901.xml"));
     }
 
     #[test]

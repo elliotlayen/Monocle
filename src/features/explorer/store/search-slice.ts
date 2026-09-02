@@ -339,10 +339,15 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
     });
 
     try {
+      const { searchRegex, searchCaseSensitive, dateRange } = get();
       const summary = await explorerService.filenameSearch(
         query,
         JSON.stringify(folderPaths),
         get().searchFilePattern,
+        searchRegex,
+        searchCaseSensitive,
+        toIsoDate(dateRange?.from),
+        toIsoDate(dateRange?.to),
         operationId
       );
       // Ignore completions from superseded operations

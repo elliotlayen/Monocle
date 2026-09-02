@@ -11,6 +11,7 @@ import { showToast } from "@/features/notifications/store";
 import { computeAggregateBadges } from "../utils/badge-aggregation";
 import { appendBounded, VALIDATION_CACHE_MAX } from "./bounded-cache";
 import { recomputeTabNames } from "./tabs-slice";
+import { toIsoDate } from "./search-slice";
 import type { SliceCreator } from "./store-types";
 
 export interface ScanSlice {
@@ -91,9 +92,12 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
     });
 
     try {
+      const { dateRange } = get();
       const summary = await explorerService.bulkScan(
         folderPath,
         filePattern,
+        toIsoDate(dateRange?.from),
+        toIsoDate(dateRange?.to),
         operationId
       );
 

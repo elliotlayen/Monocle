@@ -31,8 +31,11 @@ export const explorerService = {
   bulkScan: (
     folderPath: string,
     filePattern: string,
+    dateFrom: string | null,
+    dateTo: string | null,
     operationId: string
-  ): Promise<ScanSummary> => tauri.bulkScan(folderPath, filePattern, operationId),
+  ): Promise<ScanSummary> =>
+    tauri.bulkScan(folderPath, filePattern, dateFrom, dateTo, operationId),
 
   cancelScan: (operationId: string): Promise<void> =>
     tauri.cancelScan(operationId),
@@ -70,9 +73,22 @@ export const explorerService = {
     query: string,
     folderPaths: string,
     filePattern: string,
+    regex: boolean,
+    caseSensitive: boolean,
+    dateFrom: string | null,
+    dateTo: string | null,
     operationId: string
   ): Promise<FilenameSearchSummary> =>
-    tauri.filenameSearch(query, folderPaths, filePattern, operationId),
+    tauri.filenameSearch(
+      query,
+      folderPaths,
+      filePattern,
+      regex,
+      caseSensitive,
+      dateFrom,
+      dateTo,
+      operationId
+    ),
 
   // Shares the backend cancellation map with cancelScan (see above).
   cancelFilenameSearch: (operationId: string): Promise<void> =>
