@@ -9,7 +9,13 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useExplorerStore } from "../store";
-import { flattenTree, type TreeNodeRow } from "../store/selectors";
+import {
+  flattenTree,
+  loadedFilenameMatches,
+  resultsMatchIndex,
+  tintRunFlags,
+  type TreeNodeRow,
+} from "../store/selectors";
 import { useFileActions } from "../hooks/use-file-actions";
 import { FolderTreeRow, treeRowDomId } from "./folder-tree-node";
 
@@ -32,6 +38,13 @@ export function FolderTree() {
     folderBadgeCache,
     validationCache,
     selectedPath,
+    scopePaths,
+    lastRun,
+    searchResults,
+    filenameResults,
+    filenameQuery,
+    searchRegex,
+    searchCaseSensitive,
   } = useExplorerStore(
     useShallow((state) => ({
       folderSources: state.folderSources,
@@ -45,6 +58,13 @@ export function FolderTree() {
       folderBadgeCache: state.folderBadgeCache,
       validationCache: state.validationCache,
       selectedPath: state.selectedPath,
+      scopePaths: state.scopePaths,
+      lastRun: state.lastRun,
+      searchResults: state.searchResults,
+      filenameResults: state.filenameResults,
+      filenameQuery: state.filenameQuery,
+      searchRegex: state.searchRegex,
+      searchCaseSensitive: state.searchCaseSensitive,
     }))
   );
 
@@ -85,6 +105,47 @@ export function FolderTree() {
       favoritesCollapsed,
       folderBadgeCache,
       validationCache,
+    ]
+  );
+
+  // Indicator inputs: connected-tint flags per row and a path -> label map
+  // for files present in the active results. Both are pure and memoized so
+  // virtualized rows only re-render when their own props change.
+  const scopeActive = scopePaths.size > 0;
+  const tintFlags = useMemo(
+    () => tintRunFlags(rows, scopePaths),
+    [rows, scopePaths]
+  );
+  const matchIndex = useMemo(
+    () =>
+      resultsMatchIndex({
+        lastRun,
+        searchResults,
+        filenameResults,
+        loadedMatches:
+          lastRun === "filename"
+            ? loadedFilenameMatches({
+                loadedFileIndex,
+                treeNodes,
+                scopePaths,
+                query: filenameQuery,
+                options: {
+                  regex: searchRegex,
+                  caseSensitive: searchCaseSensitive,
+                },
+              })
+            : [],
+      }),
+    [
+      lastRun,
+      searchResults,
+      filenameResults,
+      loadedFileIndex,
+      treeNodes,
+      scopePaths,
+      filenameQuery,
+      searchRegex,
+      searchCaseSensitive,
     ]
   );
 
@@ -167,6 +228,9 @@ export function FolderTree() {
   const handleRetry = useCallback((row: TreeNodeRow) => {
     useExplorerStore.getState().expandNode(row.id);
   }, []);
+  const handleToggleScope = useCallback((row: TreeNodeRow) => {
+    useExplorerStore.getState().toggleScopePath(row.path);
+  }, []);
   const handleFavoritesToggle = useCallback((sourceId: string) => {
     setFavoritesCollapsed((prev) => {
       const next = new Set(prev);
@@ -199,7 +263,11 @@ export function FolderTree() {
       let index = current === -1 ? (delta === 1 ? -1 : rows.length) : current;
       do {
         index += delta;
-      } while (index >= 0 && index < rows.length && rows[index].kind !== "node");
+      } while (
+        index >= 0 &&
+        index < rows.length &&
+        rows[index].kind !== "node"
+      );
       if (index >= 0 && index < rows.length) focusRowAt(index);
     },
     [rows, findFocusedIndex, focusRowAt]
@@ -301,7 +369,14 @@ export function FolderTree() {
         }
       }
     },
-    [rows, findFocusedIndex, moveFocus, focusRowAt, handleToggle, handleOpenFile]
+    [
+      rows,
+      findFocusedIndex,
+      moveFocus,
+      focusRowAt,
+      handleToggle,
+      handleOpenFile,
+    ]
   );
 
   // One context menu for the whole tree. Right-clicks resolve to a row via
@@ -349,118 +424,160 @@ export function FolderTree() {
   }
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={scrollParentRef}
-          className="flex-1 overflow-auto outline-none"
-          role="tree"
-          aria-label="Folder tree"
-          tabIndex={0}
-          aria-activedescendant={
-            focusedKey !== null ? treeRowDomId(focusedKey) : undefined
-          }
-          onKeyDown={handleKeyDown}
-          onContextMenu={handleContainerContextMenu}
-        >
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
           <div
-            className="relative mx-2 my-2"
-            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+            ref={scrollParentRef}
+            className="flex-1 overflow-auto outline-none"
+            role="tree"
+            aria-label="Folder tree"
+            tabIndex={0}
+            aria-activedescendant={
+              focusedKey !== null ? treeRowDomId(focusedKey) : undefined
+            }
+            onKeyDown={handleKeyDown}
+            onContextMenu={handleContainerContextMenu}
           >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const row = rows[virtualRow.index];
-              if (!row) return null;
+            <div
+              className="relative mx-2 my-2"
+              style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const row = rows[virtualRow.index];
+                if (!row) return null;
+                const tint =
+                  row.kind === "node" ? tintFlags[virtualRow.index] : undefined;
 
-              return (
-                <div
-                  key={virtualRow.key}
-                  ref={rowVirtualizer.measureElement}
-                  data-index={virtualRow.index}
-                  className="absolute left-0 top-0 w-full"
-                  style={{ transform: `translateY(${virtualRow.start}px)` }}
-                >
-                  <FolderTreeRow
-                    row={row}
-                    isSelected={
-                      row.kind === "node" && row.path === selectedPath
-                    }
-                    isFocused={row.key === focusedKey}
-                    elapsedSeconds={
-                      row.kind === "node" ? elapsedFor(row) : null
-                    }
-                    onToggle={handleToggle}
-                    onOpenFile={handleOpenFile}
-                    onCancelLoad={handleCancelLoad}
-                    onRetry={handleRetry}
-                    onFavoritesToggle={handleFavoritesToggle}
-                  />
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={virtualRow.key}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className="absolute left-0 top-0 w-full"
+                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+                  >
+                    <FolderTreeRow
+                      row={row}
+                      isSelected={
+                        row.kind === "node" && row.path === selectedPath
+                      }
+                      isFocused={row.key === focusedKey}
+                      tint={tint}
+                      dimmed={
+                        scopeActive &&
+                        row.kind === "node" &&
+                        row.type !== "source" &&
+                        !(tint?.inScope ?? false)
+                      }
+                      scoped={row.kind === "node" && scopePaths.has(row.path)}
+                      matchLabel={
+                        row.kind === "node"
+                          ? matchIndex.get(row.path)
+                          : undefined
+                      }
+                      elapsedSeconds={
+                        row.kind === "node" ? elapsedFor(row) : null
+                      }
+                      onToggle={handleToggle}
+                      onOpenFile={handleOpenFile}
+                      onCancelLoad={handleCancelLoad}
+                      onRetry={handleRetry}
+                      onFavoritesToggle={handleFavoritesToggle}
+                      onToggleScope={handleToggleScope}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          {menuTarget && !menuTarget.isDir && (
+            <>
+              <ContextMenuItem onClick={() => copyPath(menuTarget.path)}>
+                Copy Path
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => openExternal(menuTarget.path)}>
+                Open in External Editor
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => menuOpenTab && copyContent(menuOpenTab.content)}
+                disabled={!menuOpenTab}
+              >
+                Copy Content
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() =>
+                  menuOpenTab && saveCopy(menuTarget.name, menuOpenTab.content)
+                }
+                disabled={!menuOpenTab}
+              >
+                Save Copy...
+              </ContextMenuItem>
+            </>
+          )}
+          {menuTarget && menuTarget.isDir && (
+            <>
+              <ContextMenuItem
+                onClick={() =>
+                  useExplorerStore
+                    .getState()
+                    .toggleFavorite(menuTarget.sourceId, menuTarget.path)
+                }
+              >
+                {menuTarget.isFavorite
+                  ? "Remove from Favorites"
+                  : "Add to Favorites"}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => {
+                  const store = useExplorerStore.getState();
+                  store.setSelectedPath(menuTarget.path);
+                  store.setScopeTo(menuTarget.path);
+                  document.getElementById("explorer-content-input")?.focus();
+                }}
+              >
+                Search in This Folder
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() => {
+                  const store = useExplorerStore.getState();
+                  store.requestScan(menuTarget.path, store.scanFilePattern);
+                }}
+              >
+                Scan for Issues...
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+      {(scopeActive || matchIndex.size > 0) && (
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 text-[10px] text-muted-foreground">
+          {scopeActive && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-accent-blue/25" />
+              in search scope
+            </span>
+          )}
+          {matchIndex.size > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-success/30" />
+              in results
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-destructive" />
+            errors
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-warning" />
+            warnings
+          </span>
         </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        {menuTarget && !menuTarget.isDir && (
-          <>
-            <ContextMenuItem onClick={() => copyPath(menuTarget.path)}>
-              Copy Path
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => openExternal(menuTarget.path)}>
-              Open in External Editor
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => menuOpenTab && copyContent(menuOpenTab.content)}
-              disabled={!menuOpenTab}
-            >
-              Copy Content
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() =>
-                menuOpenTab && saveCopy(menuTarget.name, menuOpenTab.content)
-              }
-              disabled={!menuOpenTab}
-            >
-              Save Copy...
-            </ContextMenuItem>
-          </>
-        )}
-        {menuTarget && menuTarget.isDir && (
-          <>
-            <ContextMenuItem
-              onClick={() =>
-                useExplorerStore
-                  .getState()
-                  .toggleFavorite(menuTarget.sourceId, menuTarget.path)
-              }
-            >
-              {menuTarget.isFavorite
-                ? "Remove from Favorites"
-                : "Add to Favorites"}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() => {
-                const store = useExplorerStore.getState();
-                store.setSelectedPath(menuTarget.path);
-                store.setScopeTo(menuTarget.path);
-                document.getElementById("explorer-content-input")?.focus();
-              }}
-            >
-              Search in This Folder
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() => {
-                const store = useExplorerStore.getState();
-                store.requestScan(menuTarget.path, store.scanFilePattern);
-              }}
-            >
-              Scan for Issues...
-            </ContextMenuItem>
-          </>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
+      )}
+    </>
   );
 }

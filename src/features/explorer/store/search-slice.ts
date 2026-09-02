@@ -191,12 +191,17 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
     filenameOperationId: null,
 
     setFilenameQuery: (text: string) => {
+      // Typing is explicit search intent, so it may flip the panel to
+      // results; a scope change re-running the live search must not (the
+      // user is often mid-scoping in the Browse tree).
       set({ filenameQuery: text });
       if (!text.trim()) {
         get().clearFilenameSearch();
         const contentActive =
           get().searchStatus !== "idle" || get().searchResults.length > 0;
         set({ lastRun: contentActive ? "content" : null });
+      } else {
+        set({ resultsPanelMode: "results" });
       }
     },
 
@@ -301,7 +306,7 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
         set({ contentQuery: entry.query });
         void get().startContentSearch();
       } else {
-        set({ filenameQuery: entry.query });
+        set({ filenameQuery: entry.query, resultsPanelMode: "results" });
         void get().startFilenameSearch();
       }
     },
@@ -311,7 +316,7 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
         set({ contentQuery: entry.query });
         void get().startContentSearch();
       } else {
-        set({ filenameQuery: entry.query });
+        set({ filenameQuery: entry.query, resultsPanelMode: "results" });
         void get().startFilenameSearch();
       }
     },
@@ -481,7 +486,6 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
       const operationId = crypto.randomUUID();
       set({
         lastRun: "filename",
-        resultsPanelMode: "results",
         filenameStatus: "searching",
         filenameOperationId: operationId,
         filenameResults: [],

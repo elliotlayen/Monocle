@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDateFolder } from "../utils/date-format";
-import type { TreeNodeRow, TreeRow } from "../store/selectors";
+import type { TintRunFlags, TreeNodeRow, TreeRow } from "../store/selectors";
 
 /** DOM id for a tree row, used by aria-activedescendant. */
 export function treeRowDomId(key: string): string {
@@ -28,6 +28,14 @@ interface FolderTreeRowProps {
   row: TreeRow;
   isSelected: boolean;
   isFocused: boolean;
+  /** Connected-tint flags for the search scope; undefined when no scope. */
+  tint?: TintRunFlags;
+  /** True while a scope is active and this row falls outside it. */
+  dimmed: boolean;
+  /** True when this exact folder is a scope root. */
+  scoped: boolean;
+  /** Short label when this file appears in the active results. */
+  matchLabel?: string;
   /** Seconds the row has been loading, or null when not worth showing. */
   elapsedSeconds: number | null;
   onToggle: (row: TreeNodeRow) => void;
@@ -35,6 +43,7 @@ interface FolderTreeRowProps {
   onCancelLoad: (row: TreeNodeRow) => void;
   onRetry: (row: TreeNodeRow) => void;
   onFavoritesToggle: (sourceId: string) => void;
+  onToggleScope: (row: TreeNodeRow) => void;
 }
 
 function Chevron({ row }: { row: TreeNodeRow }) {
@@ -103,12 +112,17 @@ function FolderTreeRowInner({
   row,
   isSelected,
   isFocused,
+  tint,
+  dimmed,
+  scoped,
+  matchLabel,
   elapsedSeconds,
   onToggle,
   onOpenFile,
   onCancelLoad,
   onRetry,
   onFavoritesToggle,
+  onToggleScope,
 }: FolderTreeRowProps) {
   if (row.kind === "favorites-header") {
     return (
@@ -132,6 +146,27 @@ function FolderTreeRowInner({
   const isLoading = row.loadState === "loading";
   const dateLabel =
     row.isDir && !isSource ? formatDateFolder(row.name).formatted : null;
+  const inScope = tint?.inScope ?? false;
+
+  // Exactly one background treatment per row; selection always wins over
+  // the green match tint, which wins over the blue in-scope tint.
+  const background = isSelected
+    ? "bg-accent"
+    : matchLabel
+      ? "bg-success/10 hover:bg-success/20"
+      : inScope
+        ? "bg-accent-blue/[0.07] hover:bg-accent-blue/15"
+        : "hover:bg-muted";
+  // Contiguous in-scope rows merge into one connected block: corners round
+  // only where the run starts or ends.
+  const corners = inScope
+    ? cn(
+        "rounded-none",
+        tint?.runStart && "rounded-t-md",
+        tint?.runEnd && "rounded-b-md"
+      )
+    : "rounded";
+  const dimClass = dimmed ? "opacity-50" : undefined;
 
   return (
     <div
@@ -142,22 +177,36 @@ function FolderTreeRowInner({
       aria-selected={isSelected}
       {...(row.isDir ? { "aria-expanded": row.isExpanded } : {})}
       className={cn(
-        "group flex items-center gap-1 w-full rounded cursor-pointer",
+        "group flex items-center gap-1 w-full cursor-pointer transition-colors duration-[var(--duration-fast)]",
+        corners,
+        background,
         isSource ? "py-1.5" : "py-1",
-        isSelected ? "bg-accent" : "hover:bg-muted",
         isFocused && "ring-1 ring-ring",
         isError && !isSource && "text-muted-foreground"
       )}
       style={{ paddingLeft: `${row.depth * 16}px` }}
       onClick={() => (row.isDir ? onToggle(row) : onOpenFile(row))}
     >
-      <Chevron row={row} />
-      <RowIcon row={row} />
-      <span className={cn("text-sm truncate", isSource && "font-semibold")}>
+      <span className={cn("contents", dimClass && "[&>*]:opacity-50")}>
+        <Chevron row={row} />
+        <RowIcon row={row} />
+      </span>
+      <span
+        className={cn(
+          "text-sm truncate",
+          isSource && "font-semibold",
+          dimClass
+        )}
+      >
         {row.name}
       </span>
       {dateLabel && (
-        <span className="text-xs text-muted-foreground flex-shrink-0 truncate">
+        <span
+          className={cn(
+            "text-xs text-muted-foreground flex-shrink-0 truncate",
+            dimClass
+          )}
+        >
           {dateLabel}
         </span>
       )}
@@ -166,7 +215,41 @@ function FolderTreeRowInner({
           {row.tag}
         </Badge>
       )}
+      {matchLabel && (
+        <span className="flex-shrink-0 text-[10px] text-success">
+          {matchLabel}
+        </span>
+      )}
       <RowBadge row={row} />
+      {row.isDir && !isSource && (
+        <span
+          role="button"
+          tabIndex={-1}
+          className={cn(
+            "inline-flex h-4 flex-shrink-0 items-center gap-0.5 rounded px-1 text-[9px] tracking-wide transition-opacity duration-[var(--duration-fast)]",
+            scoped
+              ? "border border-accent-blue/40 bg-accent-blue/12 text-accent-blue"
+              : "border border-border text-muted-foreground opacity-0 group-hover:opacity-100"
+          )}
+          title={
+            scoped
+              ? "Remove from search scope"
+              : "Search only this folder (and inside)"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleScope(row);
+          }}
+        >
+          {scoped ? (
+            <>
+              scope <X className="h-2 w-2" />
+            </>
+          ) : (
+            "+ scope"
+          )}
+        </span>
+      )}
       {isLoading && elapsedSeconds !== null && (
         <span className="flex items-center gap-1 flex-shrink-0">
           <span className="text-xs text-muted-foreground">
