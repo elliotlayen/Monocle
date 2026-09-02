@@ -15,20 +15,19 @@ interface ExplorerNavBarProps {
   onOpenSettings: () => void;
 }
 
-export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) {
-  const {
-    lastInteractedFolderPath,
-    scanStatus,
-    scanFilePattern,
-    requestScan,
-  } = useExplorerStore(
-    useShallow((state) => ({
-      lastInteractedFolderPath: state.lastInteractedFolderPath,
-      scanStatus: state.scanStatus,
-      scanFilePattern: state.scanFilePattern,
-      requestScan: state.requestScan,
-    }))
-  );
+export function ExplorerNavBar({
+  onHome,
+  onOpenSettings,
+}: ExplorerNavBarProps) {
+  const { lastInteractedFolderPath, scanStatus, scanFilePattern, requestScan } =
+    useExplorerStore(
+      useShallow((state) => ({
+        lastInteractedFolderPath: state.lastInteractedFolderPath,
+        scanStatus: state.scanStatus,
+        scanFilePattern: state.scanFilePattern,
+        requestScan: state.requestScan,
+      }))
+    );
 
   const isScanning = scanStatus === "scanning";
   const canScan = lastInteractedFolderPath !== null;
@@ -43,13 +42,14 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
   };
 
   return (
-    <div className="relative z-20 flex h-11 items-center gap-3 border-b border-border bg-background px-3">
-      <div className="flex items-center gap-2">
-        <MonocleLogo className="h-4 w-4" />
-        <span className="text-xs font-semibold tracking-wide">Monocle</span>
+    // Floats over the explorer panels like the graph toolbar: bare logo on
+    // the left, a glass action group on the right.
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start px-3 pt-3">
+      <div className="pointer-events-auto flex h-9 items-center">
+        <MonocleLogo className="h-6 w-6" />
       </div>
       <div className="flex-1" />
-      <div className="flex items-center gap-2">
+      <div className="pointer-events-auto panel-glass flex h-9 items-center gap-1 px-1">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -74,11 +74,7 @@ export function ExplorerNavBar({ onHome, onOpenSettings }: ExplorerNavBarProps) 
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onOpenSettings}
-              >
+              <Button variant="ghost" size="sm" onClick={onOpenSettings}>
                 <Settings className="w-4 h-4" />
               </Button>
             </TooltipTrigger>

@@ -232,9 +232,11 @@ export function Toolbar({
     if (!typeEnabled) {
       if (!checked) return;
       toggleObjectType(type);
-      getTypeOffSelectionToggleIds(contextRows, excludedObjectIds, rowId).forEach(
-        (id) => toggleObjectExclusion(id)
-      );
+      getTypeOffSelectionToggleIds(
+        contextRows,
+        excludedObjectIds,
+        rowId
+      ).forEach((id) => toggleObjectExclusion(id));
       return;
     }
 
@@ -243,8 +245,9 @@ export function Toolbar({
       return;
     }
 
-    const selectedCount = contextRows.filter((row) => !excludedObjectIds.has(row.id))
-      .length;
+    const selectedCount = contextRows.filter(
+      (row) => !excludedObjectIds.has(row.id)
+    ).length;
     const nextSelectedCount = selectedCount - 1;
 
     toggleObjectExclusion(rowId);
@@ -344,12 +347,7 @@ export function Toolbar({
       storedProcedures: buckets.storedProcedures,
       scalarFunctions: buckets.scalarFunctions,
     };
-  }, [
-    schema,
-    debouncedSearchFilter,
-    schemaFilter,
-    focusedTableId,
-  ]);
+  }, [schema, debouncedSearchFilter, schemaFilter, focusedTableId]);
 
   const panelRowsByType = useMemo<ObjectBuckets>(() => {
     if (!schema) return EMPTY_OBJECT_BUCKETS;
@@ -420,21 +418,19 @@ export function Toolbar({
 
   // Canvas mode file name display
   const canvasFileName = canvasFilePath
-    ? canvasFilePath.split("/").pop()?.split("\\").pop() ?? "Untitled"
+    ? (canvasFilePath.split("/").pop()?.split("\\").pop() ?? "Untitled")
     : "Untitled";
 
   return (
     <TooltipProvider delayDuration={300}>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start px-3 pt-3">
-        {/* Left: brand pill + canvas controls */}
-        <div className="pointer-events-auto panel-glass flex h-9 items-center gap-2 px-3">
-          <MonocleLogo className="h-4 w-4" />
-          <span className="text-xs font-semibold tracking-wide">Monocle</span>
+        {/* Left: bare logo, plus a glass pill of canvas controls in canvas mode */}
+        <div className="pointer-events-auto flex h-9 items-center gap-3">
+          <MonocleLogo className="h-6 w-6" />
           {canvasMode && (
-            <>
-              <Separator orientation="vertical" className="h-4" />
+            <div className="panel-glass flex h-9 items-center px-1">
               <AddObjectMenu onImport={onImport} />
-            </>
+            </div>
           )}
         </div>
 
@@ -494,7 +490,9 @@ export function Toolbar({
                   setIsFocusOpen(open);
                   if (!open) {
                     setFocusSearch("");
-                    setExpandedFocusSections(createDefaultExpandedFocusSections());
+                    setExpandedFocusSections(
+                      createDefaultExpandedFocusSections()
+                    );
                   }
                 }}
               >
@@ -504,7 +502,9 @@ export function Toolbar({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className={cn(hasFocusSelection && FILTER_ACTIVE_CLASSES)}
+                        className={cn(
+                          hasFocusSelection && FILTER_ACTIVE_CLASSES
+                        )}
                       >
                         <Crosshair className="h-4 w-4" />
                       </Button>
@@ -525,7 +525,10 @@ export function Toolbar({
                       />
                     </div>
                   </div>
-                  <div ref={scrollContainerRef} className="max-h-80 overflow-auto">
+                  <div
+                    ref={scrollContainerRef}
+                    className="max-h-80 overflow-auto"
+                  >
                     <div className="w-max min-w-full">
                       {hasFocusSelection && (
                         <button
@@ -610,11 +613,12 @@ export function Toolbar({
                           </div>
                         );
                       })}
-                      {focusSearch.trim().length > 0 && !hasFocusSearchMatches && (
-                        <div className="w-max min-w-full px-3 py-4 text-center text-xs text-muted-foreground">
-                          No matches found
-                        </div>
-                      )}
+                      {focusSearch.trim().length > 0 &&
+                        !hasFocusSearchMatches && (
+                          <div className="w-max min-w-full px-3 py-4 text-center text-xs text-muted-foreground">
+                            No matches found
+                          </div>
+                        )}
                     </div>
                   </div>
                 </PopoverContent>
@@ -626,7 +630,9 @@ export function Toolbar({
                 onOpenChange={(open) => {
                   setIsObjectsOpen(open);
                   setObjectsSearch("");
-                  setExpandedObjectSections(createDefaultExpandedObjectSections());
+                  setExpandedObjectSections(
+                    createDefaultExpandedObjectSections()
+                  );
                 }}
               >
                 <Tooltip>
@@ -635,7 +641,9 @@ export function Toolbar({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className={cn(hasObjectFilters && FILTER_ACTIVE_CLASSES)}
+                        className={cn(
+                          hasObjectFilters && FILTER_ACTIVE_CLASSES
+                        )}
                       >
                         <Box className="h-4 w-4" />
                       </Button>
@@ -686,14 +694,18 @@ export function Toolbar({
                         );
 
                         return (
-                          <div key={type} className="w-max min-w-full border-b last:border-b-0">
+                          <div
+                            key={type}
+                            className="w-max min-w-full border-b last:border-b-0"
+                          >
                             <div
                               className="flex w-max min-w-full cursor-pointer items-center gap-2 bg-muted/50 px-3 py-1.5"
                               role="button"
                               tabIndex={0}
                               onClick={() => toggleObjectSection(type)}
                               onKeyDown={(event) => {
-                                if (event.currentTarget !== event.target) return;
+                                if (event.currentTarget !== event.target)
+                                  return;
                                 if (shouldToggleSectionFromKey(event.key)) {
                                   event.preventDefault();
                                   toggleObjectSection(type);
@@ -745,7 +757,9 @@ export function Toolbar({
                             {isExpanded && (
                               <div className="w-max min-w-full py-1">
                                 {visibleRows.map((item) => {
-                                  const isExcluded = excludedObjectIds.has(item.id);
+                                  const isExcluded = excludedObjectIds.has(
+                                    item.id
+                                  );
                                   const checked = typeEnabled && !isExcluded;
                                   return (
                                     <div
@@ -765,8 +779,13 @@ export function Toolbar({
                                         )
                                       }
                                       onKeyDown={(event) => {
-                                        if (event.currentTarget !== event.target) return;
-                                        if (shouldToggleSectionFromKey(event.key)) {
+                                        if (
+                                          event.currentTarget !== event.target
+                                        )
+                                          return;
+                                        if (
+                                          shouldToggleSectionFromKey(event.key)
+                                        ) {
                                           event.preventDefault();
                                           handleRowCheckedChange(
                                             type,
@@ -806,11 +825,12 @@ export function Toolbar({
                         );
                       })}
 
-                      {objectsSearch.trim().length > 0 && !hasPanelSearchMatches && (
-                        <div className="w-max min-w-full px-3 py-4 text-center text-xs text-muted-foreground">
-                          No matches found
-                        </div>
-                      )}
+                      {objectsSearch.trim().length > 0 &&
+                        !hasPanelSearchMatches && (
+                          <div className="w-max min-w-full px-3 py-4 text-center text-xs text-muted-foreground">
+                            No matches found
+                          </div>
+                        )}
                     </div>
                   </div>
                 </PopoverContent>
@@ -824,7 +844,9 @@ export function Toolbar({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className={cn(!allEdgesSelected && FILTER_ACTIVE_CLASSES)}
+                        className={cn(
+                          !allEdgesSelected && FILTER_ACTIVE_CLASSES
+                        )}
                       >
                         <Network className="h-4 w-4" />
                       </Button>
