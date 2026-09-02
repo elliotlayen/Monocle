@@ -15,6 +15,7 @@ import { ExplorerEmptyState } from "./explorer-empty-state";
 import { ExplorerSidebar } from "./explorer-sidebar";
 import { ActivityRail } from "./activity-rail";
 import { BreadcrumbBar } from "./breadcrumb-bar";
+import { QuickOpen } from "./quick-open";
 import { useExplorerKeyboard } from "../hooks/use-explorer-keyboard";
 import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
@@ -71,6 +72,7 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
   return (
     <div className="relative flex h-screen flex-col overflow-hidden">
       <ExplorerNavBar onHome={onHome} />
+      <QuickOpen />
       {/* Floating chrome below the docked nav bar. */}
       <ActivityRail onOpenSettings={onOpenSettings} />
       <ExplorerSidebar width={width} isDragging={isDragging} startDrag={startDrag} />

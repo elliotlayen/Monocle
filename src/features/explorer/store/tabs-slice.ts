@@ -11,9 +11,13 @@ import { parseXml } from "../utils/xml-parser";
 import { appendBounded, VALIDATION_CACHE_MAX } from "./bounded-cache";
 import type { SliceCreator } from "./store-types";
 
+/** Most-recently-opened file paths kept for quick-open. */
+const RECENT_FILES_MAX = 50;
+
 export interface TabsSlice {
   tabs: FileTab[];
   activeTabId: string | null;
+  recentFilePaths: string[];
   validationCache: Map<
     string,
     { problems: ValidationProblem[]; encoding: string; hasBom: boolean }
@@ -53,6 +57,7 @@ export function recomputeTabNames(tabs: FileTab[]): FileTab[] {
 export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
   tabs: [],
   activeTabId: null,
+  recentFilePaths: [],
   validationCache: new Map(),
   problemsPanelOpen: false,
   problemsPanelHeight: 200,
@@ -98,7 +103,11 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
     };
 
     const updatedTabs = recomputeTabNames([...tabs, newTab]);
-    set({ tabs: updatedTabs, activeTabId: filePath });
+    const recent = [
+      filePath,
+      ...get().recentFilePaths.filter((p) => p !== filePath),
+    ].slice(0, RECENT_FILES_MAX);
+    set({ tabs: updatedTabs, activeTabId: filePath, recentFilePaths: recent });
 
     try {
       const result = await explorerService.readFile(filePath);
