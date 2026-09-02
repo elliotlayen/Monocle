@@ -23,7 +23,7 @@ export function ExplorerEmptyState({ onOpenSettings }: ExplorerEmptyStateProps) 
         <h2 className="text-base font-semibold tracking-wide">Integration Explorer</h2>
         <p className="max-w-sm text-xs text-muted-foreground">
           {hasSources
-            ? "Click a file in the sidebar to open it."
+            ? "Search above, or browse the tree and open a file."
             : "Add a folder source in Settings to get started."}
         </p>
         {!hasSources && (

@@ -5,31 +5,23 @@ import {
 } from "@/features/settings/services/settings-service";
 import type { SliceCreator } from "./store-types";
 
-export type ExplorerView = "explorer" | "search" | "scan";
+export type ResultsPanelMode = "results" | "browse";
 
 export interface UiSlice {
-  sidebarOpen: boolean;
+  /** Results panel width (persisted as explorerSidebarWidth). */
   sidebarWidth: number;
   explorerNodeStyle: ExplorerNodeStyle;
-  activeView: ExplorerView;
+  resultsPanelMode: ResultsPanelMode;
 
-  setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setExplorerNodeStyle: (style: ExplorerNodeStyle) => void;
-  setActiveView: (view: ExplorerView) => void;
+  setResultsPanelMode: (mode: ResultsPanelMode) => void;
 }
 
 export const createUiSlice: SliceCreator<UiSlice> = (set) => ({
-  sidebarOpen: true,
-  sidebarWidth: 280,
+  sidebarWidth: 380,
   explorerNodeStyle: DEFAULT_EXPLORER_NODE_STYLE,
-  activeView: "explorer",
-
-  setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
-
-  setActiveView: (view: ExplorerView) => {
-    set({ activeView: view, sidebarOpen: true });
-  },
+  resultsPanelMode: "browse",
 
   setSidebarWidth: (width: number) => {
     set({ sidebarWidth: width });
@@ -44,5 +36,9 @@ export const createUiSlice: SliceCreator<UiSlice> = (set) => ({
     set({ explorerNodeStyle: style });
     // Deliberately silent: the in-memory style still applies for the session.
     settingsService.saveSettings({ explorerNodeStyle: style }).catch(() => {});
+  },
+
+  setResultsPanelMode: (mode: ResultsPanelMode) => {
+    set({ resultsPanelMode: mode });
   },
 });

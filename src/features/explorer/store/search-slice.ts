@@ -326,6 +326,7 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
       get().pushSearchHistory(query, "content");
       set({
         lastRun: "content",
+        resultsPanelMode: "results",
         searchStatus: "searching",
         searchOperationId: operationId,
         searchResults: [],
@@ -480,6 +481,7 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
       const operationId = crypto.randomUUID();
       set({
         lastRun: "filename",
+        resultsPanelMode: "results",
         filenameStatus: "searching",
         filenameOperationId: operationId,
         filenameResults: [],

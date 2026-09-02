@@ -445,7 +445,7 @@ export function FolderTree() {
                 const store = useExplorerStore.getState();
                 store.setSelectedPath(menuTarget.path);
                 store.setScopeTo(menuTarget.path);
-                store.setActiveView("search");
+                document.getElementById("explorer-content-input")?.focus();
               }}
             >
               Search in This Folder

@@ -174,8 +174,8 @@ export function QuickOpen() {
     setOpen(false);
     const store = useExplorerStore.getState();
     if (entry.isDir) {
-      store.setActiveView("explorer");
-      store.revealPath(entry.path);
+      store.setResultsPanelMode("browse");
+      void store.revealPath(entry.path);
     } else {
       store.setSelectedPath(entry.path);
       store.openFile(entry.path);
@@ -225,8 +225,8 @@ export function QuickOpen() {
             {renderGroup("Files", groups.files)}
           </CommandList>
           <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-            Searches files loaded in the tree. Use Search (Cmd+Shift+F) for
-            everything on disk.
+            Searches files loaded in the tree. Use the filename field (Cmd+F)
+            for everything on disk.
           </div>
         </Command>
       </DialogContent>

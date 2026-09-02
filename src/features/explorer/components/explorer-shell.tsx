@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   AlertDialog,
@@ -9,20 +10,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { ExplorerNavBar } from "./explorer-nav-bar";
 import { ExplorerEmptyState } from "./explorer-empty-state";
-import { ExplorerSidebar } from "./explorer-sidebar";
-import { ActivityRail } from "./activity-rail";
-import { BreadcrumbBar } from "./breadcrumb-bar";
-import { QuickOpen } from "./quick-open";
-import { useExplorerKeyboard } from "../hooks/use-explorer-keyboard";
-import { useScanEvents } from "../hooks/use-scan-events";
+import { SearchPanel } from "./search-panel";
+import { ResultsPanel } from "./results-panel";
 import { FileTabBar } from "./file-tab-bar";
+import { BreadcrumbBar } from "./breadcrumb-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
+import { QuickOpen } from "./quick-open";
 import { useExplorerStore } from "../store";
 import { useExplorerSidebar } from "../hooks/use-explorer-sidebar";
+import { useExplorerKeyboard } from "../hooks/use-explorer-keyboard";
+import { useExplorerEvents } from "../hooks/use-explorer-events";
 
 interface ExplorerShellProps {
   onHome: () => void;
@@ -31,12 +31,12 @@ interface ExplorerShellProps {
 
 export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
   useExplorerKeyboard();
-  useScanEvents();
+  useExplorerEvents();
 
   const {
-    sidebarOpen,
     sidebarWidth,
     setSidebarWidth,
+    loadSources,
     tabs,
     scanStatus,
     pendingScanRequest,
@@ -45,9 +45,9 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
     dismissPendingScan,
   } = useExplorerStore(
     useShallow((state) => ({
-      sidebarOpen: state.sidebarOpen,
       sidebarWidth: state.sidebarWidth,
       setSidebarWidth: state.setSidebarWidth,
+      loadSources: state.loadSources,
       tabs: state.tabs,
       scanStatus: state.scanStatus,
       pendingScanRequest: state.pendingScanRequest,
@@ -57,8 +57,12 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
     }))
   );
 
-  // Width state lives here so the floating content panel can track the
-  // sidebar edge live during drag-resize.
+  // Load sources (and hydrate persisted search state) on entry
+  useEffect(() => {
+    loadSources();
+  }, [loadSources]);
+
+  // Results panel drag-resize; width persists via setSidebarWidth
   const { width, isDragging, startDrag } = useExplorerSidebar(
     sidebarWidth,
     setSidebarWidth
@@ -73,35 +77,32 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden">
-      <ExplorerNavBar onHome={onHome} />
+      <ExplorerNavBar onHome={onHome} onOpenSettings={onOpenSettings} />
       <QuickOpen />
-      {/* Floating chrome below the docked nav bar. */}
-      <ActivityRail onOpenSettings={onOpenSettings} />
-      <ExplorerSidebar width={width} isDragging={isDragging} startDrag={startDrag} />
-      <div
-        className={cn(
-          "panel-glass absolute bottom-3 right-3 top-14 z-10 flex flex-col overflow-hidden",
-          // Tracks the sidebar edge 1:1 during drag; animates on toggle.
-          !isDragging &&
-            "transition-[left] duration-[var(--duration-slow)] ease-[var(--ease-out)]"
-        )}
-        style={{ left: sidebarOpen ? width + 80 : 68 }}
-      >
-        {hasOpenTabs ? (
-          <>
-            <FileTabBar />
-            <BreadcrumbBar />
-            {isScanning && <ScanProgressPanel />}
-            <FileContentArea />
-          </>
-        ) : isScanning ? (
-          <div className="flex flex-1 flex-col">
-            <ScanProgressPanel />
-            <div className="flex-1" />
+
+      {/* Floating chrome below the docked nav bar */}
+      <div className="absolute bottom-3 left-3 right-3 top-14 flex flex-col gap-3">
+        <SearchPanel />
+        <div className="flex min-h-0 flex-1 gap-3">
+          <ResultsPanel width={width} isDragging={isDragging} startDrag={startDrag} />
+          <div className="panel-glass flex min-w-0 flex-1 flex-col overflow-hidden">
+            {hasOpenTabs ? (
+              <>
+                <FileTabBar />
+                <BreadcrumbBar />
+                {isScanning && <ScanProgressPanel />}
+                <FileContentArea />
+              </>
+            ) : isScanning ? (
+              <div className="flex flex-1 flex-col">
+                <ScanProgressPanel />
+                <div className="flex-1" />
+              </div>
+            ) : (
+              <ExplorerEmptyState onOpenSettings={onOpenSettings} />
+            )}
           </div>
-        ) : (
-          <ExplorerEmptyState onOpenSettings={onOpenSettings} />
-        )}
+        </div>
       </div>
 
       {/* Scan confirmation dialog (D-04) */}

@@ -1,5 +1,8 @@
 import { useEffect } from "react";
-import { useExplorerStore } from "../store";
+import {
+  CONTENT_INPUT_ID,
+  FILENAME_INPUT_ID,
+} from "../components/search-panel";
 
 function focusById(id: string, attempts = 5) {
   requestAnimationFrame(() => {
@@ -7,7 +10,7 @@ function focusById(id: string, attempts = 5) {
     if (el) {
       el.focus();
     } else if (attempts > 1) {
-      // The target view may still be mounting; retry a few frames.
+      // The target may still be mounting; retry a few frames.
       focusById(id, attempts - 1);
     }
   });
@@ -15,9 +18,9 @@ function focusById(id: string, attempts = 5) {
 
 /**
  * Explorer-wide keyboard shortcuts:
- * - Cmd/Ctrl+B toggles the sidebar
- * - Cmd/Ctrl+Shift+E / +F / +S switch to the Explorer / Search / Scan views
- * - Cmd/Ctrl+F focuses the filename filter (Explorer view)
+ * - Cmd/Ctrl+F focuses the filename field
+ * - Cmd/Ctrl+Shift+F focuses the content field
+ * (Cmd+P quick-open registers its own listener.)
  */
 export function useExplorerKeyboard() {
   useEffect(() => {
@@ -26,26 +29,13 @@ export function useExplorerKeyboard() {
       if (document.activeElement?.closest(".monaco-editor")) return;
       if (!(e.metaKey || e.ctrlKey)) return;
 
-      const store = useExplorerStore.getState();
       const key = e.key.toLowerCase();
-
-      if (key === "b" && !e.shiftKey) {
+      if (key === "f" && e.shiftKey) {
         e.preventDefault();
-        store.setSidebarOpen(!store.sidebarOpen);
-      } else if (key === "e" && e.shiftKey) {
-        e.preventDefault();
-        store.setActiveView("explorer");
-      } else if (key === "f" && e.shiftKey) {
-        e.preventDefault();
-        store.setActiveView("search");
-        focusById("explorer-content-search-input");
+        focusById(CONTENT_INPUT_ID);
       } else if (key === "f") {
         e.preventDefault();
-        store.setActiveView("explorer");
-        focusById("explorer-filter-input");
-      } else if (key === "s" && e.shiftKey) {
-        e.preventDefault();
-        store.setActiveView("scan");
+        focusById(FILENAME_INPUT_ID);
       }
     };
 
