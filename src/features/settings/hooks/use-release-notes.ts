@@ -37,7 +37,9 @@ function getReleaseRequestHeaders(): HeadersInit {
   };
 }
 
-async function fetchReleaseByTag(tag: string): Promise<GitHubReleaseResponse | null> {
+async function fetchReleaseByTag(
+  tag: string
+): Promise<GitHubReleaseResponse | null> {
   const response = await fetch(
     `${MONOCLE_RELEASES_API_URL}/tags/${encodeURIComponent(tag)}`,
     {

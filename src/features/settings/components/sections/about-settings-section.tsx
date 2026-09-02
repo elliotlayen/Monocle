@@ -29,11 +29,7 @@ export function AboutSettingsSection() {
       <div className="rounded-lg border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p
-              className="font-semibold text-sm"
-            >
-              Monocle
-            </p>
+            <p className="font-semibold text-sm">Monocle</p>
             <p className="text-xs text-muted-foreground">By Elliot Layen</p>
           </div>
           {version && (
