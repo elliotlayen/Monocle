@@ -614,6 +614,58 @@ describe("explorer store - loadSources reconciliation", () => {
   });
 });
 
+describe("explorer store - saved searches and history", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useExplorerStore.setState({ savedSearches: [], searchHistory: [] });
+  });
+
+  const entry = {
+    name: "Failed refs",
+    query: "ORD-1042",
+    mode: "content" as const,
+    regex: false,
+    caseSensitive: true,
+    filePattern: "*.xml",
+  };
+
+  it("saves a search, replaces same-named entries, and persists", () => {
+    useExplorerStore.getState().saveSearch(entry);
+    useExplorerStore.getState().saveSearch({ ...entry, query: "ORD-9" });
+
+    const saved = useExplorerStore.getState().savedSearches;
+    expect(saved).toHaveLength(1);
+    expect(saved[0].query).toBe("ORD-9");
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      explorerSavedSearches: saved,
+    });
+  });
+
+  it("deletes a saved search", () => {
+    useExplorerStore.getState().saveSearch(entry);
+    useExplorerStore.getState().deleteSavedSearch("Failed refs");
+    expect(useExplorerStore.getState().savedSearches).toHaveLength(0);
+  });
+
+  it("pushes history with dedupe, trim, and cap", () => {
+    const store = useExplorerStore.getState();
+    store.pushSearchHistory("  template  ", "filename");
+    store.pushSearchHistory("ORD-1042", "content");
+    store.pushSearchHistory("template", "filename");
+    store.pushSearchHistory("", "content");
+
+    const history = useExplorerStore.getState().searchHistory;
+    expect(history).toHaveLength(2);
+    expect(history[0]).toEqual({ query: "template", mode: "filename" });
+    expect(history[1]).toEqual({ query: "ORD-1042", mode: "content" });
+
+    for (let i = 0; i < 30; i++) {
+      useExplorerStore.getState().pushSearchHistory(`q${i}`, "filename");
+    }
+    expect(useExplorerStore.getState().searchHistory).toHaveLength(20);
+  });
+});
+
 describe("explorer store - node style setting", () => {
   beforeEach(() => {
     useExplorerStore.setState({ explorerNodeStyle: "soft" });

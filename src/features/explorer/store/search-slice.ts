@@ -10,7 +10,15 @@ import type {
 } from "../types";
 import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
+import {
+  settingsService,
+  type SavedSearch,
+  type SearchHistoryEntry,
+} from "@/features/settings/services/settings-service";
 import type { SliceCreator } from "./store-types";
+
+/** History keeps this many entries, most recent first. */
+const SEARCH_HISTORY_MAX = 20;
 
 /**
  * Content-search scope: everything, one source (by id), or whatever folder
@@ -25,6 +33,8 @@ export interface SearchSlice {
   searchFilePattern: string;
   searchRegex: boolean;
   searchCaseSensitive: boolean;
+  savedSearches: SavedSearch[];
+  searchHistory: SearchHistoryEntry[];
   searchStatus: SearchStatus;
   searchProgress: SearchProgressPayload | null;
   searchResults: SearchResultFile[];
@@ -48,6 +58,9 @@ export interface SearchSlice {
   setSearchFilePattern: (pattern: string) => void;
   setSearchRegex: (regex: boolean) => void;
   setSearchCaseSensitive: (caseSensitive: boolean) => void;
+  saveSearch: (entry: SavedSearch) => void;
+  deleteSavedSearch: (name: string) => void;
+  pushSearchHistory: (query: string, mode: SearchHistoryEntry["mode"]) => void;
   startFilenameSearch: (folderPaths: string[]) => Promise<void>;
   appendFilenameResults: (
     operationId: string,
@@ -137,6 +150,8 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
   searchFilePattern: "*.xml",
   searchRegex: false,
   searchCaseSensitive: false,
+  savedSearches: [],
+  searchHistory: [],
   searchStatus: "idle",
   searchProgress: null,
   searchResults: [],
@@ -186,6 +201,49 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
 
   setSearchCaseSensitive: (caseSensitive: boolean) => {
     set({ searchCaseSensitive: caseSensitive });
+  },
+
+  saveSearch: (entry: SavedSearch) => {
+    const next = [
+      entry,
+      ...get().savedSearches.filter((s) => s.name !== entry.name),
+    ];
+    set({ savedSearches: next });
+    settingsService
+      .saveSettings({ explorerSavedSearches: next })
+      .catch(() => {
+        showToast({
+          type: "error",
+          title: "Failed to save search",
+          message: "The saved search could not be persisted",
+          duration: 5000,
+        });
+      });
+  },
+
+  deleteSavedSearch: (name: string) => {
+    const next = get().savedSearches.filter((s) => s.name !== name);
+    set({ savedSearches: next });
+    // Deliberately silent: the in-memory list already reflects the delete.
+    settingsService
+      .saveSettings({ explorerSavedSearches: next })
+      .catch(() => {});
+  },
+
+  pushSearchHistory: (query: string, mode: SearchHistoryEntry["mode"]) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    const next = [
+      { query: trimmed, mode },
+      ...get().searchHistory.filter(
+        (h) => !(h.query === trimmed && h.mode === mode)
+      ),
+    ].slice(0, SEARCH_HISTORY_MAX);
+    set({ searchHistory: next });
+    // Deliberately silent: history is a convenience, not critical data.
+    settingsService
+      .saveSettings({ explorerSearchHistory: next })
+      .catch(() => {});
   },
 
   startContentSearch: async (folderPaths: string[], scopeLabel: string) => {

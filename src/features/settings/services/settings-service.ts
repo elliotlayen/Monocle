@@ -49,6 +49,22 @@ export function isExplorerNodeStyle(
   );
 }
 
+export type SearchFieldMode = "filename" | "content";
+
+export interface SavedSearch {
+  name: string;
+  query: string;
+  mode: SearchFieldMode;
+  regex: boolean;
+  caseSensitive: boolean;
+  filePattern: string;
+}
+
+export interface SearchHistoryEntry {
+  query: string;
+  mode: SearchFieldMode;
+}
+
 export interface AppSettings {
   theme?: ThemeSetting;
   schemaFilter?: string;
@@ -65,6 +81,8 @@ export interface AppSettings {
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
   explorerNodeStyle?: ExplorerNodeStyle;
+  explorerSavedSearches?: SavedSearch[];
+  explorerSearchHistory?: SearchHistoryEntry[];
 }
 
 export interface SettingsUpdate {
@@ -83,6 +101,8 @@ export interface SettingsUpdate {
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
   explorerNodeStyle?: ExplorerNodeStyle;
+  explorerSavedSearches?: SavedSearch[];
+  explorerSearchHistory?: SearchHistoryEntry[];
 }
 
 export const settingsService = {

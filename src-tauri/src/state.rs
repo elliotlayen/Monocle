@@ -16,6 +16,29 @@ pub struct FolderSource {
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct SavedSearch {
+    pub name: String,
+    pub query: String,
+    /// "filename" or "content"
+    pub mode: String,
+    #[serde(default)]
+    pub regex: bool,
+    #[serde(default)]
+    pub case_sensitive: bool,
+    #[serde(default)]
+    pub file_pattern: String,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHistoryEntry {
+    pub query: String,
+    /// "filename" or "content"
+    pub mode: String,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
@@ -47,6 +70,10 @@ pub struct AppSettings {
     pub explorer_sidebar_width: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explorer_node_style: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub explorer_saved_searches: Vec<SavedSearch>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub explorer_search_history: Vec<SearchHistoryEntry>,
 }
 
 pub struct AppState {
@@ -72,6 +99,8 @@ pub struct AppSettingsUpdate {
     pub folder_sources: Option<Vec<FolderSource>>,
     pub explorer_sidebar_width: Option<f64>,
     pub explorer_node_style: Option<String>,
+    pub explorer_saved_searches: Option<Vec<SavedSearch>>,
+    pub explorer_search_history: Option<Vec<SearchHistoryEntry>>,
 }
 
 impl AppState {
@@ -165,6 +194,12 @@ impl AppState {
         if let Some(explorer_node_style) = update.explorer_node_style {
             settings.explorer_node_style = Some(explorer_node_style);
         }
+        if let Some(explorer_saved_searches) = update.explorer_saved_searches {
+            settings.explorer_saved_searches = explorer_saved_searches;
+        }
+        if let Some(explorer_search_history) = update.explorer_search_history {
+            settings.explorer_search_history = explorer_search_history;
+        }
 
         let updated = settings.clone();
         drop(settings);
@@ -225,6 +260,8 @@ mod tests {
                 folder_sources: None,
                 explorer_sidebar_width: None,
                 explorer_node_style: Some("capsule".to_string()),
+                explorer_saved_searches: None,
+                explorer_search_history: None,
             })
             .expect("update settings");
 
@@ -245,6 +282,48 @@ mod tests {
             Some("inspector")
         );
         assert_eq!(settings.explorer_node_style.as_deref(), Some("capsule"));
+    }
+
+    #[test]
+    fn saved_searches_and_history_round_trip() {
+        let dir = tempdir().expect("tempdir");
+        let state = AppState::new(dir.path().to_path_buf());
+
+        state
+            .update_settings(AppSettingsUpdate {
+                explorer_saved_searches: Some(vec![SavedSearch {
+                    name: "Failed refs".to_string(),
+                    query: "ORD-1042".to_string(),
+                    mode: "content".to_string(),
+                    regex: false,
+                    case_sensitive: true,
+                    file_pattern: "*.xml".to_string(),
+                }]),
+                explorer_search_history: Some(vec![SearchHistoryEntry {
+                    query: "template".to_string(),
+                    mode: "filename".to_string(),
+                }]),
+                ..Default::default()
+            })
+            .expect("update settings");
+
+        let reloaded = AppState::new(dir.path().to_path_buf());
+        let settings = reloaded.get_settings().expect("get settings");
+
+        assert_eq!(settings.explorer_saved_searches.len(), 1);
+        let saved = &settings.explorer_saved_searches[0];
+        assert_eq!(saved.name, "Failed refs");
+        assert_eq!(saved.mode, "content");
+        assert!(saved.case_sensitive);
+        assert!(!saved.regex);
+        assert_eq!(settings.explorer_search_history.len(), 1);
+        assert_eq!(settings.explorer_search_history[0].query, "template");
+
+        // camelCase on disk
+        let raw = std::fs::read_to_string(dir.path().join("settings.json")).unwrap();
+        assert!(raw.contains("explorerSavedSearches"));
+        assert!(raw.contains("caseSensitive"));
+        assert!(raw.contains("explorerSearchHistory"));
     }
 
     #[test]

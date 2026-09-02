@@ -189,6 +189,8 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
         ...reconcileTreeWithSources(get(), sources),
         sidebarWidth,
         explorerNodeStyle,
+        savedSearches: settings.explorerSavedSearches ?? [],
+        searchHistory: settings.explorerSearchHistory ?? [],
       });
     } catch {
       showToast({
