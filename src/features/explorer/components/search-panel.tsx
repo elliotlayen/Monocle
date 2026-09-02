@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   CalendarIcon,
+  ChevronDown,
   Clock,
   FileCode,
   ListFilter,
@@ -47,6 +48,19 @@ import type { DateRange as DayPickerRange } from "react-day-picker";
 
 /** Live filename search debounce. */
 const FILENAME_DEBOUNCE_MS = 250;
+
+/**
+ * Date-range button label. Ranges within one year share the year; ranges
+ * crossing years spell out both so "Sep 2 - Oct 10" can't read as one year.
+ */
+function formatDateRangeLabel(range: { from?: Date; to?: Date } | null): string {
+  if (!range?.from) return "Any date";
+  if (!range.to) return format(range.from, "MMM d, yyyy");
+  const sameYear = range.from.getFullYear() === range.to.getFullYear();
+  return sameYear
+    ? `${format(range.from, "MMM d")} - ${format(range.to, "MMM d, yyyy")}`
+    : `${format(range.from, "MMM d, yyyy")} - ${format(range.to, "MMM d, yyyy")}`;
+}
 
 export const FILENAME_INPUT_ID = "explorer-filename-input";
 export const CONTENT_INPUT_ID = "explorer-content-input";
@@ -455,19 +469,15 @@ export function SearchPanel() {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-[26px] w-48 justify-start gap-1.5 border px-2 text-[11px] font-normal",
+                  "h-[26px] w-64 justify-start gap-1.5 border px-2 text-[11px] font-normal",
                   dateRange?.from
                     ? "border-accent-blue/40 bg-accent-blue/10 text-foreground"
-                    : "border-border bg-muted text-muted-foreground"
+                    : "border-border bg-muted text-muted-foreground hover:text-foreground"
                 )}
               >
                 <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="min-w-0 flex-1 truncate text-left">
-                  {dateRange?.from
-                    ? dateRange.to
-                      ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
-                      : format(dateRange.from, "MMM d, yyyy")
-                    : "Any date"}
+                  {formatDateRangeLabel(dateRange)}
                 </span>
                 {dateRange?.from && (
                   <span
@@ -489,6 +499,7 @@ export function SearchPanel() {
                     <X className="h-2.5 w-2.5" />
                   </span>
                 )}
+                <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent
