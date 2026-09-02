@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  ALL_FILES_ID,
   FILE_TYPE_OPTIONS,
+  coversAllTypes,
   fileTypeSummary,
   patternToTypeIds,
   typeIdsToPattern,
@@ -26,8 +26,10 @@ interface FileTypePickerProps {
 
 /**
  * Checkbox dropdown over the supported file types; composes the glob
- * pattern the store and backend keep working with. A legacy hand-typed
- * pattern shows as a custom entry until a type is picked.
+ * pattern the store and backend keep working with. "All files" mirrors the
+ * type checkboxes: it checks (and greys out) when every type is checked,
+ * and checking it checks every type. A legacy hand-typed pattern shows as
+ * a custom entry until a type is picked.
  */
 export function FileTypePicker({
   value,
@@ -37,10 +39,10 @@ export function FileTypePicker({
 }: FileTypePickerProps) {
   const ids = patternToTypeIds(value);
   const isCustom = ids === null;
-  const isAll = ids?.includes(ALL_FILES_ID) ?? false;
+  const allChecked = !isCustom && coversAllTypes(ids);
 
   const toggleType = (id: string) => {
-    if (isCustom || isAll) {
+    if (isCustom) {
       onChange(typeIdsToPattern([id]));
       return;
     }
@@ -81,7 +83,7 @@ export function FileTypePicker({
         {FILE_TYPE_OPTIONS.map((option) => (
           <DropdownMenuCheckboxItem
             key={option.id}
-            checked={!isCustom && !isAll && (ids?.includes(option.id) ?? false)}
+            checked={!isCustom && (ids?.includes(option.id) ?? false)}
             onSelect={(e) => e.preventDefault()}
             onCheckedChange={() => toggleType(option.id)}
           >
@@ -93,9 +95,10 @@ export function FileTypePicker({
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
-          checked={isAll}
+          checked={allChecked}
+          disabled={allChecked}
           onSelect={(e) => e.preventDefault()}
-          onCheckedChange={() => onChange(typeIdsToPattern([ALL_FILES_ID]))}
+          onCheckedChange={() => onChange("*")}
         >
           All files
         </DropdownMenuCheckboxItem>

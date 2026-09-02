@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  ALL_FILES_ID,
+  FILE_TYPE_OPTIONS,
+  coversAllTypes,
   fileTypeSummary,
   patternToTypeIds,
   typeIdsToPattern,
 } from "./file-types";
+
+const allIds = FILE_TYPE_OPTIONS.map((o) => o.id);
 
 describe("patternToTypeIds", () => {
   it("maps single known patterns", () => {
@@ -15,10 +18,10 @@ describe("patternToTypeIds", () => {
     expect(patternToTypeIds("*.xml, *.json")).toEqual(["xml", "json"]);
   });
 
-  it("maps wildcard and empty to all files", () => {
-    expect(patternToTypeIds("*")).toEqual([ALL_FILES_ID]);
-    expect(patternToTypeIds("*.*")).toEqual([ALL_FILES_ID]);
-    expect(patternToTypeIds("")).toEqual([ALL_FILES_ID]);
+  it("maps wildcard and empty to every type checked", () => {
+    expect(patternToTypeIds("*")).toEqual(allIds);
+    expect(patternToTypeIds("*.*")).toEqual(allIds);
+    expect(patternToTypeIds("")).toEqual(allIds);
   });
 
   it("returns null for custom globs", () => {
@@ -33,10 +36,23 @@ describe("typeIdsToPattern", () => {
     expect(typeIdsToPattern(["xml", "json"])).toBe("*.xml,*.json");
   });
 
-  it("all files wins and empty falls back to everything", () => {
-    expect(typeIdsToPattern([ALL_FILES_ID])).toBe("*");
-    expect(typeIdsToPattern(["xml", ALL_FILES_ID])).toBe("*");
+  it("collapses a full set of types to the wildcard", () => {
+    expect(typeIdsToPattern(allIds)).toBe("*");
     expect(typeIdsToPattern([])).toBe("*");
+  });
+
+  it("round-trips manually checking every type back to all files", () => {
+    const ids = patternToTypeIds(typeIdsToPattern(allIds));
+    expect(ids).toEqual(allIds);
+    expect(coversAllTypes(ids ?? [])).toBe(true);
+  });
+});
+
+describe("coversAllTypes", () => {
+  it("is true only when every type is present", () => {
+    expect(coversAllTypes(allIds)).toBe(true);
+    expect(coversAllTypes(allIds.slice(1))).toBe(false);
+    expect(coversAllTypes([])).toBe(false);
   });
 });
 
