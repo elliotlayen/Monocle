@@ -366,7 +366,10 @@ export function SearchPanel() {
         </div>
 
         {/* Row 3: scope */}
-        <div className="flex flex-wrap items-center gap-1.5" id="explorer-scope-row">
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          id="explorer-scope-row"
+        >
           <span className="text-[10px] text-muted-foreground">in</span>
           {scopeChips}
           <Popover
@@ -375,8 +378,9 @@ export function SearchPanel() {
               // Make sure the source's top-level folders are loaded
               const store = useExplorerStore.getState();
               const source =
-                store.folderSources.find((s) => s.id === store.searchSourceId) ??
-                store.folderSources[0];
+                store.folderSources.find(
+                  (s) => s.id === store.searchSourceId
+                ) ?? store.folderSources[0];
               const root = source ? store.treeNodes.get(source.id) : undefined;
               if (root && root.loadState === "idle") {
                 void store.expandNode(root.id);
@@ -387,7 +391,7 @@ export function SearchPanel() {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-[10.5px] transition-colors duration-[var(--duration-fast)]",
+                  "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-[10.5px] transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
                   scopePaths.size > 0
                     ? "border-accent-blue text-accent-blue"
                     : "border-border bg-muted text-muted-foreground hover:text-foreground"
@@ -473,7 +477,10 @@ export function SearchPanel() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+            <PopoverContent
+              className="w-auto overflow-hidden p-0"
+              align="start"
+            >
               <Calendar
                 mode="range"
                 defaultMonth={dateRange?.from ?? undefined}
@@ -493,7 +500,7 @@ export function SearchPanel() {
                 <button
                   type="button"
                   className={cn(
-                    "h-[26px] rounded-md border px-2 text-[11px] transition-colors duration-[var(--duration-fast)]",
+                    "h-[26px] rounded-md border px-2 text-[11px] transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
                     searchRegex
                       ? "border-accent-blue bg-accent-blue/12 text-accent-blue"
                       : "border-border bg-muted text-muted-foreground hover:text-foreground"
@@ -511,7 +518,7 @@ export function SearchPanel() {
                 <button
                   type="button"
                   className={cn(
-                    "h-[26px] rounded-md border px-2 text-[11px] transition-colors duration-[var(--duration-fast)]",
+                    "h-[26px] rounded-md border px-2 text-[11px] transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
                     searchCaseSensitive
                       ? "border-accent-blue bg-accent-blue/12 text-accent-blue"
                       : "border-border bg-muted text-muted-foreground hover:text-foreground"

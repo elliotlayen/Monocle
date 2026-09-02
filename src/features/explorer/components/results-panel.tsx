@@ -21,7 +21,11 @@ interface ResultsPanelProps {
 }
 
 /** Left panel: search results (filename or content) and the Browse tree. */
-export function ResultsPanel({ width, isDragging, startDrag }: ResultsPanelProps) {
+export function ResultsPanel({
+  width,
+  isDragging,
+  startDrag,
+}: ResultsPanelProps) {
   const {
     resultsPanelMode,
     setResultsPanelMode,
@@ -129,7 +133,8 @@ export function ResultsPanel({ width, isDragging, startDrag }: ResultsPanelProps
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                Sort: {dateSortOrder === "newest" ? "newest first" : "oldest first"}
+                Sort:{" "}
+                {dateSortOrder === "newest" ? "newest first" : "oldest first"}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -138,7 +143,7 @@ export function ResultsPanel({ width, isDragging, startDrag }: ResultsPanelProps
           <button
             type="button"
             className={cn(
-              "rounded px-2 py-0.5 text-[10.5px]",
+              "rounded px-2 py-0.5 text-[10.5px] transition-[transform,background-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
               !showBrowse
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -151,7 +156,7 @@ export function ResultsPanel({ width, isDragging, startDrag }: ResultsPanelProps
           <button
             type="button"
             className={cn(
-              "rounded px-2 py-0.5 text-[10.5px]",
+              "rounded px-2 py-0.5 text-[10.5px] transition-[transform,background-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
               showBrowse
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -188,7 +193,7 @@ export function ResultsPanel({ width, isDragging, startDrag }: ResultsPanelProps
       {/* Resize handle */}
       <div
         className={cn(
-          "absolute bottom-0 right-0 top-0 w-1 cursor-col-resize hover:bg-accent-blue/40",
+          "absolute bottom-0 right-0 top-0 w-1 cursor-col-resize transition-colors duration-[var(--duration-fast)] hover:bg-accent-blue/40",
           isDragging && "bg-accent-blue/30"
         )}
         onMouseDown={startDrag}
