@@ -281,14 +281,27 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - Relationship edge IDs are unique per FK column pair (from::fk_name::col->col); never assume one edge per constraint.
 - Browse mode: databases over the configurable object threshold start with an empty canvas; the graph builds only focus roots + neighbors + expansions (see utils/browse-visibility.ts and the focus selector in the toolbar).
 
+## Integration Explorer
+
+Full-screen mode (Cmd+E) for browsing folder sources and validating XML, in `src/features/explorer/`:
+
+- **Shell**: `explorer-shell.tsx` hosts a floating glass activity rail (`activity-rail.tsx`: Explorer / Search / Scan views, sidebar toggle, Settings), a per-view sidebar (`explorer-sidebar.tsx`), and the content panel with `file-tab-bar.tsx` (dnd-kit reorder, wheel scroll, all-tabs menu), `breadcrumb-bar.tsx` (sibling-jump popovers), and `quick-open.tsx` (Cmd+P over tabs, recents, favorites, loaded files).
+- **Store**: Zustand slices in `src/features/explorer/store/` (tree, ui, tabs, scan, search) composed into one `useExplorerStore`; `store/selectors.ts` holds the pure `flattenTree` used by the virtualized tree. `loadSources` reconciles instead of resetting, so explorer state survives mode switches within a session.
+- **Selection model**: one `selectedPath` drives the tree highlight, breadcrumbs, the search "Selected folder" scope, and the scan target. The tree is a single tab stop (`role=tree`, `aria-activedescendant`, arrow keys, type-ahead).
+- **Tree**: `folder-tree.tsx` renders `flattenTree` rows through `@tanstack/react-virtual`; `folder-tree-node.tsx` rows are memoized and subscription-free; one shared context menu resolves rows via `data-row-key`.
+- **Search** (`search-view.tsx`): Filename mode is live (250ms debounce) and merges instant matches from `loadedFileIndex` with streamed on-disk results from `filename_search_cmd` (500-result cap). Content mode runs on Enter over the selected scope; results show up to 3 highlighted match snippets (backend sends 5/file, 200 chars each) that jump to the line in Monaco.
+- **Scan** (`scan-view.tsx`): targets the selected folder; `bulk_scan_cmd` streams `scan-results-batch` events into `scan-results-tab.tsx` live and returns a slim summary (no `files` vector). Cancel keeps partial results. Scan events subscribe at the shell (`use-scan-events.ts`).
+- **File opens** are size-gated via `file_stat_cmd`: over 5 MB opens source-only (XML tree and formatting disabled) after a native confirm; over 50 MB is refused.
+- `validationCache` is bounded (`store/bounded-cache.ts`, 2000 entries) and updates live from scan batches, so tree and tab badges appear as a scan runs.
+
 ## Performance Patterns
 
 ### Batched Tauri Events
 
 Search and scan commands emit results in batches, not per-file:
 
-- **Search results**: Batched via `searchResultsBatchHub` in `src/services/events.ts`. Rust emits every 50 files or 150ms (whichever comes first). Frontend `appendSearchResults` in the store accepts `SearchResultFile[]` and `SearchErrorFile[]` arrays.
-- **Scan progress**: Throttled to emit every 200 files or 150ms minimum. `totalFiles` may be `null` in streaming mode (unknown count).
+- **Search results**: `search-results-batch` via `searchResultsBatchHub` in `src/services/events.ts`; Rust flushes when 50 results are pending or 150ms elapsed. Same batching for `scan-results-batch` and `filename-results-batch`.
+- **Progress events**: throttled to every 200 files or 150ms minimum. `totalFiles` may be `null` in streaming mode (unknown count).
 - Never emit one event per file — it saturates the IPC bridge over VPN.
 
 ### Streaming Search (Rust)
@@ -296,15 +309,15 @@ Search and scan commands emit results in batches, not per-file:
 `content_search_cmd` in `src-tauri/src/commands/explorer.rs` walks and searches incrementally:
 
 - No pre-count phase — `totalFiles` is `null`, progress shows files scanned so far.
-- `search_file_line_by_line()` uses `BufReader` for line-by-line streaming instead of loading full file content into memory.
+- `search_file_content()` uses `BufReader` for line-by-line streaming instead of loading full file content into memory, and captures up to 5 matching lines per file as previews.
 - AND-logic: all search terms must appear in a file to match.
 
 ### Virtual Scrolling
 
-`search-results.tsx` uses `@tanstack/react-virtual` for large result sets:
+`folder-tree.tsx`, `search-results.tsx`, and `scan-results-tab.tsx` use `@tanstack/react-virtual`:
 
-- Collapsible folder groups with deferred file expansion.
-- Never render all search results at once — only visible rows are in the DOM.
+- Flatten grouped/hierarchical data into a typed row array, then virtualize it.
+- Never render all rows at once — only visible rows are in the DOM.
 
 ## Release Workflow
 

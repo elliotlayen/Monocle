@@ -443,6 +443,16 @@ export function FolderTree() {
             <ContextMenuItem
               onClick={() => {
                 const store = useExplorerStore.getState();
+                store.setSelectedPath(menuTarget.path);
+                store.setSearchScope("selected");
+                store.setActiveView("search");
+              }}
+            >
+              Search in This Folder
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => {
+                const store = useExplorerStore.getState();
                 store.requestScan(menuTarget.path, store.scanFilePattern);
               }}
             >
