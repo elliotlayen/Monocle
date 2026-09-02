@@ -65,6 +65,13 @@ export interface SearchHistoryEntry {
   mode: SearchFieldMode;
 }
 
+/** A saved SQL Server the Schema Browser can connect to. */
+export interface ServerSource {
+  id: string;
+  server: string;
+  label: string;
+}
+
 export interface AppSettings {
   theme?: ThemeSetting;
   schemaFilter?: string;
@@ -78,6 +85,7 @@ export interface AppSettings {
   canvasEdgeLabelMode?: EdgeLabelMode;
   canvasShowMiniMap?: boolean;
   canvasDetailViewMode?: DetailViewMode;
+  serverSources?: ServerSource[];
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
   explorerNodeStyle?: ExplorerNodeStyle;
@@ -98,6 +106,7 @@ export interface SettingsUpdate {
   canvasEdgeLabelMode?: EdgeLabelMode;
   canvasShowMiniMap?: boolean;
   canvasDetailViewMode?: DetailViewMode;
+  serverSources?: ServerSource[];
   folderSources?: FolderSource[];
   explorerSidebarWidth?: number;
   explorerNodeStyle?: ExplorerNodeStyle;

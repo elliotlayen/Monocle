@@ -44,6 +44,7 @@ import {
   ServerConnectionForm,
   type ServerConnectionFormValues,
 } from "@/features/connection/components/server-connection-form";
+import { useServerSources } from "@/features/connection/hooks/use-server-sources";
 import { OBJECT_COLORS } from "@/constants/edge-colors";
 import type {
   SchemaGraph,
@@ -127,6 +128,7 @@ export function ImportFromDatabaseDialog({
   const { addToast } = useToastStore();
 
   const [step, setStep] = useState<ImportDialogStep>("connect");
+  const serverSources = useServerSources(open);
   const [initialSavedSettings] = useState(() => loadConnectionSettings());
   const [connectionValues, setConnectionValues] =
     useState<ServerConnectionFormValues>(() => ({
@@ -420,6 +422,7 @@ export function ImportFromDatabaseDialog({
             submitLabel="Connect"
             submitDisabled={!connectionValues.server}
             error={error}
+            serverSources={serverSources}
             fieldIdPrefix="import"
             cancelAction={
               <Button

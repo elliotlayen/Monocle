@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { DialogFooter } from "@/components/ui/dialog";
 import type { AuthType } from "@/features/schema-graph/types";
+import type { ServerSource } from "@/features/settings/services/settings-service";
 
 export interface ServerConnectionFormValues {
   server: string;
@@ -32,6 +33,8 @@ export interface ServerConnectionFormProps {
   cancelAction?: ReactNode;
   extraActions?: ReactNode;
   fieldIdPrefix?: string;
+  /** Saved servers; when present the server field becomes a dropdown. */
+  serverSources?: ServerSource[];
 }
 
 export function ServerConnectionForm({
@@ -45,8 +48,15 @@ export function ServerConnectionForm({
   cancelAction,
   extraActions,
   fieldIdPrefix = "server-connection",
+  serverSources = [],
 }: ServerConnectionFormProps) {
   const isWindowsAuth = values.authType === "windows";
+  const hasServerSources = serverSources.length > 0;
+  // The dropdown reflects whichever saved server matches the current value,
+  // so the remembered last choice selects itself on open.
+  const selectedSource = hasServerSources
+    ? serverSources.find((s) => s.server === values.server)
+    : undefined;
   const serverId = `${fieldIdPrefix}-server`;
   const authTypeId = `${fieldIdPrefix}-auth-type`;
   const usernameId = `${fieldIdPrefix}-username`;
@@ -57,6 +67,8 @@ export function ServerConnectionForm({
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (submitIsDisabled) return;
+    // The saved-server dropdown cannot carry `required`; guard here.
+    if (!values.server.trim()) return;
     void onSubmit();
   };
 
@@ -64,17 +76,53 @@ export function ServerConnectionForm({
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1">
         <Label htmlFor={serverId}>Server</Label>
-        <Input
-          id={serverId}
-          type="text"
-          value={values.server}
-          onChange={(event) => onValuesChange({ server: event.target.value })}
-          placeholder="HOST\\INSTANCE"
-          required
-        />
-        <p className="text-xs text-muted-foreground">
-          Examples: HOST\INSTANCE, HOST,1433, localhost
-        </p>
+        {hasServerSources ? (
+          <>
+            <Select
+              value={selectedSource?.id ?? ""}
+              onValueChange={(id) => {
+                const source = serverSources.find((s) => s.id === id);
+                if (source) onValuesChange({ server: source.server });
+              }}
+            >
+              <SelectTrigger id={serverId}>
+                <SelectValue placeholder="Select a server" />
+              </SelectTrigger>
+              <SelectContent>
+                {serverSources.map((source) => (
+                  <SelectItem key={source.id} value={source.id}>
+                    <span>{source.label || source.server}</span>
+                    {source.label && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {source.server}
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Manage servers in Settings, under Schema Browser.
+            </p>
+          </>
+        ) : (
+          <>
+            <Input
+              id={serverId}
+              type="text"
+              value={values.server}
+              onChange={(event) =>
+                onValuesChange({ server: event.target.value })
+              }
+              placeholder="HOST\\INSTANCE"
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Examples: HOST\INSTANCE, HOST,1433, localhost. Save servers in
+              Settings, under Schema Browser.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="space-y-1">

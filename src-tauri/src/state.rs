@@ -16,6 +16,14 @@ pub struct FolderSource {
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct ServerSource {
+    pub id: String,
+    pub server: String,
+    pub label: String,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SavedSearch {
     pub name: String,
     pub query: String,
@@ -65,6 +73,8 @@ pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_detail_view_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub server_sources: Vec<ServerSource>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub folder_sources: Vec<FolderSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explorer_sidebar_width: Option<f64>,
@@ -96,6 +106,7 @@ pub struct AppSettingsUpdate {
     pub canvas_edge_label_mode: Option<String>,
     pub canvas_show_mini_map: Option<bool>,
     pub canvas_detail_view_mode: Option<String>,
+    pub server_sources: Option<Vec<ServerSource>>,
     pub folder_sources: Option<Vec<FolderSource>>,
     pub explorer_sidebar_width: Option<f64>,
     pub explorer_node_style: Option<String>,
@@ -185,6 +196,9 @@ impl AppState {
         if let Some(canvas_detail_view_mode) = update.canvas_detail_view_mode {
             settings.canvas_detail_view_mode = Some(canvas_detail_view_mode);
         }
+        if let Some(server_sources) = update.server_sources {
+            settings.server_sources = server_sources;
+        }
         if let Some(folder_sources) = update.folder_sources {
             settings.folder_sources = folder_sources;
         }
@@ -257,6 +271,7 @@ mod tests {
                 canvas_edge_label_mode: Some("never".to_string()),
                 canvas_show_mini_map: Some(false),
                 canvas_detail_view_mode: Some("inspector".to_string()),
+                server_sources: None,
                 folder_sources: None,
                 explorer_sidebar_width: None,
                 explorer_node_style: Some("capsule".to_string()),
@@ -355,6 +370,38 @@ mod tests {
         assert_eq!(settings.folder_sources[0].label, "Inbound");
         assert_eq!(settings.folder_sources[0].tag, "Production");
         assert_eq!(settings.folder_sources[0].favorites, vec!["ClientA"]);
+    }
+
+    #[test]
+    fn server_sources_round_trip() {
+        let dir = tempdir().expect("tempdir");
+        let state = AppState::new(dir.path().to_path_buf());
+
+        let sources = vec![ServerSource {
+            id: "srv-1".to_string(),
+            server: "HOST\\INSTANCE".to_string(),
+            label: "Production".to_string(),
+        }];
+
+        state
+            .update_settings(AppSettingsUpdate {
+                server_sources: Some(sources.clone()),
+                ..Default::default()
+            })
+            .expect("update settings");
+
+        let reloaded = AppState::new(dir.path().to_path_buf());
+        let settings = reloaded.get_settings().expect("get settings");
+
+        assert_eq!(settings.server_sources.len(), 1);
+        assert_eq!(settings.server_sources[0].id, "srv-1");
+        assert_eq!(settings.server_sources[0].server, "HOST\\INSTANCE");
+        assert_eq!(settings.server_sources[0].label, "Production");
+
+        // camelCase on disk so the frontend reads it directly.
+        let raw = std::fs::read_to_string(dir.path().join("settings.json"))
+            .expect("read settings file");
+        assert!(raw.contains("serverSources"));
     }
 
     #[test]

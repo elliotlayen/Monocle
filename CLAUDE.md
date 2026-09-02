@@ -275,6 +275,7 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - React Flow nodes require unique IDs matching the data model
 - Schema filter state persists across sessions via settings
 - Connection passwords are not stored - only connection metadata
+- Saved servers (`serverSources` in settings, managed under Settings > Schema Browser > Sources) turn the connection dialog's server field into a dropdown; the last choice restores via the same localStorage mechanism as authentication (`connection-settings.ts`)
 - The app uses React Flow's dagre layout for automatic positioning
 - Monaco Editor provides SQL syntax highlighting and intellisense (replaces prism-react-renderer)
 - Edge direction convention: FK child -> parent; reads table -> code object; writes code object -> table; calls caller -> callee. An arrow into a code object means it reads that; an arrow out of it into a table means it writes it.

@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
+  Database,
   FolderSync,
   Info,
   Network,
@@ -20,6 +21,7 @@ import {
   type SchemaStore,
 } from "@/features/schema-graph/store";
 import { GraphSettingsSection } from "@/features/settings/components/sections/graph-settings-section";
+import { ServerSourcesSection } from "@/features/settings/components/sections/server-sources-section";
 import { CanvasDisplaySettingsSection } from "@/features/settings/components/sections/canvas-display-settings-section";
 import { AppearanceSettingsSection } from "@/features/settings/components/sections/appearance-settings-section";
 import { FolderSourcesSection } from "@/features/settings/components/sections/folder-sources-section";
@@ -32,6 +34,7 @@ interface AppSettingsSheetProps {
 
 export type SettingsSectionId =
   | "schema-graph"
+  | "schema-sources"
   | "canvas-display"
   | "explorer-sources"
   | "general-appearance"
@@ -61,6 +64,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         label: "Graph",
         icon: Network,
         render: () => <GraphSettingsSection />,
+      },
+      {
+        id: "schema-sources",
+        label: "Sources",
+        icon: Database,
+        render: () => <ServerSourcesSection />,
       },
     ],
   },

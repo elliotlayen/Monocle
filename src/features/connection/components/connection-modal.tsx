@@ -19,6 +19,7 @@ import {
   ServerConnectionForm,
   type ServerConnectionFormValues,
 } from "@/features/connection/components/server-connection-form";
+import { useServerSources } from "@/features/connection/hooks/use-server-sources";
 
 type FormData = ServerConnectionFormValues;
 
@@ -45,6 +46,7 @@ export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
   );
 
   const { addToast } = useToastStore();
+  const serverSources = useServerSources(open);
 
   const [formData, setFormData] = useState<FormData>(() => {
     const saved = loadConnectionSettings();
@@ -132,6 +134,7 @@ export function ConnectionModal({ open, onOpenChange }: ConnectionModalProps) {
             submitLabel="Connect"
             error={error}
             fieldIdPrefix="connect"
+            serverSources={serverSources}
             extraActions={
               import.meta.env.DEV ? (
                 <Button
