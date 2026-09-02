@@ -35,17 +35,20 @@ export function applyNodeRenderPatch(
 ): NodeRenderUpdateResult {
   const previousData = (node.data as NodeRenderData | undefined) ?? {};
   const positionChanged =
-    patch.position.x !== node.position.x || patch.position.y !== node.position.y;
+    patch.position.x !== node.position.x ||
+    patch.position.y !== node.position.y;
   const hiddenChanged = Boolean(node.hidden) !== patch.hidden;
+  // isCompact is diffed for every node kind: routine nodes restyle in compact
+  // bands, but only table/view nodes change size (see geometryChanged).
   const coreDataChanged =
     previousData.isFocused !== patch.isFocused ||
     previousData.isDimmed !== patch.isDimmed ||
-    previousData.nodeWidth !== patch.nodeWidth;
+    previousData.nodeWidth !== patch.nodeWidth ||
+    previousData.isCompact !== patch.isCompact;
 
   const tableViewDataChanged =
     patch.includeTableViewFields &&
-    (previousData.isCompact !== patch.isCompact ||
-      previousData.columnsWithHandles !== patch.columnsWithHandles ||
+    (previousData.columnsWithHandles !== patch.columnsWithHandles ||
       previousData.handleEdgeTypes !== patch.handleEdgeTypes);
 
   const dataChanged = coreDataChanged || tableViewDataChanged;
@@ -63,9 +66,9 @@ export function applyNodeRenderPatch(
         isFocused: patch.isFocused,
         isDimmed: patch.isDimmed,
         nodeWidth: patch.nodeWidth,
+        isCompact: patch.isCompact,
         ...(patch.includeTableViewFields
           ? {
-              isCompact: patch.isCompact,
               columnsWithHandles: patch.columnsWithHandles,
               handleEdgeTypes: patch.handleEdgeTypes,
             }
@@ -77,7 +80,8 @@ export function applyNodeRenderPatch(
     positionChanged ||
     hiddenChanged ||
     previousData.nodeWidth !== patch.nodeWidth ||
-    (patch.includeTableViewFields && previousData.isCompact !== patch.isCompact);
+    (patch.includeTableViewFields &&
+      previousData.isCompact !== patch.isCompact);
 
   return {
     node: {

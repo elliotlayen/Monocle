@@ -15,9 +15,12 @@ import { schemaService } from "./services/schema-service";
 import { databaseService } from "@/features/connection/services/database-service";
 import {
   settingsService,
+  isNodeStyle,
+  DEFAULT_NODE_STYLE,
   type AppSettings,
   type DetailViewMode,
   type EdgeLabelMode,
+  type NodeStyle,
 } from "@/features/settings/services/settings-service";
 import type {
   CreateTableInput,
@@ -62,6 +65,7 @@ interface SchemaStore {
   edgeLabelMode: EdgeLabelMode;
   showMiniMap: boolean;
   detailViewMode: DetailViewMode;
+  nodeStyle: NodeStyle;
 
   // Canvas mode state
   mode: "connected" | "canvas" | "explorer";
@@ -115,6 +119,7 @@ interface SchemaStore {
   setEdgeLabelMode: (mode: EdgeLabelMode) => void;
   setShowMiniMap: (show: boolean) => void;
   setDetailViewMode: (mode: DetailViewMode) => void;
+  setNodeStyle: (style: NodeStyle) => void;
   setFocusedTable: (tableId: string | null) => void;
   clearFocus: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -161,20 +166,41 @@ interface SchemaStore {
   setCanvasDirty: (dirty: boolean) => void;
 
   // Canvas CRUD actions
-  addTable: (input: CreateTableInput, position?: { x: number; y: number }) => string | null;
+  addTable: (
+    input: CreateTableInput,
+    position?: { x: number; y: number }
+  ) => string | null;
   updateTable: (id: string, input: CreateTableInput) => string | null;
   removeTable: (id: string) => void;
-  addView: (input: CreateViewInput, position?: { x: number; y: number }) => string | null;
+  addView: (
+    input: CreateViewInput,
+    position?: { x: number; y: number }
+  ) => string | null;
   updateView: (id: string, input: CreateViewInput) => string | null;
   removeView: (id: string) => void;
-  addTrigger: (input: CreateTriggerInput, position?: { x: number; y: number }) => string | null;
+  addTrigger: (
+    input: CreateTriggerInput,
+    position?: { x: number; y: number }
+  ) => string | null;
   updateTrigger: (id: string, input: CreateTriggerInput) => string | null;
   removeTrigger: (id: string) => void;
-  addStoredProcedure: (input: CreateProcedureInput, position?: { x: number; y: number }) => string | null;
-  updateStoredProcedure: (id: string, input: CreateProcedureInput) => string | null;
+  addStoredProcedure: (
+    input: CreateProcedureInput,
+    position?: { x: number; y: number }
+  ) => string | null;
+  updateStoredProcedure: (
+    id: string,
+    input: CreateProcedureInput
+  ) => string | null;
   removeStoredProcedure: (id: string) => void;
-  addScalarFunction: (input: CreateFunctionInput, position?: { x: number; y: number }) => string | null;
-  updateScalarFunction: (id: string, input: CreateFunctionInput) => string | null;
+  addScalarFunction: (
+    input: CreateFunctionInput,
+    position?: { x: number; y: number }
+  ) => string | null;
+  updateScalarFunction: (
+    id: string,
+    input: CreateFunctionInput
+  ) => string | null;
   removeScalarFunction: (id: string) => void;
   addRelationship: (
     from: string,
@@ -367,11 +393,7 @@ const updateReferencesForRename = (
       oldId,
       newId
     ),
-    affectedTables: replaceIdInList(
-      trigger.affectedTables || [],
-      oldId,
-      newId
-    ),
+    affectedTables: replaceIdInList(trigger.affectedTables || [], oldId, newId),
   }));
 
   schema.storedProcedures = schema.storedProcedures.map((procedure) => ({
@@ -390,16 +412,8 @@ const updateReferencesForRename = (
 
   schema.scalarFunctions = schema.scalarFunctions.map((fn) => ({
     ...fn,
-    referencedTables: replaceIdInList(
-      fn.referencedTables || [],
-      oldId,
-      newId
-    ),
-    affectedTables: replaceIdInList(
-      fn.affectedTables || [],
-      oldId,
-      newId
-    ),
+    referencedTables: replaceIdInList(fn.referencedTables || [], oldId, newId),
+    affectedTables: replaceIdInList(fn.affectedTables || [], oldId, newId),
   }));
 
   schema.views = schema.views.map((view) => ({
@@ -438,14 +452,8 @@ const updateReferencesForRename = (
 const removeReferencesForNode = (schema: SchemaGraph, nodeId: string) => {
   schema.triggers = schema.triggers.map((trigger) => ({
     ...trigger,
-    referencedTables: removeIdFromList(
-      trigger.referencedTables || [],
-      nodeId
-    ),
-    affectedTables: removeIdFromList(
-      trigger.affectedTables || [],
-      nodeId
-    ),
+    referencedTables: removeIdFromList(trigger.referencedTables || [], nodeId),
+    affectedTables: removeIdFromList(trigger.affectedTables || [], nodeId),
   }));
 
   schema.storedProcedures = schema.storedProcedures.map((procedure) => ({
@@ -454,10 +462,7 @@ const removeReferencesForNode = (schema: SchemaGraph, nodeId: string) => {
       procedure.referencedTables || [],
       nodeId
     ),
-    affectedTables: removeIdFromList(
-      procedure.affectedTables || [],
-      nodeId
-    ),
+    affectedTables: removeIdFromList(procedure.affectedTables || [], nodeId),
   }));
 
   schema.scalarFunctions = schema.scalarFunctions.map((fn) => ({
@@ -507,6 +512,7 @@ export const createInitialSchemaState = () => ({
   edgeLabelMode: "auto" as EdgeLabelMode,
   showMiniMap: true,
   detailViewMode: "inspector" as DetailViewMode,
+  nodeStyle: DEFAULT_NODE_STYLE,
   focusedTableId: null,
   sidebarOpen: true,
   viewMode: "full" as const,
@@ -545,9 +551,7 @@ const pruneExcludedObjectIds = (
   schema: SchemaGraph,
   excludedObjectIds: Set<string>
 ) =>
-  new Set(
-    [...excludedObjectIds].filter((id) => getAllNodeIds(schema).has(id))
-  );
+  new Set([...excludedObjectIds].filter((id) => getAllNodeIds(schema).has(id)));
 
 const normalizeLookupKey = (value: string) =>
   value.replace(/[[\]]/g, "").toLowerCase();
@@ -590,7 +594,7 @@ const resolveObjectId = (value: string, lookup: Map<string, string>) => {
 const hasColumnLineage = (column: Column) =>
   Boolean(
     (column.sourceColumns && column.sourceColumns.length > 0) ||
-      (column.sourceTable && column.sourceColumn)
+    (column.sourceTable && column.sourceColumn)
   );
 
 const getColumnLineage = (column: Column) => {
@@ -632,7 +636,9 @@ const mergeReferences = (
 const sameStringArray = (a: string[], b: string[]) =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
-const enrichLoadedSchemaViewDependencies = (schema: SchemaGraph): SchemaGraph => {
+const enrichLoadedSchemaViewDependencies = (
+  schema: SchemaGraph
+): SchemaGraph => {
   if (!schema.views || schema.views.length === 0) {
     return schema;
   }
@@ -1030,6 +1036,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     ) {
       updates.detailViewMode = settings.detailViewMode;
     }
+    if (isNodeStyle(settings.nodeStyle)) {
+      updates.nodeStyle = settings.nodeStyle;
+    }
 
     if (Object.keys(updates).length > 0) {
       set(updates);
@@ -1062,6 +1071,13 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   setDetailViewMode: (mode: DetailViewMode) => {
     set({ detailViewMode: mode });
     settingsService.saveSettings({ detailViewMode: mode }).catch(() => {
+      // Ignore persistence errors
+    });
+  },
+
+  setNodeStyle: (style: NodeStyle) => {
+    set({ nodeStyle: style });
+    settingsService.saveSettings({ nodeStyle: style }).catch(() => {
       // Ignore persistence errors
     });
   },
@@ -1625,7 +1641,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     const parsedParams = parseRoutineParameters(definition);
     const parameters = parsedParams.hasSignature
       ? parsedParams.parameters
-      : input.parameters ?? [];
+      : (input.parameters ?? []);
 
     const procedure: StoredProcedure = {
       id,
@@ -1672,7 +1688,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     const parsedParams = parseRoutineParameters(definition);
     const parameters = parsedParams.hasSignature
       ? parsedParams.parameters
-      : input.parameters ?? newSchema.storedProcedures[index].parameters;
+      : (input.parameters ?? newSchema.storedProcedures[index].parameters);
 
     newSchema.storedProcedures[index] = {
       ...newSchema.storedProcedures[index],
@@ -1749,7 +1765,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     const parsedReturnType = parseFunctionReturnType(definition);
     const parameters = parsedParams.hasSignature
       ? parsedParams.parameters
-      : input.parameters ?? [];
+      : (input.parameters ?? []);
     const returnType = parsedReturnType ?? input.returnType ?? "int";
 
     const fn: ScalarFunction = {
@@ -1799,7 +1815,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     const parsedReturnType = parseFunctionReturnType(definition);
     const parameters = parsedParams.hasSignature
       ? parsedParams.parameters
-      : input.parameters ?? newSchema.scalarFunctions[index].parameters;
+      : (input.parameters ?? newSchema.scalarFunctions[index].parameters);
     const returnType =
       parsedReturnType ??
       input.returnType ??
@@ -2090,7 +2106,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     if (state.mode !== "canvas" || !state.schema) return false;
 
     const newSchema = cloneSchema(state.schema);
-    const index = newSchema.scalarFunctions.findIndex((f) => f.id === functionId);
+    const index = newSchema.scalarFunctions.findIndex(
+      (f) => f.id === functionId
+    );
     if (index === -1) return false;
     const fn = newSchema.scalarFunctions[index];
     const list = fn.referencedTables || [];
@@ -2110,7 +2128,9 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     if (state.mode !== "canvas" || !state.schema) return false;
 
     const newSchema = cloneSchema(state.schema);
-    const index = newSchema.scalarFunctions.findIndex((f) => f.id === functionId);
+    const index = newSchema.scalarFunctions.findIndex(
+      (f) => f.id === functionId
+    );
     if (index === -1) return false;
     const fn = newSchema.scalarFunctions[index];
     const list = fn.referencedTables || [];
@@ -2141,7 +2161,12 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       targetColumn.sourceColumns && targetColumn.sourceColumns.length > 0
         ? targetColumn.sourceColumns
         : targetColumn.sourceTable && targetColumn.sourceColumn
-          ? [{ table: targetColumn.sourceTable, column: targetColumn.sourceColumn }]
+          ? [
+              {
+                table: targetColumn.sourceTable,
+                column: targetColumn.sourceColumn,
+              },
+            ]
           : [];
     const alreadyExists = existingSources.some(
       (source) =>
@@ -2179,12 +2204,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     return true;
   },
 
-  removeViewColumnSource: (
-    viewId,
-    columnName,
-    sourceTableId,
-    sourceColumn
-  ) => {
+  removeViewColumnSource: (viewId, columnName, sourceTableId, sourceColumn) => {
     const state = get();
     if (state.mode !== "canvas" || !state.schema) return false;
 
@@ -2301,19 +2321,13 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       const newProcs = objects.storedProcedures.filter(
         (p) => !existingIds.has(p.id)
       );
-      newSchema.storedProcedures = [
-        ...newSchema.storedProcedures,
-        ...newProcs,
-      ];
+      newSchema.storedProcedures = [...newSchema.storedProcedures, ...newProcs];
     }
     if (objects.scalarFunctions) {
       const newFuncs = objects.scalarFunctions.filter(
         (f) => !existingIds.has(f.id)
       );
-      newSchema.scalarFunctions = [
-        ...newSchema.scalarFunctions,
-        ...newFuncs,
-      ];
+      newSchema.scalarFunctions = [...newSchema.scalarFunctions, ...newFuncs];
     }
 
     // Import relationships where both endpoints exist
@@ -2335,3 +2349,4 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     });
   },
 }));
+

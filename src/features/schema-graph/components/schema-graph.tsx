@@ -50,10 +50,7 @@ import {
   TRIGGER_MIN_WIDTH,
 } from "./node-width";
 import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
-import {
-  SchemaBrowserSidebar,
-  SIDEBAR_WIDTH,
-} from "./schema-browser-sidebar";
+import { SchemaBrowserSidebar, SIDEBAR_WIDTH } from "./schema-browser-sidebar";
 import { DetailInspector } from "./detail-inspector";
 import { DetailDrawer } from "./detail-drawer";
 import { SidebarToggle } from "@/components/ui/sidebar-toggle";
@@ -164,7 +161,8 @@ function getMinimapNodeColor(node: Node): string {
   if (node.data?.isDimmed) return "var(--color-muted)";
   if (node.type === "viewNode") return OBJECT_COLORS.views;
   if (node.type === "triggerNode") return OBJECT_COLORS.triggers;
-  if (node.type === "storedProcedureNode") return OBJECT_COLORS.storedProcedures;
+  if (node.type === "storedProcedureNode")
+    return OBJECT_COLORS.storedProcedures;
   if (node.type === "scalarFunctionNode") return OBJECT_COLORS.scalarFunctions;
   return OBJECT_COLORS.tables;
 }
@@ -251,7 +249,10 @@ function estimateOverviewAuxCols(
   }
 
   const totalStackHeight =
-    nodeIds.reduce((sum, nodeId) => sum + getNodeHeight(nodeHeights, nodeId), 0) +
+    nodeIds.reduce(
+      (sum, nodeId) => sum + getNodeHeight(nodeHeights, nodeId),
+      0
+    ) +
     GAP_Y * Math.max(0, nodeIds.length - 1);
   const avgNodeWidth =
     nodeIds.reduce(
@@ -262,7 +263,9 @@ function estimateOverviewAuxCols(
 
   return clampValue(
     Math.ceil(
-      Math.sqrt((OVERVIEW_TARGET_ASPECT_RATIO * totalStackHeight) / safeAvgWidth)
+      Math.sqrt(
+        (OVERVIEW_TARGET_ASPECT_RATIO * totalStackHeight) / safeAvgWidth
+      )
     ),
     1,
     OVERVIEW_AUX_MAX_COLS
@@ -322,7 +325,10 @@ function buildBaseNodes(
   const views = (schema.views || []).filter((view) => includes(view.id));
   const hiddenNeighborCount = (id: string) =>
     includeIds ? countHiddenNeighbors(id, includeIds, neighbors) : 0;
-  const mainNodeIds = [...tables.map((table) => table.id), ...views.map((view) => view.id)];
+  const mainNodeIds = [
+    ...tables.map((table) => table.id),
+    ...views.map((view) => view.id),
+  ];
   const overviewMaxLanes = getOverviewMainMaxLanes(mainNodeIds.length);
   const layered = layoutLayeredLeftToRight({
     nodeIds: mainNodeIds,
@@ -333,11 +339,14 @@ function buildBaseNodes(
     maxLanes: overviewMaxLanes,
     targetAspectRatio: OVERVIEW_TARGET_ASPECT_RATIO,
     getHeight: (nodeId) => getNodeHeight(nodeHeights, nodeId),
-    getWidth: (nodeId) => getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH),
+    getWidth: (nodeId) =>
+      getNodeWidth(nodeWidths, nodeId, TABLE_VIEW_MIN_WIDTH),
   });
   const mainPositions = layered.positions;
   const orderedRanks = [
-    ...new Set(mainNodeIds.map((nodeId) => layered.layerByNode.get(nodeId) ?? 0)),
+    ...new Set(
+      mainNodeIds.map((nodeId) => layered.layerByNode.get(nodeId) ?? 0)
+    ),
   ].sort((a, b) => a - b);
   const orderedBandIds = orderedRanks.map((rank) => `overview-rank-${rank}`);
   const bandIdByRank = new Map<number, string>();
@@ -514,25 +523,25 @@ function buildBaseNodes(
     data: {
       trigger,
       isDimmed: false,
+      isCompact: false,
       nodeWidth: getNodeWidth(nodeWidths, trigger.id, TRIGGER_MIN_WIDTH),
       onClick: (e: React.MouseEvent) => options?.onTriggerClick?.(trigger, e),
     },
   }));
 
-  const procedureNodes: Node[] = procedures.map(
-    (procedure) => ({
-      id: procedure.id,
-      type: "storedProcedureNode",
-      position: bottomPositions.get(procedure.id) ?? { x: 0, y: 0 },
-      data: {
-        procedure,
-        isDimmed: false,
-        nodeWidth: getNodeWidth(nodeWidths, procedure.id, ROUTINE_MIN_WIDTH),
-        onClick: (e: React.MouseEvent) =>
-          options?.onProcedureClick?.(procedure, e),
-      },
-    })
-  );
+  const procedureNodes: Node[] = procedures.map((procedure) => ({
+    id: procedure.id,
+    type: "storedProcedureNode",
+    position: bottomPositions.get(procedure.id) ?? { x: 0, y: 0 },
+    data: {
+      procedure,
+      isDimmed: false,
+      isCompact: false,
+      nodeWidth: getNodeWidth(nodeWidths, procedure.id, ROUTINE_MIN_WIDTH),
+      onClick: (e: React.MouseEvent) =>
+        options?.onProcedureClick?.(procedure, e),
+    },
+  }));
 
   const functionNodes: Node[] = scalarFunctions.map((fn) => ({
     id: fn.id,
@@ -541,6 +550,7 @@ function buildBaseNodes(
     data: {
       function: fn,
       isDimmed: false,
+      isCompact: false,
       nodeWidth: getNodeWidth(nodeWidths, fn.id, ROUTINE_MIN_WIDTH),
       onClick: (e: React.MouseEvent) => options?.onFunctionClick?.(fn, e),
     },
@@ -589,7 +599,9 @@ function buildBaseEdges(
       sourceColumn: rel.fromColumn,
       targetColumn: rel.toColumn,
       label:
-        columnLabel && rel.isDisabled ? `${columnLabel} (disabled)` : columnLabel,
+        columnLabel && rel.isDisabled
+          ? `${columnLabel} (disabled)`
+          : columnLabel,
       isDisabled: rel.isDisabled,
     });
   });
@@ -998,18 +1010,21 @@ function SchemaGraphInner({
     [canvasMode]
   );
 
-  const onMove = useCallback((_event: unknown, viewport: { zoom: number }) => {
-    zoomRef.current = viewport.zoom;
-    const nextZoomBand = getZoomBand(viewport.zoom);
-    setZoomBand((prev) => (prev === nextZoomBand ? prev : nextZoomBand));
+  const onMove = useCallback(
+    (_event: unknown, viewport: { zoom: number }) => {
+      zoomRef.current = viewport.zoom;
+      const nextZoomBand = getZoomBand(viewport.zoom);
+      setZoomBand((prev) => (prev === nextZoomBand ? prev : nextZoomBand));
 
-    if (edgeLabelMode === "auto") {
-      const nextShowLabels = shouldShowEdgeLabelsAtZoom(viewport.zoom);
-      setAutoShowEdgeLabels((prev) =>
-        prev === nextShowLabels ? prev : nextShowLabels
-      );
-    }
-  }, [edgeLabelMode]);
+      if (edgeLabelMode === "auto") {
+        const nextShowLabels = shouldShowEdgeLabelsAtZoom(viewport.zoom);
+        setAutoShowEdgeLabels((prev) =>
+          prev === nextShowLabels ? prev : nextShowLabels
+        );
+      }
+    },
+    [edgeLabelMode]
+  );
 
   const removeEdgeDescriptor = useCallback(
     (descriptor: EdgeEditState) => {
@@ -1050,10 +1065,7 @@ function SchemaGraphInner({
           );
           break;
         case "viewDependencies":
-          if (
-            descriptor.targetColumn &&
-            descriptor.sourceColumn
-          ) {
+          if (descriptor.targetColumn && descriptor.sourceColumn) {
             removeViewColumnSource(
               descriptor.targetId,
               descriptor.targetColumn,
@@ -1149,7 +1161,8 @@ function SchemaGraphInner({
         targetId,
         sourceColumn,
         targetColumn,
-        edgeType: allowedEdgeTypes.length === 1 ? allowedEdgeTypes[0] : undefined,
+        edgeType:
+          allowedEdgeTypes.length === 1 ? allowedEdgeTypes[0] : undefined,
       });
     },
     [canvasMode, schema]
@@ -1550,7 +1563,11 @@ function SchemaGraphInner({
 
   const focusState = useMemo(
     () =>
-      computeFocusState(effectiveVisibility, focusedTableId ?? null, schemaIndex),
+      computeFocusState(
+        effectiveVisibility,
+        focusedTableId ?? null,
+        schemaIndex
+      ),
     [effectiveVisibility, focusedTableId, schemaIndex]
   );
 
@@ -1604,8 +1621,12 @@ function SchemaGraphInner({
       focusedTableId: focusedTableId ?? null,
     };
     const focusTransition = getFocusTransition(prevState, nextFocusState);
-    const focusSessionActive = isFocusSessionActive(nextFocusState.focusedTableId);
-    const prevFocusSessionActive = isFocusSessionActive(prevState.focusedTableId);
+    const focusSessionActive = isFocusSessionActive(
+      nextFocusState.focusedTableId
+    );
+    const prevFocusSessionActive = isFocusSessionActive(
+      prevState.focusedTableId
+    );
     const focusTargetChanged = focusTransition === "target-change";
 
     if ((focusSessionActive && !prevFocusSessionActive) || focusTargetChanged) {
@@ -1654,7 +1675,8 @@ function SchemaGraphInner({
       let changed = false;
       const nextNodes = currentNodes.map((node) => {
         const isVisible = visibleNodeIds.has(node.id);
-        const isTableOrView = node.type === "tableNode" || node.type === "viewNode";
+        const isTableOrView =
+          node.type === "tableNode" || node.type === "viewNode";
         const isFocused = isTableOrView && node.id === focusedTableId;
         const isDimmed = dimmedNodeIds.has(node.id);
 
@@ -1667,25 +1689,21 @@ function SchemaGraphInner({
               : TABLE_VIEW_MIN_WIDTH;
         const nodeWidth = getNodeWidth(nodeWidths, node.id, widthFallback);
 
-        let nodeIsCompact: boolean | undefined;
-        if (isTableOrView) {
-          // Per-node compact calculation.
-          nodeIsCompact = isCompactForZoomBand(zoomBand);
-
-          if (zoomBand === "forceCompact") {
-            nodeIsCompact = true;
-          } else if (focusedTableId) {
-            if (node.id === focusedTableId) {
-              // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM).
+        // Per-node compact calculation. Every node kind follows the zoom band
+        // (routine nodes restyle only); focus overrides apply to tables/views.
+        let nodeIsCompact = isCompactForZoomBand(zoomBand);
+        if (zoomBand === "forceCompact") {
+          nodeIsCompact = true;
+        } else if (isTableOrView && focusedTableId) {
+          if (node.id === focusedTableId) {
+            // Focused node is always expanded (unless below FORCE_COMPACT_ZOOM).
+            nodeIsCompact = false;
+          } else if (isNeighbor(node.id)) {
+            // Neighbors a neighbor: expand based on count thresholds.
+            if (visibleNonDimmedCount <= focusExpandThreshold) {
               nodeIsCompact = false;
-            } else if (isNeighbor(node.id)) {
-              // Neighbors a neighbor: expand based on count thresholds.
-              if (visibleNonDimmedCount <= focusExpandThreshold) {
-                nodeIsCompact = false;
-              } else if (visibleNonDimmedCount <= moderateThreshold) {
-                nodeIsCompact =
-                  isFocusModerateCompactForZoomBand(zoomBand);
-              }
+            } else if (visibleNonDimmedCount <= moderateThreshold) {
+              nodeIsCompact = isFocusModerateCompactForZoomBand(zoomBand);
             }
           }
         }
@@ -1881,8 +1899,7 @@ function SchemaGraphInner({
           // 12px past the sidebar's right edge (12px inset + width).
           marginBottom: 48,
           marginLeft: sidebarOpen ? SIDEBAR_WIDTH + 24 : 12,
-          transition:
-            "margin-left var(--duration-slow) var(--ease-out)",
+          transition: "margin-left var(--duration-slow) var(--ease-out)",
         }}
       />
       {showMiniMap && (
@@ -1902,171 +1919,171 @@ function SchemaGraphInner({
     // One tooltip provider for the whole graph: column rows previously
     // mounted a provider per FK column.
     <TooltipProvider delayDuration={200}>
-    <div className="w-full h-full relative flex">
-      <SchemaBrowserSidebar onItemClick={handleSidebarItemClick} />
-      {detailViewMode === "drawer" ? (
-        <DetailDrawer
-          open={detailOpen}
-          data={detailData}
-          onClose={closeDetail}
-          onEdit={canvasMode ? handleEditFromPopover : undefined}
-        />
-      ) : (
-        <DetailInspector
-          open={detailOpen}
-          data={detailData}
-          onClose={closeDetail}
-          onEdit={canvasMode ? handleEditFromPopover : undefined}
-        />
-      )}
-      {/* The floating sidebar overlays the canvas; no layout push, so the
+      <div className="w-full h-full relative flex">
+        <SchemaBrowserSidebar onItemClick={handleSidebarItemClick} />
+        {detailViewMode === "drawer" ? (
+          <DetailDrawer
+            open={detailOpen}
+            data={detailData}
+            onClose={closeDetail}
+            onEdit={canvasMode ? handleEditFromPopover : undefined}
+          />
+        ) : (
+          <DetailInspector
+            open={detailOpen}
+            data={detailData}
+            onClose={closeDetail}
+            onEdit={canvasMode ? handleEditFromPopover : undefined}
+          />
+        )}
+        {/* The floating sidebar overlays the canvas; no layout push, so the
           React Flow viewport stays stable when it toggles. */}
-      <main className="flex-1 h-full">
-        <div
-          className="relative w-full h-full"
-          onContextMenu={canvasMode ? handleContextMenu : undefined}
-        >
-          <SidebarToggle
-            onClick={() => setSidebarOpen(true)}
-            visible={!sidebarOpen}
-          />
-          {reactFlowContent}
-          {viewMode === "browse" && !canvasMode && focusRoots.size === 0 && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div className="panel-glass pointer-events-auto max-w-md space-y-3 px-8 py-6 text-center">
-                <h3 className="text-sm font-semibold">Browse mode</h3>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  This database is large, so nothing is rendered yet. Pick an
-                  object in the sidebar (double-click or the crosshair) to
-                  explore its relationships, then expand outward from there.
-                </p>
-                <Button variant="outline" size="sm" onClick={showFullGraph}>
-                  Show full graph anyway
-                </Button>
-              </div>
-            </div>
-          )}
-          {hoverCard && (
-            <div
-              style={{
-                position: "fixed",
-                left: hoverCard.x + EDGE_HOVER_CARD_OFFSET_X,
-                top: hoverCard.y + EDGE_HOVER_CARD_OFFSET_Y,
-                zIndex: 120,
-              }}
-              className="panel-glass pointer-events-none max-w-[420px] break-words rounded-md px-2.5 py-1.5 text-xs text-popover-foreground"
-            >
-              {hoverCard.title && (
-                <div className="mb-1 font-medium">{hoverCard.title}</div>
-              )}
-              <div className="space-y-0.5">
-                <div>
-                  <span className="font-medium">From:</span>{" "}
-                  {renderHoverEndpoint(hoverCard.from)}
-                </div>
-                <div>
-                  <span className="font-medium">To:</span>{" "}
-                  {renderHoverEndpoint(hoverCard.to)}
-                </div>
-              </div>
-            </div>
-          )}
-          {canvasMode && contextMenuPos && !contextMenuEdge && (
-            <CanvasContextMenu
-              screenPosition={contextMenuPos.screen}
-              flowPosition={contextMenuPos.flow}
-              onClose={() => setContextMenuPos(null)}
-              nodes={nodes}
-              schema={schema}
-              onEdit={(type, id) => setEditDialogState({ type, id })}
-              onDelete={(nodeType, id) => {
-                switch (nodeType) {
-                  case "tableNode":
-                    removeTable(id);
-                    break;
-                  case "viewNode":
-                    removeView(id);
-                    break;
-                  case "triggerNode":
-                    removeTrigger(id);
-                    break;
-                  case "storedProcedureNode":
-                    removeStoredProcedure(id);
-                    break;
-                  case "scalarFunctionNode":
-                    removeScalarFunction(id);
-                    break;
-                }
-              }}
+        <main className="flex-1 h-full">
+          <div
+            className="relative w-full h-full"
+            onContextMenu={canvasMode ? handleContextMenu : undefined}
+          >
+            <SidebarToggle
+              onClick={() => setSidebarOpen(true)}
+              visible={!sidebarOpen}
             />
-          )}
-          {canvasMode && contextMenuPos && contextMenuEdge && (
-            <div
-              style={{
-                position: "fixed",
-                left: contextMenuPos.screen.x,
-                top: contextMenuPos.screen.y,
-                zIndex: 100,
+            {reactFlowContent}
+            {viewMode === "browse" && !canvasMode && focusRoots.size === 0 && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                <div className="panel-glass pointer-events-auto max-w-md space-y-3 px-8 py-6 text-center">
+                  <h3 className="text-sm font-semibold">Browse mode</h3>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    This database is large, so nothing is rendered yet. Pick an
+                    object in the sidebar (double-click or the crosshair) to
+                    explore its relationships, then expand outward from there.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={showFullGraph}>
+                    Show full graph anyway
+                  </Button>
+                </div>
+              </div>
+            )}
+            {hoverCard && (
+              <div
+                style={{
+                  position: "fixed",
+                  left: hoverCard.x + EDGE_HOVER_CARD_OFFSET_X,
+                  top: hoverCard.y + EDGE_HOVER_CARD_OFFSET_Y,
+                  zIndex: 120,
+                }}
+                className="panel-glass pointer-events-none max-w-[420px] break-words rounded-md px-2.5 py-1.5 text-xs text-popover-foreground"
+              >
+                {hoverCard.title && (
+                  <div className="mb-1 font-medium">{hoverCard.title}</div>
+                )}
+                <div className="space-y-0.5">
+                  <div>
+                    <span className="font-medium">From:</span>{" "}
+                    {renderHoverEndpoint(hoverCard.from)}
+                  </div>
+                  <div>
+                    <span className="font-medium">To:</span>{" "}
+                    {renderHoverEndpoint(hoverCard.to)}
+                  </div>
+                </div>
+              </div>
+            )}
+            {canvasMode && contextMenuPos && !contextMenuEdge && (
+              <CanvasContextMenu
+                screenPosition={contextMenuPos.screen}
+                flowPosition={contextMenuPos.flow}
+                onClose={() => setContextMenuPos(null)}
+                nodes={nodes}
+                schema={schema}
+                onEdit={(type, id) => setEditDialogState({ type, id })}
+                onDelete={(nodeType, id) => {
+                  switch (nodeType) {
+                    case "tableNode":
+                      removeTable(id);
+                      break;
+                    case "viewNode":
+                      removeView(id);
+                      break;
+                    case "triggerNode":
+                      removeTrigger(id);
+                      break;
+                    case "storedProcedureNode":
+                      removeStoredProcedure(id);
+                      break;
+                    case "scalarFunctionNode":
+                      removeScalarFunction(id);
+                      break;
+                  }
+                }}
+              />
+            )}
+            {canvasMode && contextMenuPos && contextMenuEdge && (
+              <div
+                style={{
+                  position: "fixed",
+                  left: contextMenuPos.screen.x,
+                  top: contextMenuPos.screen.y,
+                  zIndex: 100,
+                }}
+                className="bg-popover border border-border rounded-md shadow-md py-1 min-w-[140px]"
+              >
+                <button
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                  onClick={() => {
+                    setPendingConnection({
+                      sourceId: contextMenuEdge.sourceId,
+                      targetId: contextMenuEdge.targetId,
+                      sourceColumn: contextMenuEdge.sourceColumn,
+                      targetColumn: contextMenuEdge.targetColumn,
+                      edgeType: contextMenuEdge.edgeType,
+                      editEdge: contextMenuEdge,
+                    });
+                    setContextMenuEdge(null);
+                    setContextMenuPos(null);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted text-destructive"
+                  onClick={() => {
+                    removeEdgeDescriptor(contextMenuEdge);
+                    clearEdgeSelection();
+                    setContextMenuEdge(null);
+                    setContextMenuPos(null);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </main>
+        {canvasMode && (
+          <>
+            <CanvasEditDialogs
+              editState={editDialogState}
+              onClose={() => setEditDialogState(null)}
+            />
+            <ImportFromDatabaseDialog
+              open={importDialogOpen ?? false}
+              onOpenChange={onImportDialogOpenChange ?? (() => {})}
+            />
+            <CreateEdgeDialog
+              open={pendingConnection !== null}
+              onOpenChange={(open) => {
+                if (!open) setPendingConnection(null);
               }}
-              className="bg-popover border border-border rounded-md shadow-md py-1 min-w-[140px]"
-            >
-              <button
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
-                onClick={() => {
-                  setPendingConnection({
-                    sourceId: contextMenuEdge.sourceId,
-                    targetId: contextMenuEdge.targetId,
-                    sourceColumn: contextMenuEdge.sourceColumn,
-                    targetColumn: contextMenuEdge.targetColumn,
-                    edgeType: contextMenuEdge.edgeType,
-                    editEdge: contextMenuEdge,
-                  });
-                  setContextMenuEdge(null);
-                  setContextMenuPos(null);
-                }}
-              >
-                Edit
-              </button>
-              <button
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted text-destructive"
-                onClick={() => {
-                  removeEdgeDescriptor(contextMenuEdge);
-                  clearEdgeSelection();
-                  setContextMenuEdge(null);
-                  setContextMenuPos(null);
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-      </main>
-      {canvasMode && (
-        <>
-          <CanvasEditDialogs
-            editState={editDialogState}
-            onClose={() => setEditDialogState(null)}
-          />
-          <ImportFromDatabaseDialog
-            open={importDialogOpen ?? false}
-            onOpenChange={onImportDialogOpenChange ?? (() => {})}
-          />
-          <CreateEdgeDialog
-            open={pendingConnection !== null}
-            onOpenChange={(open) => {
-              if (!open) setPendingConnection(null);
-            }}
-            initialFrom={pendingConnection?.sourceId}
-            initialTo={pendingConnection?.targetId}
-            initialFromColumn={pendingConnection?.sourceColumn}
-            initialToColumn={pendingConnection?.targetColumn}
-            initialEdgeType={pendingConnection?.edgeType}
-            editEdge={pendingConnection?.editEdge ?? null}
-          />
-        </>
-      )}
-    </div>
+              initialFrom={pendingConnection?.sourceId}
+              initialTo={pendingConnection?.targetId}
+              initialFromColumn={pendingConnection?.sourceColumn}
+              initialToColumn={pendingConnection?.targetColumn}
+              initialEdgeType={pendingConnection?.edgeType}
+              editEdge={pendingConnection?.editEdge ?? null}
+            />
+          </>
+        )}
+      </div>
     </TooltipProvider>
   );
 }

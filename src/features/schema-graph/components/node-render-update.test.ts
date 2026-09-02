@@ -17,6 +17,27 @@ function buildNode(): Node {
 }
 
 describe("applyNodeRenderPatch", () => {
+  it("restyles routine nodes on compact change without a geometry change", () => {
+    const node: Node = {
+      ...buildNode(),
+      id: "dbo.trg_audit",
+      type: "triggerNode",
+    };
+    const result = applyNodeRenderPatch(node, {
+      position: { x: 10, y: 20 },
+      hidden: false,
+      isFocused: false,
+      isDimmed: false,
+      nodeWidth: 320,
+      isCompact: true,
+      includeTableViewFields: false,
+    });
+
+    expect(result.changed).toBe(true);
+    expect(result.geometryChanged).toBe(false);
+    expect(result.node.data.isCompact).toBe(true);
+  });
+
   it("returns the same node reference for no-op updates", () => {
     const node = buildNode();
     const result = applyNodeRenderPatch(node, {

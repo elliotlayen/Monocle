@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSchemaStore, createInitialSchemaState } from "./store";
 import { schemaService } from "./services/schema-service";
+import { settingsService } from "@/features/settings/services/settings-service";
 
 vi.mock("./services/schema-service", () => ({
   schemaService: {
@@ -9,11 +10,17 @@ vi.mock("./services/schema-service", () => ({
   },
 }));
 
-vi.mock("@/features/settings/services/settings-service", () => ({
-  settingsService: {
-    saveSettings: vi.fn(),
-  },
-}));
+vi.mock("@/features/settings/services/settings-service", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/settings/services/settings-service")
+  >("@/features/settings/services/settings-service");
+  return {
+    ...actual,
+    settingsService: {
+      saveSettings: vi.fn().mockResolvedValue({}),
+    },
+  };
+});
 
 const mockedSchemaService = vi.mocked(schemaService);
 const ALL_OBJECT_TYPES = [
@@ -183,8 +190,12 @@ describe("useSchemaStore.loadSchema", () => {
     expect(loadedSchema).toBeTruthy();
 
     const view = loadedSchema!.views[0];
-    const displayTotal = view.columns.find((column) => column.name === "display_total");
-    const statusLabel = view.columns.find((column) => column.name === "status_label");
+    const displayTotal = view.columns.find(
+      (column) => column.name === "display_total"
+    );
+    const statusLabel = view.columns.find(
+      (column) => column.name === "status_label"
+    );
     const idColumn = view.columns.find((column) => column.name === "id");
 
     expect(displayTotal?.dataType).toBe("money");
@@ -293,8 +304,9 @@ describe("useSchemaStore.refreshSelectedDatabase", () => {
   });
 
   it("returns false with clear errors when missing connection or selected database", async () => {
-    const withoutConnection =
-      await useSchemaStore.getState().refreshSelectedDatabase();
+    const withoutConnection = await useSchemaStore
+      .getState()
+      .refreshSelectedDatabase();
     expect(withoutConnection).toBe(false);
     expect(useSchemaStore.getState().error).toBe("Not connected to server");
 
@@ -309,8 +321,9 @@ describe("useSchemaStore.refreshSelectedDatabase", () => {
       selectedDatabase: null,
     });
 
-    const withoutDatabase =
-      await useSchemaStore.getState().refreshSelectedDatabase();
+    const withoutDatabase = await useSchemaStore
+      .getState()
+      .refreshSelectedDatabase();
     expect(withoutDatabase).toBe(false);
     expect(useSchemaStore.getState().error).toBe("No database selected");
   });
@@ -494,4 +507,26 @@ describe("useSchemaStore.hydrateSettings", () => {
 
     expect(useSchemaStore.getState().edgeLabelMode).toBe("auto");
   });
+
+  it("hydrates nodeStyle when the value is valid", () => {
+    useSchemaStore.getState().hydrateSettings({ nodeStyle: "solid" });
+
+    expect(useSchemaStore.getState().nodeStyle).toBe("solid");
+  });
+
+  it("keeps the default nodeStyle when the value is invalid", () => {
+    useSchemaStore.getState().hydrateSettings({ nodeStyle: "neon" as never });
+
+    expect(useSchemaStore.getState().nodeStyle).toBe("adaptive");
+  });
+
+  it("persists nodeStyle through setNodeStyle", () => {
+    useSchemaStore.getState().setNodeStyle("surface");
+
+    expect(useSchemaStore.getState().nodeStyle).toBe("surface");
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      nodeStyle: "surface",
+    });
+  });
+
 });

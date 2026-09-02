@@ -9,21 +9,35 @@ import {
   nodeHandleClass,
   nodeShellClass,
 } from "./table-view-node-shared";
+import { TABLE_VIEW_HEADER_HEIGHT } from "./node-geometry";
+import { getNodeStyleSpec } from "./node-style";
+import { useSchemaStore } from "../store";
+import { cn } from "@/lib/utils";
 
 interface StoredProcedureNodeData {
   procedure: StoredProcedure;
   nodeWidth?: number;
   isFocused?: boolean;
   isDimmed?: boolean;
+  isCompact?: boolean;
   canvasMode?: boolean;
   onClick?: (event: React.MouseEvent) => void;
 }
 
 function StoredProcedureNodeComponent({ data }: NodeProps) {
-  const { procedure, nodeWidth, isFocused, isDimmed, canvasMode, onClick } =
-    data as unknown as StoredProcedureNodeData;
+  const {
+    procedure,
+    nodeWidth,
+    isFocused,
+    isDimmed,
+    isCompact,
+    canvasMode,
+    onClick,
+  } = data as unknown as StoredProcedureNodeData;
   const nodeHandleBase = buildNodeHandleBase(procedure.id);
   const handleClass = nodeHandleClass(canvasMode);
+  const nodeStyle = useSchemaStore((state) => state.nodeStyle);
+  const styleSpec = getNodeStyleSpec(nodeStyle, "storedProcedures", isCompact);
 
   const inputParams = procedure.parameters.filter((p) => !p.isOutput);
   const outputParams = procedure.parameters.filter((p) => p.isOutput);
@@ -33,12 +47,19 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
       onClick={onClick}
       style={{
         width: nodeWidth,
+        ...styleSpec.shellStyle,
         ...nodeFocusStyle("storedProcedures", isFocused),
       }}
       className={nodeShellClass(isDimmed)}
     >
-      {/* Header */}
-      <div className="relative border-b bg-muted/40 px-3 py-2">
+      {/* Header: minHeight pins geometry so style swaps never move handles. */}
+      <div
+        className={cn("relative border-b px-3 py-2", styleSpec.headerClass)}
+        style={{
+          minHeight: TABLE_VIEW_HEADER_HEIGHT,
+          ...styleSpec.headerStyle,
+        }}
+      >
         {/* Target handle for incoming connections from referenced tables - inside header */}
         <Handle
           type="target"
@@ -55,17 +76,31 @@ function StoredProcedureNodeComponent({ data }: NodeProps) {
           className={handleClass}
           style={{ top: "50%", transform: "translateY(-50%)", right: -4 }}
         />
-        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-          <NodeKindDot objectType="storedProcedures" />
-          Procedure
-        </span>
-        <span className="block whitespace-nowrap text-sm font-semibold">
+        {styleSpec.showKindLabel && (
+          <span
+            className={cn(
+              "flex items-center gap-1.5 text-[10px] uppercase tracking-wide",
+              styleSpec.kindLabelClass
+            )}
+          >
+            {styleSpec.showKindDot && (
+              <NodeKindDot objectType="storedProcedures" />
+            )}
+            Procedure
+          </span>
+        )}
+        <span
+          className={cn(
+            "block whitespace-nowrap font-semibold",
+            styleSpec.nameClass
+          )}
+        >
           {procedure.name}
         </span>
       </div>
 
       {/* Parameters */}
-      <div className="space-y-2 px-3 py-2">
+      <div className="space-y-2 px-3 py-2" style={styleSpec.bodyStyle}>
         {procedure.parameters.length === 0 ? (
           <span className="text-xs italic text-muted-foreground">
             No parameters

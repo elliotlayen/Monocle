@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { Column } from "../types";
-import { EdgeType, ObjectType } from "../store";
+import { EdgeType, ObjectType, useSchemaStore } from "../store";
 import { cn } from "@/lib/utils";
 import { EDGE_COLORS, OBJECT_COLORS } from "@/constants/edge-colors";
 import {
@@ -14,9 +14,13 @@ import {
   buildNodeHandleBase,
 } from "@/features/schema-graph/utils/handle-ids";
 import {
+  TABLE_VIEW_HEADER_HEIGHT,
   TABLE_VIEW_ROW_HEIGHT,
   getTableViewNodeHeight,
 } from "./node-geometry";
+import { NODE_SHELL_CLASS, getNodeStyleSpec } from "./node-style";
+
+export { NODE_SHELL_CLASS } from "./node-style";
 
 export function HandleIndicators({
   edgeTypes,
@@ -45,11 +49,6 @@ export function nodeHandleClass(canvasMode?: boolean): string {
     ? "!w-2 !h-2 !rounded-full !bg-accent-blue !border-accent-blue"
     : "!w-0 !h-0 !bg-transparent !border-0";
 }
-
-// transition-shadow, not transition-all: focus/dim toggles flip classes on
-// hundreds of nodes at once and must not animate.
-export const NODE_SHELL_CLASS =
-  "bg-card border border-border rounded-lg shadow-sm overflow-hidden transition-shadow duration-200 cursor-pointer relative";
 
 export function nodeShellClass(isDimmed?: boolean): string {
   return cn(
@@ -357,10 +356,19 @@ export function TableViewNodeBody({
             ),
         };
       }),
-    [columns, nodeId, columnsWithHandles, fkColumnUsage, fkColumnLinks, handleEdgeTypes]
+    [
+      columns,
+      nodeId,
+      columnsWithHandles,
+      fkColumnUsage,
+      fkColumnLinks,
+      handleEdgeTypes,
+    ]
   );
 
   const nodeLevelHandleClass = nodeHandleClass(canvasMode);
+  const nodeStyle = useSchemaStore((state) => state.nodeStyle);
+  const styleSpec = getNodeStyleSpec(nodeStyle, variant.objectType, isCompact);
 
   return (
     <div
@@ -368,12 +376,22 @@ export function TableViewNodeBody({
       style={{
         width: nodeWidth,
         minHeight: getTableViewNodeHeight(columns.length),
+        ...styleSpec.shellStyle,
         ...nodeFocusStyle(variant.objectType, isFocused),
       }}
       className={nodeShellClass(isDimmed)}
     >
-      {/* Header */}
-      <div className="relative flex items-center border-b bg-muted/40 px-3 py-2">
+      {/* Header: minHeight pins geometry so style swaps never move handles. */}
+      <div
+        className={cn(
+          "relative flex items-center border-b px-3 py-2",
+          styleSpec.headerClass
+        )}
+        style={{
+          minHeight: TABLE_VIEW_HEADER_HEIGHT,
+          ...styleSpec.headerStyle,
+        }}
+      >
         {/* Generic target handle for incoming node-level references - inside header */}
         <Handle
           type="target"
@@ -392,11 +410,24 @@ export function TableViewNodeBody({
         </div>
 
         <div className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-            <NodeKindDot objectType={variant.objectType} />
-            {variant.kindLabel}
+          {styleSpec.showKindLabel && (
+            <span
+              className={cn(
+                "flex items-center gap-1.5 text-[10px] uppercase tracking-wide",
+                styleSpec.kindLabelClass
+              )}
+            >
+              {styleSpec.showKindDot && (
+                <NodeKindDot objectType={variant.objectType} />
+              )}
+              {variant.kindLabel}
+            </span>
+          )}
+          <span
+            className={cn("block truncate font-semibold", styleSpec.nameClass)}
+          >
+            {name}
           </span>
-          <span className="block truncate text-sm font-semibold">{name}</span>
         </div>
 
         {/* Browse mode: expand hidden neighbors */}
@@ -434,7 +465,7 @@ export function TableViewNodeBody({
       </div>
 
       {/* Columns */}
-      <div className="py-1">
+      <div className="py-1" style={styleSpec.bodyStyle}>
         {columnRows.map((row) => (
           <ColumnRow
             key={row.column.name}

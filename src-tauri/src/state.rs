@@ -31,6 +31,8 @@ pub struct AppSettings {
     pub show_mini_map: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail_view_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_style: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub folder_sources: Vec<FolderSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -52,6 +54,7 @@ pub struct AppSettingsUpdate {
     pub edge_label_mode: Option<String>,
     pub show_mini_map: Option<bool>,
     pub detail_view_mode: Option<String>,
+    pub node_style: Option<String>,
     pub folder_sources: Option<Vec<FolderSource>>,
     pub explorer_sidebar_width: Option<f64>,
 }
@@ -123,6 +126,9 @@ impl AppState {
         if let Some(detail_view_mode) = update.detail_view_mode {
             settings.detail_view_mode = Some(detail_view_mode);
         }
+        if let Some(node_style) = update.node_style {
+            settings.node_style = Some(node_style);
+        }
         if let Some(folder_sources) = update.folder_sources {
             settings.folder_sources = folder_sources;
         }
@@ -174,6 +180,7 @@ mod tests {
                 edge_label_mode: Some("auto".to_string()),
                 show_mini_map: Some(true),
                 detail_view_mode: Some("drawer".to_string()),
+                node_style: Some("solid".to_string()),
                 folder_sources: None,
                 explorer_sidebar_width: None,
             })
@@ -187,6 +194,7 @@ mod tests {
         assert_eq!(settings.edge_label_mode.as_deref(), Some("auto"));
         assert_eq!(settings.show_mini_map, Some(true));
         assert_eq!(settings.detail_view_mode.as_deref(), Some("drawer"));
+        assert_eq!(settings.node_style.as_deref(), Some("solid"));
     }
 
     #[test]

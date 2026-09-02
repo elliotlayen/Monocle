@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSchemaStore, createInitialSchemaState } from "@/features/schema-graph/store";
+import {
+  useSchemaStore,
+  createInitialSchemaState,
+} from "@/features/schema-graph/store";
 
 vi.mock("@/features/schema-graph/services/schema-service", () => ({
   schemaService: {
@@ -8,11 +11,17 @@ vi.mock("@/features/schema-graph/services/schema-service", () => ({
   },
 }));
 
-vi.mock("@/features/settings/services/settings-service", () => ({
-  settingsService: {
-    saveSettings: vi.fn(),
-  },
-}));
+vi.mock("@/features/settings/services/settings-service", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/settings/services/settings-service")
+  >("@/features/settings/services/settings-service");
+  return {
+    ...actual,
+    settingsService: {
+      saveSettings: vi.fn(),
+    },
+  };
+});
 
 describe("explorer mode", () => {
   beforeEach(() => {
