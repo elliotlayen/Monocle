@@ -428,8 +428,23 @@ export function Toolbar({
         <div className="pointer-events-auto flex h-9 items-center gap-3">
           <MonocleLogo className="h-6 w-6" />
           {canvasMode && (
-            <div className="panel-glass flex h-9 items-center px-1">
-              <AddObjectMenu onImport={onImport} />
+            <div className="panel-glass flex h-9 items-center gap-1 px-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={onOpen}>
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open File</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={onSave}>
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save</TooltipContent>
+              </Tooltip>
             </div>
           )}
         </div>
@@ -461,22 +476,7 @@ export function Toolbar({
         <div className="pointer-events-auto panel-glass flex h-9 items-center gap-1 px-1">
           {canvasMode && (
             <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={onOpen}>
-                    <FolderOpen className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Open File</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={onSave}>
-                    <Save className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Save</TooltipContent>
-              </Tooltip>
+              <AddObjectMenu onImport={onImport} />
               <Separator orientation="vertical" className="h-4" />
             </>
           )}

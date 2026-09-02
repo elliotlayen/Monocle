@@ -44,14 +44,14 @@ export function AddObjectMenu({ onImport }: AddObjectMenuProps) {
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="ghost" size="sm">
                 <Plus className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>Add Object</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent align="start">
+        <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setTableDialogOpen(true)}>
             Add Table
           </DropdownMenuItem>
