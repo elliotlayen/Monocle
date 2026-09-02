@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { memo } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -9,402 +9,147 @@ import {
   FileCode,
   FileText,
   AlertTriangle,
+  RotateCw,
   Star,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useFileActions } from "../hooks/use-file-actions";
-import { useExplorerStore } from "../store";
-import type { TreeNode } from "../types";
+import type { TreeNodeRow, TreeRow } from "../store/selectors";
 
-interface FolderTreeNodeProps {
-  node: TreeNode;
-  depth: number;
-  sourceId: string;
-  isExpanded: boolean;
-  onExpand: (nodeId: string) => void;
-  onCollapse: (nodeId: string) => void;
-  onCancel: (nodeId: string) => void;
-  onToggleFavorite: (sourceId: string, clientName: string) => void;
-  onFileClick: (filePath: string) => void;
-  selectedFolderPath?: string | null;
-  showCheckbox?: boolean;
-  isChecked?: boolean;
-  onToggleCheck?: (path: string) => void;
+interface FolderTreeRowProps {
+  row: TreeRow;
+  showCheckbox: boolean;
+  isChecked: boolean;
+  /** Seconds the row has been loading, or null when not worth showing. */
+  elapsedSeconds: number | null;
+  onToggle: (row: TreeNodeRow) => void;
+  onOpenFile: (row: TreeNodeRow) => void;
+  onCancelLoad: (row: TreeNodeRow) => void;
+  onRetry: (row: TreeNodeRow) => void;
+  onToggleCheck: (path: string) => void;
+  onFavoritesToggle: (sourceId: string) => void;
 }
 
-export function FolderTreeNode({
-  node,
-  depth,
-  sourceId,
-  isExpanded,
-  onExpand,
-  onCollapse,
-  onCancel,
-  onToggleFavorite,
-  onFileClick,
-  showCheckbox,
-  isChecked,
-  onToggleCheck,
-}: FolderTreeNodeProps) {
-  const { copyPath, copyContent, openExternal, saveCopy } = useFileActions();
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Track elapsed time during loading state
-  useEffect(() => {
-    if (node.loadState !== "loading") {
-      setElapsedSeconds(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [node.loadState]);
-
-  const requestScan = useExplorerStore((state) => state.requestScan);
-  const scanFilePattern = useExplorerStore((state) => state.scanFilePattern);
-  const setLastInteractedFolder = useExplorerStore(
-    (state) => state.setLastInteractedFolder
-  );
-  const folderBadge = useExplorerStore((state) =>
-    node.isDir ? state.getFolderBadge(node.path) : undefined
-  );
-
-  const handleToggle = () => {
-    if (!node.isDir) return;
-    // Track last-interacted folder for toolbar scan button (D-01)
-    setLastInteractedFolder(node.path);
-    if (isExpanded) {
-      onCollapse(node.id);
-    } else {
-      onExpand(node.id);
-    }
-  };
-
-  const isSource = node.type === "source";
-  const isLoading = node.loadState === "loading";
-  const isError = node.loadState === "error";
-
-
-  const rowPadding = isSource ? "py-1.5" : "py-1";
-
-  const renderChevron = () => {
-    if (!node.isDir) return null;
-
-    if (isLoading) {
-      return (
-        <Loader2 className="h-4 w-4 text-muted-foreground flex-shrink-0 animate-spin" />
-      );
-    }
-
-    if (isExpanded) {
-      return (
-        <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      );
-    }
-
+function Chevron({ row }: { row: TreeNodeRow }) {
+  if (!row.isDir) return null;
+  if (row.loadState === "loading") {
     return (
-      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      <Loader2 className="h-4 w-4 text-muted-foreground flex-shrink-0 animate-spin" />
     );
-  };
-
-  const renderIcon = () => {
-    if (isSource) {
-      if (isError) {
-        return (
-          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-        );
-      }
-      return <FolderSync className="h-4 w-4 flex-shrink-0" />;
-    }
-
-    if (node.isDir) {
-      if (isExpanded) {
-        return <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />;
-      }
-      return <Folder className="h-3.5 w-3.5 flex-shrink-0" />;
-    }
-
-    const isXml = node.name.toLowerCase().endsWith(".xml");
-    if (isXml) {
-      return <FileCode className="h-3.5 w-3.5 flex-shrink-0" />;
-    }
+  }
+  if (row.isExpanded) {
     return (
-      <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+      <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
     );
-  };
-
-  const renderName = () => {
-    return (
-      <span
-        className={cn(
-          "text-sm truncate",
-          isSource && "font-semibold"
-        )}
-      >
-        {node.name}
-      </span>
-    );
-  };
-
-  const validationStatus = useExplorerStore((state) =>
-    !node.isDir ? state.getValidationStatus(node.path) : undefined
+  }
+  return (
+    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
   );
+}
 
-  const renderBadge = () => {
-    if (node.isDir && !isSource && node.childCount !== undefined) {
+function RowIcon({ row }: { row: TreeNodeRow }) {
+  if (row.type === "source") {
+    if (row.loadState === "error") {
+      return <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />;
+    }
+    return <FolderSync className="h-4 w-4 flex-shrink-0" />;
+  }
+  if (row.isDir) {
+    if (row.loadState === "error") {
       return (
-        <span className="flex items-center gap-1 flex-shrink-0">
-          <span className="text-xs text-muted-foreground">
-            {node.childCount}
-          </span>
-          {folderBadge === "error" && (
-            <span className="h-2 w-2 rounded-full bg-destructive" />
-          )}
-          {folderBadge === "warning" && (
-            <span className="h-2 w-2 rounded-full bg-warning" />
-          )}
-        </span>
+        <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
       );
     }
-
-    // Folder nodes without childCount (not yet loaded but scanned)
-    if (node.isDir && !isSource && folderBadge === "error") {
-      return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-destructive ml-1" />
-      );
+    if (row.isExpanded) {
+      return <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />;
     }
-    if (node.isDir && !isSource && folderBadge === "warning") {
-      return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-warning ml-1" />
-      );
-    }
+    return <Folder className="h-3.5 w-3.5 flex-shrink-0" />;
+  }
+  if (row.name.toLowerCase().endsWith(".xml")) {
+    return <FileCode className="h-3.5 w-3.5 flex-shrink-0" />;
+  }
+  return (
+    <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+  );
+}
 
-    if (!node.isDir && validationStatus === "error") {
-      return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-destructive ml-1" />
-      );
-    }
+function RowBadge({ row }: { row: TreeNodeRow }) {
+  const dot =
+    row.badge === "error" ? (
+      <span className="h-2 w-2 rounded-full flex-shrink-0 bg-destructive" />
+    ) : row.badge === "warning" ? (
+      <span className="h-2 w-2 rounded-full flex-shrink-0 bg-warning" />
+    ) : null;
 
-    if (!node.isDir && validationStatus === "warning") {
-      return (
-        <span className="h-2 w-2 rounded-full flex-shrink-0 bg-warning ml-1" />
-      );
-    }
-
-    return null;
-  };
-
-  const renderLoadingInfo = () => {
-    if (!isLoading || elapsedSeconds < 3) return null;
-
+  if (row.isDir && row.type !== "source" && row.childCount !== undefined) {
     return (
       <span className="flex items-center gap-1 flex-shrink-0">
-        <span className="text-xs text-muted-foreground">
-          Loading... {elapsedSeconds}s
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCancel(node.id);
-          }}
-        >
-          <X className="h-3 w-3" />
-        </Button>
+        <span className="text-xs text-muted-foreground">{row.childCount}</span>
+        {dot}
       </span>
     );
-  };
+  }
+  return dot ? <span className="ml-1 flex flex-shrink-0">{dot}</span> : null;
+}
 
-  const renderStar = () => {
-    if (!node.isDir || isSource || !node.isFavorite) return null;
-
+function FolderTreeRowInner({
+  row,
+  showCheckbox,
+  isChecked,
+  elapsedSeconds,
+  onToggle,
+  onOpenFile,
+  onCancelLoad,
+  onRetry,
+  onToggleCheck,
+  onFavoritesToggle,
+}: FolderTreeRowProps) {
+  if (row.kind === "favorites-header") {
     return (
-      <Star className="h-3.5 w-3.5 flex-shrink-0 fill-warning text-warning" />
+      <div
+        className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1 cursor-pointer hover:text-foreground"
+        style={{ paddingLeft: `${row.depth * 16}px` }}
+        onClick={() => onFavoritesToggle(row.sourceId)}
+      >
+        {row.collapsed ? (
+          <ChevronRight className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )}
+        Favorites
+      </div>
     );
-  };
+  }
 
-  const rowContent = (
-    <div
-      className={cn(
-        "group flex items-center gap-1 w-full rounded hover:bg-muted cursor-pointer",
-        rowPadding,
-        isError && "text-muted-foreground opacity-60"
-      )}
-      style={{ paddingLeft: `${depth * 16}px` }}
-      onClick={node.isDir ? handleToggle : () => onFileClick(node.path)}
-    >
-      {renderChevron()}
-      {renderIcon()}
-      {renderName()}
-      {renderBadge()}
-      {renderLoadingInfo()}
-      {renderStar()}
-      {showCheckbox && node.isDir && (
-        <>
-          <span className="flex-1" />
-          <input
-            type="checkbox"
-            checked={isChecked ?? false}
-            className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0 mr-1"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCheck?.(node.path);
-            }}
-            onChange={() => {}}
-          />
-        </>
-      )}
-    </div>
-  );
-
-  // Check if file is open in a tab (for enabling content-dependent actions)
-  const isFileOpenInTab = useExplorerStore((state) =>
-    !node.isDir ? state.tabs.some((t) => t.id === node.path) : false
-  );
-  const openTab = useExplorerStore((state) =>
-    !node.isDir ? state.tabs.find((t) => t.id === node.path) : undefined
-  );
-
-  // Wrap nodes with context menus
-  const wrappedRow = !node.isDir ? (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onClick={() => copyPath(node.path)}>Copy Path</ContextMenuItem>
-        <ContextMenuItem onClick={() => openExternal(node.path)}>Open in External Editor</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={() => openTab && copyContent(openTab.content)}
-          disabled={!isFileOpenInTab}
-        >
-          Copy Content
-        </ContextMenuItem>
-        <ContextMenuItem
-          onClick={() => openTab && saveCopy(node.name, openTab.content)}
-          disabled={!isFileOpenInTab}
-        >
-          Save Copy...
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  ) : node.isDir && !isSource ? (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem
-          onClick={() => onToggleFavorite(sourceId, node.path)}
-        >
-          {node.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={() => requestScan(node.path, scanFilePattern)}
-        >
-          Scan for Issues...
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  ) : isError && node.isDir ? (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>{rowContent}</TooltipTrigger>
-        <TooltipContent>
-          <p>Failed to load folder contents</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  ) : (
-    rowContent
-  );
-
-  return <>{wrappedRow}</>;
-}
-
-// Subcomponent: Source node with tag badge support
-interface FolderTreeSourceNodeProps extends Omit<FolderTreeNodeProps, "onFileClick"> {
-  tag?: string;
-  onFileClick: (filePath: string) => void;
-}
-
-export function FolderTreeSourceNode({
-  tag,
-  ...props
-}: FolderTreeSourceNodeProps) {
-  const { node, depth, isExpanded, onExpand, onCollapse, onCancel } = props;
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const isLoading = node.loadState === "loading";
-  const isError = node.loadState === "error";
-
-  useEffect(() => {
-    if (node.loadState !== "loading") {
-      setElapsedSeconds(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [node.loadState]);
-
-  const handleToggle = () => {
-    if (isExpanded) {
-      onCollapse(node.id);
-    } else {
-      onExpand(node.id);
-    }
-  };
+  const isSource = row.type === "source";
+  const isError = row.loadState === "error";
+  const isLoading = row.loadState === "loading";
 
   return (
     <div
+      data-row-key={row.key}
       className={cn(
-        "group flex items-center gap-1 w-full rounded py-1.5 hover:bg-muted cursor-pointer",
-        isError && "opacity-60"
+        "group flex items-center gap-1 w-full rounded hover:bg-muted cursor-pointer",
+        isSource ? "py-1.5" : "py-1",
+        isError && !isSource && "text-muted-foreground"
       )}
-      style={{ paddingLeft: `${depth * 16}px` }}
-      onClick={handleToggle}
+      style={{ paddingLeft: `${row.depth * 16}px` }}
+      onClick={() => (row.isDir ? onToggle(row) : onOpenFile(row))}
     >
-      {isLoading ? (
-        <Loader2 className="h-4 w-4 text-muted-foreground flex-shrink-0 animate-spin" />
-      ) : isExpanded ? (
-        <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      ) : (
-        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      )}
-      {isError ? (
-        <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-      ) : (
-        <FolderSync className="h-4 w-4 flex-shrink-0" />
-      )}
-      <span className="text-sm font-semibold truncate">{node.name}</span>
-      {tag && (
+      <Chevron row={row} />
+      <RowIcon row={row} />
+      <span className={cn("text-sm truncate", isSource && "font-semibold")}>
+        {row.name}
+      </span>
+      {isSource && row.tag && (
         <Badge variant="secondary" className="text-xs flex-shrink-0">
-          {tag}
+          {row.tag}
         </Badge>
       )}
-      {isLoading && elapsedSeconds >= 3 && (
+      <RowBadge row={row} />
+      {isLoading && elapsedSeconds !== null && (
         <span className="flex items-center gap-1 flex-shrink-0">
           <span className="text-xs text-muted-foreground">
             Loading... {elapsedSeconds}s
@@ -415,23 +160,40 @@ export function FolderTreeSourceNode({
             className="h-5 w-5"
             onClick={(e) => {
               e.stopPropagation();
-              onCancel(node.id);
+              onCancelLoad(row);
             }}
           >
             <X className="h-3 w-3" />
           </Button>
         </span>
       )}
-      {props.showCheckbox && (
+      {isError && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-5 px-1.5 text-xs flex-shrink-0 text-muted-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRetry(row);
+          }}
+        >
+          <RotateCw className="h-3 w-3" />
+          Retry
+        </Button>
+      )}
+      {row.isFavorite && row.isDir && !isSource && (
+        <Star className="h-3.5 w-3.5 flex-shrink-0 fill-warning text-warning" />
+      )}
+      {showCheckbox && row.isDir && (
         <>
           <span className="flex-1" />
           <input
             type="checkbox"
-            checked={props.isChecked ?? false}
+            checked={isChecked}
             className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0 mr-1"
             onClick={(e) => {
               e.stopPropagation();
-              props.onToggleCheck?.(node.path);
+              onToggleCheck(row.path);
             }}
             onChange={() => {}}
           />
@@ -440,3 +202,5 @@ export function FolderTreeSourceNode({
     </div>
   );
 }
+
+export const FolderTreeRow = memo(FolderTreeRowInner);

@@ -1,52 +1,168 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { useExplorerStore } from "../store";
-import { formatDateFolder } from "../utils/date-format";
-import { FolderTreeNode, FolderTreeSourceNode } from "./folder-tree-node";
-import type { TreeNode } from "../types";
+import { flattenTree, type TreeNodeRow } from "../store/selectors";
+import { useFileActions } from "../hooks/use-file-actions";
+import { FolderTreeRow } from "./folder-tree-node";
+
+/** Rows loading for at least this long show elapsed time and a cancel button. */
+const LOADING_INFO_DELAY_S = 3;
 
 export function FolderTree() {
   const {
     folderSources,
     treeNodes,
-    loadedFileIndex,
     expandedIds,
+    activeOperations,
     filterText,
+    loadedFileIndex,
     dateSortOrder,
     dateRange,
-    expandNode,
-    collapseNode,
-    cancelLoad,
-    toggleFavorite,
-    lastInteractedFolderPath,
+    folderBadgeCache,
+    validationCache,
     searchMode,
     searchCheckedPaths,
-    toggleSearchCheck,
   } = useExplorerStore(
     useShallow((state) => ({
       folderSources: state.folderSources,
       treeNodes: state.treeNodes,
-      loadedFileIndex: state.loadedFileIndex,
       expandedIds: state.expandedIds,
+      activeOperations: state.activeOperations,
       filterText: state.filterText,
+      loadedFileIndex: state.loadedFileIndex,
       dateSortOrder: state.dateSortOrder,
       dateRange: state.dateRange,
-      expandNode: state.expandNode,
-      collapseNode: state.collapseNode,
-      cancelLoad: state.cancelLoad,
-      toggleFavorite: state.toggleFavorite,
-      lastInteractedFolderPath: state.lastInteractedFolderPath,
+      folderBadgeCache: state.folderBadgeCache,
+      validationCache: state.validationCache,
       searchMode: state.searchMode,
       searchCheckedPaths: state.searchCheckedPaths,
-      toggleSearchCheck: state.toggleSearchCheck,
     }))
   );
 
-  const [favoritesCollapsed, setFavoritesCollapsed] = useState<Set<string>>(new Set());
+  const { copyPath, copyContent, openExternal, saveCopy } = useFileActions();
 
-  const toggleFavoritesCollapsed = useCallback((sourceId: string) => {
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState<Set<string>>(
+    new Set()
+  );
+  const [menuTarget, setMenuTarget] = useState<TreeNodeRow | null>(null);
+
+  const rows = useMemo(
+    () =>
+      flattenTree({
+        treeNodes,
+        folderSources,
+        expandedIds,
+        filterText,
+        loadedFileIndex,
+        dateSortOrder,
+        dateRange,
+        favoritesCollapsed,
+        folderBadgeCache,
+        validationCache,
+      }),
+    [
+      treeNodes,
+      folderSources,
+      expandedIds,
+      filterText,
+      loadedFileIndex,
+      dateSortOrder,
+      dateRange,
+      favoritesCollapsed,
+      folderBadgeCache,
+      validationCache,
+    ]
+  );
+
+  const rowsByKey = useMemo(() => {
+    const map = new Map<string, TreeNodeRow>();
+    for (const row of rows) {
+      if (row.kind === "node") map.set(row.key, row);
+    }
+    return map;
+  }, [rows]);
+
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 28,
+    overscan: 10,
+    getItemKey: (index) => rows[index]?.key ?? index,
+  });
+
+  // One shared ticker for loading elapsed times, active only while
+  // something is loading (replaces the old per-row setInterval).
+  const loadingStartRef = useRef(new Map<string, number>());
+  const [, setNowTick] = useState(0);
+  const hasLoading = activeOperations.size > 0;
+  useEffect(() => {
+    const starts = loadingStartRef.current;
+    for (const nodeId of activeOperations.keys()) {
+      if (!starts.has(nodeId)) starts.set(nodeId, Date.now());
+    }
+    for (const nodeId of starts.keys()) {
+      if (!activeOperations.has(nodeId)) starts.delete(nodeId);
+    }
+  }, [activeOperations]);
+  useEffect(() => {
+    if (!hasLoading) return;
+    const interval = setInterval(() => setNowTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [hasLoading]);
+
+  const elapsedFor = (row: TreeNodeRow): number | null => {
+    if (row.loadState !== "loading") return null;
+    const start = loadingStartRef.current.get(row.id);
+    if (!start) return null;
+    const seconds = Math.floor((Date.now() - start) / 1000);
+    return seconds >= LOADING_INFO_DELAY_S ? seconds : null;
+  };
+
+  const showCheckboxes = searchMode === "content";
+  const isPathChecked = useCallback(
+    (path: string) => {
+      if (searchCheckedPaths.has(path)) return true;
+      for (const checked of searchCheckedPaths) {
+        if (path.startsWith(checked + "/") || path.startsWith(checked + "\\"))
+          return true;
+      }
+      return false;
+    },
+    [searchCheckedPaths]
+  );
+
+  // Stable row callbacks (rows re-render only when their data changes)
+  const handleToggle = useCallback((row: TreeNodeRow) => {
+    const store = useExplorerStore.getState();
+    if (row.type !== "source") store.setLastInteractedFolder(row.path);
+    if (row.isExpanded) {
+      store.collapseNode(row.id);
+    } else {
+      store.expandNode(row.id);
+    }
+  }, []);
+  const handleOpenFile = useCallback((row: TreeNodeRow) => {
+    useExplorerStore.getState().openFile(row.path);
+  }, []);
+  const handleCancelLoad = useCallback((row: TreeNodeRow) => {
+    useExplorerStore.getState().cancelLoad(row.id);
+  }, []);
+  const handleRetry = useCallback((row: TreeNodeRow) => {
+    useExplorerStore.getState().expandNode(row.id);
+  }, []);
+  const handleToggleCheck = useCallback((path: string) => {
+    useExplorerStore.getState().toggleSearchCheck(path);
+  }, []);
+  const handleFavoritesToggle = useCallback((sourceId: string) => {
     setFavoritesCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(sourceId)) next.delete(sourceId);
@@ -55,191 +171,29 @@ export function FolderTree() {
     });
   }, []);
 
-  const handleFileClick = useCallback((filePath: string) => {
-    useExplorerStore.getState().openFile(filePath);
-  }, []);
-
-  // Build visible tree from root nodes in source order
-  const rootNodes = useMemo(() => {
-    return folderSources
-      .map((source) => treeNodes.get(source.id))
-      .filter((n): n is TreeNode => n !== undefined);
-  }, [folderSources, treeNodes]);
-
-  const visibleNodeIds = useMemo(() => {
-    const lowerFilter = filterText.trim().toLowerCase();
-    if (!lowerFilter) return null;
-
-    const ids = new Set<string>();
-    const addAncestors = (node: TreeNode) => {
-      let current: TreeNode | undefined = node;
-      while (current) {
-        ids.add(current.id);
-        current = current.parentId ? treeNodes.get(current.parentId) : undefined;
+  // One context menu for the whole tree. Right-clicks resolve to a row via
+  // data-row-key; source rows and empty space open nothing.
+  const handleContainerContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const rowEl = (e.target as HTMLElement).closest("[data-row-key]");
+      const key = rowEl?.getAttribute("data-row-key");
+      const row = key ? rowsByKey.get(key) : undefined;
+      if (!row || row.type === "source") {
+        e.preventDefault();
+        e.stopPropagation();
+        setMenuTarget(null);
+        return;
       }
-    };
-    const addLoadedDescendants = (node: TreeNode) => {
-      for (const child of node.children ?? []) {
-        const current = treeNodes.get(child.id) ?? child;
-        ids.add(current.id);
-        if (current.children) addLoadedDescendants(current);
-      }
-    };
-
-    for (const [id, lowerName] of loadedFileIndex) {
-      if (!lowerName.includes(lowerFilter)) continue;
-      const node = treeNodes.get(id);
-      if (!node) continue;
-      addAncestors(node);
-      if (node.isDir) addLoadedDescendants(node);
-    }
-
-    return ids;
-  }, [loadedFileIndex, filterText, treeNodes]);
-
-  const visibleRoots = useMemo(() => {
-    if (!visibleNodeIds) return rootNodes;
-    return rootNodes.filter((root) => visibleNodeIds.has(root.id));
-  }, [rootNodes, visibleNodeIds]);
-
-  const selectedFolderPath = searchMode === "content" ? lastInteractedFolderPath : null;
-  const showCheckboxes = searchMode === "content";
-
-  const isPathChecked = useCallback(
-    (path: string) => {
-      if (searchCheckedPaths.has(path)) return true;
-      for (const checked of searchCheckedPaths) {
-        if (path.startsWith(checked + "/") || path.startsWith(checked + "\\")) return true;
-      }
-      return false;
+      setMenuTarget(row);
     },
-    [searchCheckedPaths]
+    [rowsByKey]
   );
 
-  const filterByDateRange = useCallback(
-    (nodes: TreeNode[]): TreeNode[] => {
-      if (!dateRange?.from) return nodes;
-
-      const from = new Date(dateRange.from);
-      from.setHours(0, 0, 0, 0);
-      const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
-      to.setHours(23, 59, 59, 999);
-
-      return nodes.filter((child) => {
-        if (!child.isDir) return true;
-        const dateInfo = formatDateFolder(child.name);
-        if (!dateInfo.formatted) return true;
-        const year = parseInt(child.name.slice(0, 4), 10);
-        const month = parseInt(child.name.slice(4, 6), 10);
-        const day = parseInt(child.name.slice(6, 8), 10);
-        const folderDate = new Date(year, month - 1, day);
-        return folderDate >= from && folderDate <= to;
-      });
-    },
-    [dateRange]
+  const menuOpenTab = useExplorerStore((state) =>
+    menuTarget && !menuTarget.isDir
+      ? state.tabs.find((t) => t.id === menuTarget.path)
+      : undefined
   );
-
-  const renderChildren = (node: TreeNode, depth: number, sourceId: string) => {
-    const current = treeNodes.get(node.id) ?? node;
-    if (!expandedIds.has(current.id) || !current.children) return null;
-
-    const sortedChildren = filterByDateRange(
-      current.children
-        .map((child) => treeNodes.get(child.id) ?? child)
-        .filter((child) => !visibleNodeIds || visibleNodeIds.has(child.id))
-        .sort((a, b) => {
-          if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-          // Apply dateSortOrder to 8-digit date-pattern folder names (YYYYMMDD)
-          if (a.isDir && b.isDir && /^\d{8}$/.test(a.name) && /^\d{8}$/.test(b.name)) {
-            return dateSortOrder === "newest"
-              ? b.name.localeCompare(a.name)
-              : a.name.localeCompare(b.name);
-          }
-          return a.name.localeCompare(b.name);
-        })
-    );
-
-    // Get favorites for this source — collect from all depths
-    const source = folderSources.find((s) => s.id === sourceId);
-    const favorites = source?.favorites ?? [];
-    const hasFavorites = node.type === "source" && favorites.length > 0;
-
-    const favoritedNodes: TreeNode[] = [];
-    if (hasFavorites) {
-      for (const favPath of favorites) {
-        const favNode = treeNodes.get(favPath);
-        if (favNode) favoritedNodes.push(favNode);
-      }
-      favoritedNodes.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    // Direct children that are favorited (to exclude from main list)
-    const favoritedChildIds = new Set(favoritedNodes.map((n) => n.id));
-
-    return (
-      <div>
-        {/* Favorites section (collapsible) */}
-        {hasFavorites && favoritedNodes.length > 0 && (
-          <div>
-            <div
-              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1 cursor-pointer hover:text-foreground"
-              style={{ paddingLeft: `${(depth + 1) * 16}px` }}
-              onClick={() => toggleFavoritesCollapsed(sourceId)}
-            >
-              {favoritesCollapsed.has(sourceId) ? (
-                <ChevronRight className="h-3 w-3" />
-              ) : (
-                <ChevronDown className="h-3 w-3" />
-              )}
-              Favorites
-            </div>
-            {!favoritesCollapsed.has(sourceId) && favoritedNodes.map((favNode) => (
-              <div key={`fav-${favNode.id}`}>
-                <FolderTreeNode
-                  node={favNode}
-                  depth={depth + 1}
-                  sourceId={sourceId}
-                  isExpanded={expandedIds.has(favNode.id)}
-                  onExpand={expandNode}
-                  onCollapse={collapseNode}
-                  onCancel={cancelLoad}
-                  onToggleFavorite={toggleFavorite}
-                  onFileClick={handleFileClick}
-                  selectedFolderPath={selectedFolderPath}
-                  showCheckbox={showCheckboxes}
-                  isChecked={isPathChecked(favNode.path)}
-                  onToggleCheck={toggleSearchCheck}
-                />
-                {renderChildren(favNode, depth + 1, sourceId)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* All children alphabetically (exclude favorites already shown above) */}
-        {sortedChildren.filter((child) => !favoritedChildIds.has(child.id)).map((child) => (
-          <div key={child.id}>
-            <FolderTreeNode
-              node={child}
-              depth={depth + 1}
-              sourceId={sourceId}
-              isExpanded={expandedIds.has(child.id)}
-              onExpand={expandNode}
-              onCollapse={collapseNode}
-              onCancel={cancelLoad}
-              onToggleFavorite={toggleFavorite}
-              onFileClick={handleFileClick}
-              selectedFolderPath={selectedFolderPath}
-              showCheckbox={showCheckboxes}
-              isChecked={isPathChecked(child.path)}
-              onToggleCheck={toggleSearchCheck}
-            />
-            {renderChildren(child, depth + 1, sourceId)}
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   if (folderSources.length === 0) {
     return (
@@ -251,7 +205,7 @@ export function FolderTree() {
     );
   }
 
-  if (visibleRoots.length === 0 && filterText.trim()) {
+  if (rows.length === 0 && filterText.trim()) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-sm text-muted-foreground text-center px-4">
@@ -262,32 +216,102 @@ export function FolderTree() {
   }
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="p-2">
-        {visibleRoots.map((root) => {
-          const source = folderSources.find((s) => s.id === root.id);
-          return (
-            <div key={root.id} className="mb-1">
-              <FolderTreeSourceNode
-                node={root}
-                depth={0}
-                sourceId={root.id}
-                isExpanded={expandedIds.has(root.id)}
-                onExpand={expandNode}
-                onCollapse={collapseNode}
-                onCancel={cancelLoad}
-                onToggleFavorite={toggleFavorite}
-                onFileClick={handleFileClick}
-                tag={source?.tag}
-                showCheckbox={showCheckboxes}
-                isChecked={isPathChecked(root.path ?? root.id)}
-                onToggleCheck={toggleSearchCheck}
-              />
-              {renderChildren(root, 0, root.id)}
-            </div>
-          );
-        })}
-      </div>
-    </ScrollArea>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={scrollParentRef}
+          className="flex-1 overflow-auto"
+          onContextMenu={handleContainerContextMenu}
+        >
+          <div
+            className="relative mx-2 my-2"
+            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              if (!row) return null;
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="absolute left-0 top-0 w-full"
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
+                >
+                  <FolderTreeRow
+                    row={row}
+                    showCheckbox={showCheckboxes && row.kind === "node"}
+                    isChecked={
+                      row.kind === "node" ? isPathChecked(row.path) : false
+                    }
+                    elapsedSeconds={
+                      row.kind === "node" ? elapsedFor(row) : null
+                    }
+                    onToggle={handleToggle}
+                    onOpenFile={handleOpenFile}
+                    onCancelLoad={handleCancelLoad}
+                    onRetry={handleRetry}
+                    onToggleCheck={handleToggleCheck}
+                    onFavoritesToggle={handleFavoritesToggle}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {menuTarget && !menuTarget.isDir && (
+          <>
+            <ContextMenuItem onClick={() => copyPath(menuTarget.path)}>
+              Copy Path
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => openExternal(menuTarget.path)}>
+              Open in External Editor
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={() => menuOpenTab && copyContent(menuOpenTab.content)}
+              disabled={!menuOpenTab}
+            >
+              Copy Content
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() =>
+                menuOpenTab && saveCopy(menuTarget.name, menuOpenTab.content)
+              }
+              disabled={!menuOpenTab}
+            >
+              Save Copy...
+            </ContextMenuItem>
+          </>
+        )}
+        {menuTarget && menuTarget.isDir && (
+          <>
+            <ContextMenuItem
+              onClick={() =>
+                useExplorerStore
+                  .getState()
+                  .toggleFavorite(menuTarget.sourceId, menuTarget.path)
+              }
+            >
+              {menuTarget.isFavorite
+                ? "Remove from Favorites"
+                : "Add to Favorites"}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={() => {
+                const store = useExplorerStore.getState();
+                store.requestScan(menuTarget.path, store.scanFilePattern);
+              }}
+            >
+              Scan for Issues...
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
