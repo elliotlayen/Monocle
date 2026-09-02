@@ -195,8 +195,10 @@ pub async fn check_path_reachable(path: String) -> Result<bool, String> {
     Ok(result)
 }
 
+// Async so the settings.json write runs on the async runtime instead of
+// blocking the main IPC thread.
 #[tauri::command]
-pub fn toggle_favorite_cmd(
+pub async fn toggle_favorite_cmd(
     source_id: String,
     client_name: String,
     state: State<'_, AppState>,
