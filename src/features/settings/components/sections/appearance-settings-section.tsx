@@ -12,6 +12,7 @@ import { useSchemaStore } from "@/features/schema-graph/store";
 import { useExplorerStore } from "@/features/explorer/store";
 import type { ExplorerNodeStyle } from "@/features/settings/services/settings-service";
 import { XmlNodeStylePreview } from "@/features/settings/components/xml-node-style-preview";
+import { AccentColorField } from "@/features/settings/components/accent-color-field";
 import { NodeStyleField } from "./node-style-field";
 import { EXPLORER_NODE_STYLE_OPTIONS } from "./display-options";
 
@@ -58,6 +59,8 @@ export function AppearanceSettingsSection() {
           Choose your preferred color scheme.
         </p>
       </div>
+
+      <AccentColorField />
 
       <NodeStyleField
         label="Schema Browser nodes"
