@@ -137,6 +137,17 @@ export function FolderTree() {
     return seconds >= LOADING_INFO_DELAY_S ? seconds : null;
   };
 
+  // Keep an externally driven selection (breadcrumbs, reveal) in view.
+  // align "auto" makes this a no-op when the row is already visible.
+  useEffect(() => {
+    if (!selectedPath) return;
+    const index = rows.findIndex(
+      (r) => r.kind === "node" && r.path === selectedPath
+    );
+    if (index >= 0) rowVirtualizer.scrollToIndex(index);
+    // Deliberately depends only on the selection, not on row churn.
+  }, [selectedPath]);
+
   const showCheckboxes = searchMode === "content";
   const isPathChecked = useCallback(
     (path: string) => {

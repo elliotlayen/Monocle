@@ -35,6 +35,8 @@ export interface TreeSlice {
   saveSources: () => Promise<void>;
   setSelectedPath: (path: string | null) => void;
   setFocusedPath: (path: string | null) => void;
+  /** Expand every ancestor of a path (loading as needed) and select it. */
+  revealPath: (path: string) => Promise<void>;
 }
 
 function buildChildNodes(
@@ -422,4 +424,39 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   setSelectedPath: (path: string | null) => set({ selectedPath: path }),
 
   setFocusedPath: (path: string | null) => set({ focusedPath: path }),
+
+  revealPath: async (path: string) => {
+    const { folderSources } = get();
+    const source = folderSources.find((s) => belongsToSource(path, s));
+    if (!source) return;
+
+    const sep = source.path.includes("\\") ? "\\" : "/";
+    // Ancestor chain: source root id, then each intermediate folder path.
+    const chain: string[] = [source.id];
+    if (path !== source.path) {
+      const parts = path.slice(source.path.length + 1).split(/[/\\]/);
+      let current = source.path;
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current + sep + parts[i];
+        chain.push(current);
+      }
+    }
+
+    for (const id of chain) {
+      const node = get().treeNodes.get(id);
+      if (!node || !node.isDir) return;
+      if (node.loadState === "loaded" && node.children) {
+        if (!get().expandedIds.has(id)) {
+          const next = new Set(get().expandedIds);
+          next.add(id);
+          set({ expandedIds: next });
+        }
+      } else {
+        await get().expandNode(id);
+        if (get().treeNodes.get(id)?.loadState !== "loaded") return;
+      }
+    }
+
+    set({ selectedPath: path });
+  },
 });

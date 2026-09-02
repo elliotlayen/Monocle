@@ -14,6 +14,7 @@ import { ExplorerNavBar } from "./explorer-nav-bar";
 import { ExplorerEmptyState } from "./explorer-empty-state";
 import { ExplorerSidebar } from "./explorer-sidebar";
 import { ActivityRail } from "./activity-rail";
+import { BreadcrumbBar } from "./breadcrumb-bar";
 import { useExplorerKeyboard } from "../hooks/use-explorer-keyboard";
 import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
@@ -85,6 +86,7 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
         {hasOpenTabs ? (
           <>
             <FileTabBar />
+            <BreadcrumbBar />
             {isScanning && <ScanProgressPanel />}
             <FileContentArea />
           </>
