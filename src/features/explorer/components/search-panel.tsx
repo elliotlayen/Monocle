@@ -399,7 +399,6 @@ export function SearchPanel() {
           id="explorer-scope-row"
         >
           <span className="text-[10px] text-muted-foreground">in</span>
-          {scopeChips}
           <Popover
             onOpenChange={(open) => {
               if (!open) return;
@@ -445,15 +444,20 @@ export function SearchPanel() {
               </div>
             </PopoverContent>
           </Popover>
-          {scopePaths.size > 0 && (
-            <button
-              type="button"
-              className="text-[10.5px] text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:text-foreground"
-              onClick={clearScope}
-            >
-              Clear
-            </button>
-          )}
+          {/* Always rendered (invisible when empty) so the controls stay
+              put and chips append after them without shifting anything. */}
+          <button
+            type="button"
+            className={cn(
+              "text-[10.5px] text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:text-foreground",
+              scopePaths.size === 0 && "invisible"
+            )}
+            onClick={clearScope}
+            tabIndex={scopePaths.size === 0 ? -1 : 0}
+          >
+            Clear
+          </button>
+          {scopeChips}
         </div>
 
         {/* Row 4: file types, dates, regex/case */}
