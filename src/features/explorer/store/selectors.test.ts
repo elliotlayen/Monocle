@@ -8,6 +8,7 @@ import {
   togglePathInScope,
   type FlattenTreeInput,
   type TreeRow,
+  scopeTreeFilter,
 } from "./selectors";
 import type { TreeNode, ValidationStatus } from "../types";
 
@@ -409,5 +410,56 @@ describe("resultsMatchIndex", () => {
       loadedMatches: [],
     });
     expect(index.size).toBe(0);
+  });
+});
+
+describe("scopeTreeFilter", () => {
+  const folder = (
+    id: string,
+    name: string,
+    children: TreeNode[] = []
+  ): TreeNode => ({
+    id,
+    path: id,
+    name,
+    type: "folder",
+    children,
+    loadState: "loaded",
+    isDir: true,
+  });
+
+  const buildTree = () => {
+    const inbound = folder("/r/a/inbound", "inbound");
+    const errors = folder("/r/a/errors", "errors");
+    const a = folder("/r/a", "20260901", [inbound, errors]);
+    const b = folder("/r/b", "20260831");
+    const root = folder("root", "Root", [a, b]);
+    const nodes = new Map<string, TreeNode>(
+      [root, a, b, inbound, errors].map((n) => [n.id, n])
+    );
+    return { root, nodes };
+  };
+
+  it("returns null for an empty filter", () => {
+    const { root, nodes } = buildTree();
+    expect(scopeTreeFilter(nodes, root, "  ")).toBeNull();
+  });
+
+  it("keeps matches and their ancestors, expanding the ancestors", () => {
+    const { root, nodes } = buildTree();
+    const result = scopeTreeFilter(nodes, root, "inbound");
+    expect(result).not.toBeNull();
+    expect(result?.visibleIds.has("/r/a/inbound")).toBe(true);
+    expect(result?.visibleIds.has("/r/a")).toBe(true);
+    expect(result?.visibleIds.has("/r/b")).toBe(false);
+    expect(result?.expandIds.has("/r/a")).toBe(true);
+    expect(result?.expandIds.has("/r/a/inbound")).toBe(false);
+  });
+
+  it("matches case-insensitively on partial names", () => {
+    const { root, nodes } = buildTree();
+    const result = scopeTreeFilter(nodes, root, "2026");
+    expect(result?.visibleIds.has("/r/a")).toBe(true);
+    expect(result?.visibleIds.has("/r/b")).toBe(true);
   });
 });

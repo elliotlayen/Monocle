@@ -1,8 +1,10 @@
+import { useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { ChevronRight, Folder, Loader2 } from "lucide-react";
+import { ChevronRight, Folder, Loader2, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useExplorerStore } from "../store";
-import { isPathInScope } from "../store/selectors";
+import { isPathInScope, scopeTreeFilter } from "../store/selectors";
 import type { TreeNode } from "../types";
 
 /**
@@ -28,9 +30,17 @@ export function ScopeTree() {
     }))
   );
 
+  const [filter, setFilter] = useState("");
+
   const activeSource =
     folderSources.find((s) => s.id === searchSourceId) ?? folderSources[0];
   const root = activeSource ? treeNodes.get(activeSource.id) : undefined;
+
+  // Matching folders plus their ancestors; null when not filtering.
+  const filtered = useMemo(
+    () => (root ? scopeTreeFilter(treeNodes, root, filter) : null),
+    [treeNodes, root, filter]
+  );
 
   if (!activeSource || !root) {
     return (
@@ -50,10 +60,13 @@ export function ScopeTree() {
   };
 
   const renderFolder = (node: TreeNode, depth: number): React.ReactNode => {
+    if (filtered && !filtered.visibleIds.has(node.id)) return null;
     const checked = scopePaths.has(node.path);
     const covered =
       !checked && scopePaths.size > 0 && isPathInScope(scopePaths, node.path);
-    const open = expandedIds.has(node.id);
+    const open = filtered
+      ? filtered.expandIds.has(node.id)
+      : expandedIds.has(node.id);
     const loading = activeOperations.has(node.id);
     const childFolders = (node.children ?? []).filter((c) => c.isDir);
 
@@ -117,20 +130,42 @@ export function ScopeTree() {
   };
 
   const rootFolders = (root.children ?? []).filter((c) => c.isDir);
+  const noFilterMatches =
+    filtered !== null &&
+    rootFolders.every(
+      (child) => !filtered.visibleIds.has((treeNodes.get(child.id) ?? child).id)
+    );
 
   return (
-    <div className="max-h-72 overflow-y-auto p-1.5">
-      {root.loadState === "idle" || root.loadState === "loading" ? (
-        <RootLoader rootId={root.id} loading={root.loadState === "loading"} />
-      ) : rootFolders.length === 0 ? (
-        <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-          {activeSource.label} has no subfolders to scope.
-        </p>
-      ) : (
-        rootFolders.map((child) =>
-          renderFolder(treeNodes.get(child.id) ?? child, 0)
-        )
-      )}
+    <div>
+      <div className="relative border-b px-1.5 py-1.5">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter folders"
+          aria-label="Filter folders"
+          autoFocus
+          className="h-7 pl-7 text-xs"
+        />
+      </div>
+      <div className="max-h-72 overflow-y-auto p-1.5">
+        {root.loadState === "idle" || root.loadState === "loading" ? (
+          <RootLoader rootId={root.id} loading={root.loadState === "loading"} />
+        ) : rootFolders.length === 0 ? (
+          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+            {activeSource.label} has no subfolders to scope.
+          </p>
+        ) : noFilterMatches ? (
+          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+            No loaded folders match. Expand folders to load more of the tree.
+          </p>
+        ) : (
+          rootFolders.map((child) =>
+            renderFolder(treeNodes.get(child.id) ?? child, 0)
+          )
+        )}
+      </div>
     </div>
   );
 }

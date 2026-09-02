@@ -40,6 +40,44 @@ export function togglePathInScope(
   return next;
 }
 
+/**
+ * Filter the scope-picker folder tree by name. Returns the folders to show
+ * (matches plus their ancestors) and the ancestors to force-expand, or null
+ * when the filter is empty. Only loaded folders can match.
+ */
+export function scopeTreeFilter(
+  treeNodes: Map<string, TreeNode>,
+  root: TreeNode,
+  filter: string
+): { visibleIds: Set<string>; expandIds: Set<string> } | null {
+  const query = filter.trim().toLowerCase();
+  if (!query) return null;
+
+  const visibleIds = new Set<string>();
+  const expandIds = new Set<string>();
+
+  const visit = (node: TreeNode): boolean => {
+    const selfMatches = node.name.toLowerCase().includes(query);
+    let childMatches = false;
+    for (const child of node.children ?? []) {
+      if (!child.isDir) continue;
+      if (visit(treeNodes.get(child.id) ?? child)) childMatches = true;
+    }
+    if (childMatches) expandIds.add(node.id);
+    if (selfMatches || childMatches) {
+      visibleIds.add(node.id);
+      return true;
+    }
+    return false;
+  };
+
+  for (const child of root.children ?? []) {
+    if (!child.isDir) continue;
+    visit(treeNodes.get(child.id) ?? child);
+  }
+  return { visibleIds, expandIds };
+}
+
 /** Empty scope means the whole location is in scope. */
 export function isPathInScope(
   scopePaths: Set<string>,
