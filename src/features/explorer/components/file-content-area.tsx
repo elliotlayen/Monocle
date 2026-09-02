@@ -3,7 +3,8 @@ import { useShallow } from "zustand/shallow";
 import { AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useExplorerStore } from "../store";
-import { FileContentHeader } from "./file-content-header";
+import { BreadcrumbBar } from "./breadcrumb-bar";
+import { FileContentActions } from "./file-content-actions";
 import { XmlSourceView, type XmlSourceViewHandle } from "./xml-source-view";
 import { XmlTreeFlow, type XmlTreeViewHandle } from "./xml-tree-flow";
 import { ProblemsPanel } from "./problems-panel";
@@ -121,12 +122,15 @@ export function FileContentArea() {
     }
   }, [problemsPanelHeight, isDragging]);
 
-  const startDrag = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    startYRef.current = e.clientY;
-    startHeightRef.current = dragHeight;
-    setIsDragging(true);
-  }, [dragHeight]);
+  const startDrag = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      startYRef.current = e.clientY;
+      startHeightRef.current = dragHeight;
+      setIsDragging(true);
+    },
+    [dragHeight]
+  );
 
   useEffect(() => {
     if (!isDragging) return;
@@ -173,9 +177,7 @@ export function FileContentArea() {
 
   const showParseErrorBanner = activeTab.isXml && activeTab.parseError;
   const showTreeView =
-    activeTab.viewMode === "tree" &&
-    activeTab.isXml &&
-    !activeTab.parseError;
+    activeTab.viewMode === "tree" && activeTab.isXml && !activeTab.parseError;
 
   const errorCount = activeTab.problems.filter(
     (p) => p.severity === "error"
@@ -188,12 +190,24 @@ export function FileContentArea() {
 
   return (
     <div ref={contentAreaRef} className="flex flex-col flex-1 overflow-hidden">
-      <FileContentHeader
-        tab={activeTab}
-        isFormatted={isFormatted}
-        onToggleFormat={handleToggleFormat}
-        onExpandAll={showTreeView ? () => treeViewRef.current?.expandAll() : () => sourceViewRef.current?.unfoldAll()}
-        onCollapseAll={showTreeView ? () => treeViewRef.current?.collapseAll() : () => sourceViewRef.current?.foldAll()}
+      <BreadcrumbBar
+        actions={
+          <FileContentActions
+            tab={activeTab}
+            isFormatted={isFormatted}
+            onToggleFormat={handleToggleFormat}
+            onExpandAll={
+              showTreeView
+                ? () => treeViewRef.current?.expandAll()
+                : () => sourceViewRef.current?.unfoldAll()
+            }
+            onCollapseAll={
+              showTreeView
+                ? () => treeViewRef.current?.collapseAll()
+                : () => sourceViewRef.current?.foldAll()
+            }
+          />
+        }
       />
       {showParseErrorBanner && (
         <div className="flex items-center gap-2 px-4 py-2 bg-warning/10 border-b border-warning/30">

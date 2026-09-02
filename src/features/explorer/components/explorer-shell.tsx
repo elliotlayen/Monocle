@@ -15,7 +15,6 @@ import { ExplorerEmptyState } from "./explorer-empty-state";
 import { SearchPanel } from "./search-panel";
 import { ResultsPanel } from "./results-panel";
 import { FileTabBar } from "./file-tab-bar";
-import { BreadcrumbBar } from "./breadcrumb-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
 import { QuickOpen } from "./quick-open";
@@ -84,12 +83,15 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
       <div className="absolute bottom-3 left-3 right-3 top-14 flex flex-col gap-3">
         <SearchPanel />
         <div className="flex min-h-0 flex-1 gap-3">
-          <ResultsPanel width={width} isDragging={isDragging} startDrag={startDrag} />
+          <ResultsPanel
+            width={width}
+            isDragging={isDragging}
+            startDrag={startDrag}
+          />
           <div className="panel-glass flex min-w-0 flex-1 flex-col overflow-hidden">
             {hasOpenTabs ? (
               <>
                 <FileTabBar />
-                <BreadcrumbBar />
                 {isScanning && <ScanProgressPanel />}
                 <FileContentArea />
               </>
