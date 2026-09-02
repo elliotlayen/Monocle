@@ -144,6 +144,32 @@ export function ExplorerSidebar({
     [openFile, setActiveSearchTerms, searchQuery]
   );
 
+  // A snippet click opens the file and jumps to its line
+  const handleSnippetClick = useCallback(
+    (filePath: string, line: number) => {
+      setActiveSearchTerms(parseSearchTermsFrontend(searchQuery));
+      void openFile(filePath).then(() => {
+        useExplorerStore.getState().jumpToProblem(filePath, line, 1);
+      });
+    },
+    [openFile, setActiveSearchTerms, searchQuery]
+  );
+
+  // Group headers show the folder relative to its source root
+  const getGroupLabel = useCallback((folderPath: string) => {
+    const { folderSources } = useExplorerStore.getState();
+    const source = folderSources.find(
+      (s) =>
+        folderPath === s.path ||
+        folderPath.startsWith(s.path + "/") ||
+        folderPath.startsWith(s.path + "\\")
+    );
+    if (!source) return folderPath.split(/[/\\]/).pop() ?? folderPath;
+    if (folderPath === source.path) return source.label;
+    const rel = folderPath.slice(source.path.length + 1).replace(/\\/g, "/");
+    return `${source.label} / ${rel}`;
+  }, []);
+
   const showSearchResults =
     activeView === "search" &&
     (searchStatus !== "idle" ||
@@ -343,6 +369,8 @@ export function ExplorerSidebar({
           onCancel={cancelContentSearch}
           onClear={clearSearchResults}
           onFileClick={handleFileClick}
+          onSnippetClick={handleSnippetClick}
+          getGroupLabel={getGroupLabel}
         />
       ) : (
         <FolderTree />

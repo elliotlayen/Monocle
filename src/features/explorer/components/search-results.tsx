@@ -14,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { parseSearchTermsFrontend } from "../store";
 import { SearchProgress } from "./search-progress";
 import { SearchResultRow } from "./search-result-row";
 import type {
@@ -35,7 +36,13 @@ interface SearchResultsProps {
   onCancel: () => void;
   onClear: () => void;
   onFileClick: (filePath: string) => void;
+  onSnippetClick: (filePath: string, line: number) => void;
+  /** Folder path -> display label (e.g. relative to its source root). */
+  getGroupLabel: (folderPath: string) => string;
 }
+
+/** Snippet lines shown per matched file before the "+N more" row. */
+const MAX_SNIPPETS_SHOWN = 3;
 
 type SearchVirtualRow =
   | {
@@ -53,10 +60,44 @@ type SearchVirtualRow =
       file: SearchResultFile;
     }
   | {
+      type: "snippet";
+      key: string;
+      filePath: string;
+      line: number;
+      text: string;
+    }
+  | {
+      type: "more";
+      key: string;
+      filePath: string;
+      remaining: number;
+    }
+  | {
       type: "error";
       key: string;
       file: SearchErrorFile;
     };
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightTerms(text: string, terms: string[]): React.ReactNode {
+  const usable = terms.filter((t) => t.length > 0);
+  if (usable.length === 0) return text;
+  const pattern = new RegExp(`(${usable.map(escapeRegExp).join("|")})`, "gi");
+  const parts = text.split(pattern);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <span key={i} className="rounded-sm bg-accent-blue/25 text-foreground">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+}
 
 export function SearchResults({
   results,
@@ -69,6 +110,8 @@ export function SearchResults({
   onCancel,
   onClear,
   onFileClick,
+  onSnippetClick,
+  getGroupLabel,
 }: SearchResultsProps) {
   const [expandedOverrides, setExpandedOverrides] = useState<
     Map<string, boolean>
@@ -92,13 +135,12 @@ export function SearchResults({
   const virtualRows = useMemo<SearchVirtualRow[]>(() => {
     const rows: SearchVirtualRow[] = [];
     for (const [folderPath, files] of groupedResults.entries()) {
-      const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
       const expanded = expandedOverrides.get(folderPath) ?? true;
       rows.push({
         type: "group",
         key: `group:${folderPath}`,
         folderPath,
-        label: folderName,
+        label: getGroupLabel(folderPath),
         fileCount: files.length,
         isError: false,
         expanded,
@@ -110,6 +152,25 @@ export function SearchResults({
             key: `result:${file.filePath}`,
             file,
           });
+          const previews = file.matches ?? [];
+          for (const match of previews.slice(0, MAX_SNIPPETS_SHOWN)) {
+            rows.push({
+              type: "snippet",
+              key: `snippet:${file.filePath}:${match.line}`,
+              filePath: file.filePath,
+              line: match.line,
+              text: match.text,
+            });
+          }
+          const shown = Math.min(previews.length, MAX_SNIPPETS_SHOWN);
+          if (file.matchCount > shown) {
+            rows.push({
+              type: "more",
+              key: `more:${file.filePath}`,
+              filePath: file.filePath,
+              remaining: file.matchCount - shown,
+            });
+          }
         }
       }
     }
@@ -138,7 +199,12 @@ export function SearchResults({
     }
 
     return rows;
-  }, [groupedResults, errors, expandedOverrides]);
+  }, [groupedResults, errors, expandedOverrides, getGroupLabel]);
+
+  const searchTerms = useMemo(
+    () => parseSearchTermsFrontend(searchQuery),
+    [searchQuery]
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: virtualRows.length,
@@ -281,6 +347,28 @@ export function SearchResults({
                         </span>
                       )}
                     </div>
+                  ) : row.type === "snippet" ? (
+                    <button
+                      type="button"
+                      className="flex w-full items-baseline gap-2 py-0.5 pl-12 pr-4 text-left hover:bg-muted"
+                      onClick={() => onSnippetClick(row.filePath, row.line)}
+                    >
+                      <span className="w-8 flex-shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
+                        {row.line}
+                      </span>
+                      <span className="truncate font-mono text-xs text-muted-foreground">
+                        {highlightTerms(row.text.trimStart(), searchTerms)}
+                      </span>
+                    </button>
+                  ) : row.type === "more" ? (
+                    <button
+                      type="button"
+                      className="w-full py-0.5 pl-[5.5rem] pr-4 text-left text-[10px] text-muted-foreground hover:bg-muted"
+                      onClick={() => onFileClick(row.filePath)}
+                    >
+                      +{row.remaining} more{" "}
+                      {row.remaining === 1 ? "match" : "matches"}
+                    </button>
                   ) : (
                     <SearchResultRow
                       file={row.file}

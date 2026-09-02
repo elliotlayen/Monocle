@@ -258,16 +258,28 @@ fn build_search_matcher(terms: &[String]) -> SearchMatcher {
     }
 }
 
+/// At most this many matching lines are captured per file as previews.
+const MAX_MATCH_PREVIEWS: usize = 5;
+/// Preview lines are truncated to this many characters.
+const MAX_PREVIEW_CHARS: usize = 200;
+
+struct SearchFileMatches {
+    match_count: u32,
+    previews: Vec<SearchMatchPreview>,
+}
+
 fn search_file_content(
     file_path: &Path,
     matcher: &SearchMatcher,
     cancel_token: Option<&CancellationToken>,
-) -> std::io::Result<Option<u32>> {
+) -> std::io::Result<Option<SearchFileMatches>> {
     let file = std::fs::File::open(file_path)?;
     let mut reader = BufReader::new(file);
     let mut buffer = Vec::new();
     let mut found_terms = vec![false; matcher.terms.len()];
     let mut match_count: u32 = 0;
+    let mut previews: Vec<SearchMatchPreview> = Vec::new();
+    let mut line_number: u32 = 0;
 
     loop {
         if cancel_token.is_some_and(CancellationToken::is_cancelled) {
@@ -279,6 +291,7 @@ fn search_file_content(
         if read == 0 {
             break;
         }
+        line_number = line_number.saturating_add(1);
 
         if buffer.last() == Some(&b'\n') {
             buffer.pop();
@@ -287,11 +300,13 @@ fn search_file_content(
             buffer.pop();
         }
 
+        let mut line_matched = false;
         if let Some(ascii_matcher) = &matcher.ascii_matcher {
             for matched in ascii_matcher.find_overlapping_iter(&buffer) {
                 let idx = matched.pattern().as_usize();
                 found_terms[idx] = true;
                 match_count = match_count.saturating_add(1);
+                line_matched = true;
             }
         } else {
             let line = String::from_utf8_lossy(&buffer).to_lowercase();
@@ -300,13 +315,28 @@ fn search_file_content(
                 if count > 0 {
                     found_terms[idx] = true;
                     match_count = match_count.saturating_add(count);
+                    line_matched = true;
                 }
             }
+        }
+
+        if line_matched && previews.len() < MAX_MATCH_PREVIEWS {
+            let text: String = String::from_utf8_lossy(&buffer)
+                .chars()
+                .take(MAX_PREVIEW_CHARS)
+                .collect();
+            previews.push(SearchMatchPreview {
+                line: line_number,
+                text,
+            });
         }
     }
 
     if found_terms.into_iter().all(|found| found) {
-        Ok(Some(match_count))
+        Ok(Some(SearchFileMatches {
+            match_count,
+            previews,
+        }))
     } else {
         Ok(None)
     }
@@ -316,6 +346,14 @@ fn search_file_content(
 fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Result<Option<u32>> {
     let matcher = build_search_matcher(terms);
     search_file_content(file_path, &matcher, None)
+        .map(|found| found.map(|matches| matches.match_count))
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchMatchPreview {
+    pub line: u32,
+    pub text: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -325,6 +363,7 @@ pub struct SearchResultPayload {
     pub file_name: String,
     pub parent_folder: String,
     pub match_count: u32,
+    pub matches: Vec<SearchMatchPreview>,
     pub operation_id: String,
 }
 
@@ -493,15 +532,16 @@ fn scan_search_candidate(
             error_message: "Failed to read file".to_string(),
         })),
         _ => match search_file_content(&candidate.file_path, matcher, Some(cancel_token)) {
-            Ok(Some(match_count)) => Some(SearchScanOutcome::Matched(
+            Ok(Some(found)) => Some(SearchScanOutcome::Matched(
                 SearchResultPayload {
                     file_path: file_path_string,
                     file_name: candidate.file_name,
                     parent_folder: candidate.parent_folder,
-                    match_count,
+                    match_count: found.match_count,
+                    matches: found.previews,
                     operation_id: operation_id.to_string(),
                 },
-                match_count,
+                found.match_count,
             )),
             Ok(None) => Some(SearchScanOutcome::NoMatch),
             Err(_) => Some(SearchScanOutcome::Error(SearchErrorPayload {
@@ -1216,7 +1256,12 @@ mod tests {
         assert!(matcher.ascii_matcher.is_some());
 
         let result = search_file_content(&file_path, &matcher, None).unwrap();
-        assert_eq!(result, Some(4));
+        let found = result.expect("expected a match");
+        assert_eq!(found.match_count, 4);
+        assert_eq!(found.previews.len(), 2);
+        assert_eq!(found.previews[0].line, 1);
+        assert_eq!(found.previews[0].text, "CONFIG value");
+        assert_eq!(found.previews[1].line, 2);
     }
 
     #[test]
@@ -1229,7 +1274,9 @@ mod tests {
         assert!(matcher.ascii_matcher.is_none());
 
         let result = search_file_content(&file_path, &matcher, None).unwrap();
-        assert_eq!(result, Some(2));
+        let found = result.expect("expected a match");
+        assert_eq!(found.match_count, 2);
+        assert_eq!(found.previews.len(), 2);
     }
 
     #[test]
@@ -1243,7 +1290,7 @@ mod tests {
         token.cancel();
 
         let result = search_file_content(&file_path, &matcher, Some(&token)).unwrap();
-        assert_eq!(result, None);
+        assert!(result.is_none());
     }
 
     #[test]

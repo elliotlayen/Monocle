@@ -117,11 +117,17 @@ export type SearchMode = "filename" | "content";
 
 export type SearchStatus = "idle" | "searching" | "completed" | "cancelled";
 
+export interface SearchMatchPreview {
+  line: number;
+  text: string;
+}
+
 export interface SearchResultFile {
   filePath: string;
   fileName: string;
   parentFolder: string;
   matchCount: number;
+  matches: SearchMatchPreview[];
   operationId: string;
 }
 
