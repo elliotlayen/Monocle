@@ -21,7 +21,6 @@ export interface ScanSlice {
   scanProgress: ScanProgressPayload | null;
   scanResult: ScanSummary | null;
   folderBadgeCache: Map<string, ValidationStatus>;
-  lastInteractedFolderPath: string | null;
   pendingScanRequest: {
     folderPath: string;
     filePattern: string;
@@ -33,7 +32,6 @@ export interface ScanSlice {
   cancelScan: () => Promise<void>;
   clearScanResult: () => void;
   setScanFilePattern: (pattern: string) => void;
-  setLastInteractedFolder: (path: string) => void;
   getFolderBadge: (folderPath: string) => ValidationStatus | undefined;
   confirmPendingScan: () => void;
   dismissPendingScan: () => void;
@@ -152,7 +150,6 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
     scanProgress: null,
     scanResult: null,
     folderBadgeCache: new Map(),
-    lastInteractedFolderPath: null,
     pendingScanRequest: null,
 
     requestScan: (folderPath: string, filePattern: string) => {
@@ -202,10 +199,6 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
 
     setScanFilePattern: (pattern: string) => {
       set({ scanFilePattern: pattern });
-    },
-
-    setLastInteractedFolder: (path: string) => {
-      set({ lastInteractedFolderPath: path });
     },
 
     getFolderBadge: (folderPath: string): ValidationStatus | undefined => {

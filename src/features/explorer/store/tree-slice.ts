@@ -13,7 +13,10 @@ export interface TreeSlice {
   treeNodes: Map<string, TreeNode>;
   expandedIds: Set<string>;
   activeOperations: Map<string, string>;
+  /** Debounced filter the tree derives visibility from. */
   filterText: string;
+  /** Immediate mirror of the filter input's value. */
+  filterInputText: string;
   dateSortOrder: "newest" | "oldest";
   dateRange: DateRange;
   loadedFileIndex: Map<string, string>;
@@ -161,6 +164,7 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   expandedIds: new Set(),
   activeOperations: new Map(),
   filterText: "",
+  filterInputText: "",
   dateSortOrder: "newest",
   dateRange: null,
   loadedFileIndex: new Map<string, string>(),
@@ -319,6 +323,7 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
   setFilterText: (text: string) => {
     // Debounce the filter the tree derives visibility from; clearing is
     // instant so escape/clear feels immediate.
+    set({ filterInputText: text });
     if (filterDebounce) clearTimeout(filterDebounce);
     if (!text.trim()) {
       filterDebounce = null;

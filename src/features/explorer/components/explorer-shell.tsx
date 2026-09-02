@@ -10,10 +10,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { SidebarToggle } from "@/components/ui/sidebar-toggle";
 import { ExplorerNavBar } from "./explorer-nav-bar";
 import { ExplorerEmptyState } from "./explorer-empty-state";
 import { ExplorerSidebar } from "./explorer-sidebar";
+import { ActivityRail } from "./activity-rail";
+import { useExplorerKeyboard } from "../hooks/use-explorer-keyboard";
 import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
@@ -26,9 +27,10 @@ interface ExplorerShellProps {
 }
 
 export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
+  useExplorerKeyboard();
+
   const {
     sidebarOpen,
-    setSidebarOpen,
     sidebarWidth,
     setSidebarWidth,
     tabs,
@@ -40,7 +42,6 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
   } = useExplorerStore(
     useShallow((state) => ({
       sidebarOpen: state.sidebarOpen,
-      setSidebarOpen: state.setSidebarOpen,
       sidebarWidth: state.sidebarWidth,
       setSidebarWidth: state.setSidebarWidth,
       tabs: state.tabs,
@@ -68,10 +69,10 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden">
-      <ExplorerNavBar onHome={onHome} onOpenSettings={onOpenSettings} />
+      <ExplorerNavBar onHome={onHome} />
       {/* Floating chrome below the docked nav bar. */}
+      <ActivityRail onOpenSettings={onOpenSettings} />
       <ExplorerSidebar width={width} isDragging={isDragging} startDrag={startDrag} />
-      <SidebarToggle onClick={() => setSidebarOpen(true)} visible={!sidebarOpen} />
       <div
         className={cn(
           "panel-glass absolute bottom-3 right-3 top-14 z-10 flex flex-col overflow-hidden",
@@ -79,7 +80,7 @@ export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
           !isDragging &&
             "transition-[left] duration-[var(--duration-slow)] ease-[var(--ease-out)]"
         )}
-        style={{ left: sidebarOpen ? width + 24 : 56 }}
+        style={{ left: sidebarOpen ? width + 80 : 68 }}
       >
         {hasOpenTabs ? (
           <>

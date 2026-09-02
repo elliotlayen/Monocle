@@ -153,7 +153,6 @@ export function FolderTree() {
   // Stable row callbacks (rows re-render only when their data changes)
   const handleToggle = useCallback((row: TreeNodeRow) => {
     const store = useExplorerStore.getState();
-    if (row.type !== "source") store.setLastInteractedFolder(row.path);
     store.setSelectedPath(row.path);
     setFocusedKey(row.key);
     if (row.isExpanded) {
