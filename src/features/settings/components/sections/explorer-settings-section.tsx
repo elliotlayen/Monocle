@@ -21,7 +21,7 @@ export function ExplorerSettingsSection() {
   return (
     <div className="space-y-6 px-1">
       <div className="space-y-1">
-        <h3 className="text-base font-semibold">Explorer</h3>
+        <h3 className="text-base font-semibold">Scanning</h3>
         <p className="text-xs text-muted-foreground">
           Configure file patterns for scanning and content search.
         </p>

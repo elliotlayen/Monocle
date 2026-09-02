@@ -90,7 +90,9 @@ src/
       types.ts                      - TypeScript types (SchemaGraph, TableNode, etc.)
     settings/
       components/
-        settings-sheet.tsx          - Settings panel
+        sections/                   - Per-section panels (display-options.ts, node-style-field.tsx, graph-display-fields.tsx shared)
+        node-style-preview.tsx      - Live preview of the selected graph node style
+        xml-node-style-preview.tsx  - Live preview of the selected explorer node style
       services/
         settings-service.ts         - Tauri IPC for settings persistence
     toolbar/
@@ -141,6 +143,7 @@ src/
     use-resolved-theme.ts           - Theme resolution hook (system/dark/light)
   types/                            - TypeScript type declarations
   components/
+    app-settings-sheet.tsx          - Settings dialog shell (section nav + panes)
     ui/                             - shadcn/ui components
   constants/
     edge-colors.ts                  - Edge color constants
@@ -262,6 +265,10 @@ No external database drivers needed - tiberius connects to SQL Server directly v
 - Toasts render through Sonner behind the existing `useToastStore`/`showToast` API in `src/features/notifications/store.tsx` (headless `toast.custom` content). One `<Toaster />` mounts in `App.tsx`.
 - Monaco editors use the `monocle-dark`/`monocle-light` themes from `src/lib/monaco-themes.ts`; its hexes mirror the CSS tokens and must be kept in sync.
 - Object details open per the `detailViewMode` setting ("inspector" | "drawer"), persisted like `showMiniMap`.
+- Node color identity is chosen by the `nodeStyle` setting ("tinted" | "surface" | "adaptive" | "solid", default "adaptive"), persisted like `detailViewMode`. `src/features/schema-graph/components/node-style.ts` (`getNodeStyleSpec`) is the single source for node and settings-preview styling; it derives everything from `OBJECT_COLORS` plus `color-mix()` and `--object-on-color`, and never changes node geometry. "adaptive" keys off the per-node `isCompact` flag, which every node kind now receives from the zoom band.
+- Canvas Mode persists its own display set (`canvasNodeStyle`, `canvasEdgeLabelMode`, `canvasShowMiniMap`, `canvasDetailViewMode`). Consumers select by `canvasMode` through `useGraphDisplaySettings` / `selectNodeStyle` exported from the schema store; never read the plain or canvas fields directly in graph components.
+- The Integration Explorer XML tree has its own `explorerNodeStyle` ("soft" | "capsule" | "outline" | "depth", default "soft") in the explorer store, hydrated in `loadSources`. `src/features/explorer/utils/xml-node-style.ts` (`getXmlNodeStyleSpec`) is the single source for the tree card and its settings preview; it derives from `XML_KIND_COLORS` plus `color-mix()`, never paints on-color, and never changes `XML_NODE_HEIGHT` or the estimated widths. `XmlNodeCard` in `xml-flow-node.tsx` is the shared presentational card.
+- The settings dialog nav is grouped by feature (Schema Browser, Canvas Mode, Integration Explorer, General) with uppercase group titles, and opens on the group matching the current app `mode`.
 
 ## Notes
 

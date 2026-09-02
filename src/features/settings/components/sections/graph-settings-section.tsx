@@ -1,10 +1,7 @@
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { Label } from "@/components/ui/label";
-import type {
-  DetailViewMode,
-  EdgeLabelMode,
-} from "@/features/settings/services/settings-service";
 import { useShallow } from "zustand/shallow";
+import { GraphDisplayFields } from "./graph-display-fields";
 import {
   Select,
   SelectContent,
@@ -12,12 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const EDGE_LABEL_MODES: Array<{ label: string; value: EdgeLabelMode }> = [
-  { label: "Auto", value: "auto" },
-  { label: "Never", value: "never" },
-  { label: "Always", value: "always" },
-];
 
 const FOCUS_THRESHOLD_OPTIONS = ["5", "10", "15", "20", "25"];
 
@@ -131,71 +122,20 @@ export function GraphSettingsSection() {
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Databases with more objects than this start with an empty canvas;
-          pick objects to explore instead of rendering the full graph. Applies
-          on the next database load.
+          Databases with more objects than this start with an empty canvas; pick
+          objects to explore instead of rendering the full graph. Applies on the
+          next database load.
         </p>
       </div>
 
-      <div className="space-y-2">
-        <Label>Edge Labels</Label>
-        <Select
-          value={edgeLabelMode}
-          onValueChange={(value) => setEdgeLabelMode(value as EdgeLabelMode)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {EDGE_LABEL_MODES.map((mode) => (
-              <SelectItem key={mode.value} value={mode.value}>
-                {mode.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Control edge label visibility across zoom levels.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>MiniMap</Label>
-        <Select
-          value={showMiniMap ? "on" : "off"}
-          onValueChange={(value) => setShowMiniMap(value === "on")}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="on">On</SelectItem>
-            <SelectItem value="off">Off</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Show or hide the graph overview minimap.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Object Details</Label>
-        <Select
-          value={detailViewMode}
-          onValueChange={(value) => setDetailViewMode(value as DetailViewMode)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="inspector">Inspector panel</SelectItem>
-            <SelectItem value="drawer">Bottom panel</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Where object details open when you click a node or sidebar item.
-        </p>
-      </div>
+      <GraphDisplayFields
+        edgeLabelMode={edgeLabelMode}
+        onEdgeLabelModeChange={setEdgeLabelMode}
+        showMiniMap={showMiniMap}
+        onShowMiniMapChange={setShowMiniMap}
+        detailViewMode={detailViewMode}
+        onDetailViewModeChange={setDetailViewMode}
+      />
     </div>
   );
 }

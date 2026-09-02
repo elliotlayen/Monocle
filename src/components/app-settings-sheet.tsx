@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,12 +6,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FolderSync, Info, Network, Palette, Search } from "lucide-react";
+import {
+  FolderSync,
+  GitBranch,
+  Info,
+  LayoutGrid,
+  Network,
+  Palette,
+  PenTool,
+  Search,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  useSchemaStore,
+  type SchemaStore,
+} from "@/features/schema-graph/store";
 import { GraphSettingsSection } from "@/features/settings/components/sections/graph-settings-section";
+import { SchemaNodesSettingsSection } from "@/features/settings/components/sections/schema-nodes-settings-section";
+import { CanvasDisplaySettingsSection } from "@/features/settings/components/sections/canvas-display-settings-section";
 import { AppearanceSettingsSection } from "@/features/settings/components/sections/appearance-settings-section";
 import { FolderSourcesSection } from "@/features/settings/components/sections/folder-sources-section";
 import { ExplorerSettingsSection } from "@/features/settings/components/sections/explorer-settings-section";
+import { ExplorerNodesSettingsSection } from "@/features/settings/components/sections/explorer-nodes-settings-section";
 import { AboutSettingsSection } from "@/features/settings/components/sections/about-settings-section";
 
 interface AppSettingsSheetProps {
@@ -19,45 +36,130 @@ interface AppSettingsSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type SettingsSectionId = "graph" | "appearance" | "sources" | "explorer" | "about";
+export type SettingsSectionId =
+  | "schema-graph"
+  | "schema-nodes"
+  | "canvas-display"
+  | "explorer-sources"
+  | "explorer-scan"
+  | "explorer-nodes"
+  | "general-appearance"
+  | "general-about";
 
-const SETTINGS_SECTIONS: Array<{
+interface SettingsSection {
   id: SettingsSectionId;
   label: string;
-  icon: typeof Network;
-}> = [
-  { id: "graph", label: "Graph", icon: Network },
-  { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "sources", label: "Sources", icon: FolderSync },
-  { id: "explorer", label: "Explorer", icon: Search },
-  { id: "about", label: "About", icon: Info },
+  icon: LucideIcon;
+  render: () => ReactNode;
+}
+
+interface SettingsGroup {
+  id: string;
+  title: string;
+  sections: SettingsSection[];
+}
+
+// Nav is grouped by feature so each mode's settings sit together.
+const SETTINGS_GROUPS: SettingsGroup[] = [
+  {
+    id: "schema",
+    title: "Schema Browser",
+    sections: [
+      {
+        id: "schema-graph",
+        label: "Graph",
+        icon: Network,
+        render: () => <GraphSettingsSection />,
+      },
+      {
+        id: "schema-nodes",
+        label: "Nodes",
+        icon: LayoutGrid,
+        render: () => <SchemaNodesSettingsSection />,
+      },
+    ],
+  },
+  {
+    id: "canvas",
+    title: "Canvas Mode",
+    sections: [
+      {
+        id: "canvas-display",
+        label: "Display",
+        icon: PenTool,
+        render: () => <CanvasDisplaySettingsSection />,
+      },
+    ],
+  },
+  {
+    id: "explorer",
+    title: "Integration Explorer",
+    sections: [
+      {
+        id: "explorer-sources",
+        label: "Sources",
+        icon: FolderSync,
+        render: () => <FolderSourcesSection />,
+      },
+      {
+        id: "explorer-scan",
+        label: "Scanning",
+        icon: Search,
+        render: () => <ExplorerSettingsSection />,
+      },
+      {
+        id: "explorer-nodes",
+        label: "Nodes",
+        icon: GitBranch,
+        render: () => <ExplorerNodesSettingsSection />,
+      },
+    ],
+  },
+  {
+    id: "general",
+    title: "General",
+    sections: [
+      {
+        id: "general-appearance",
+        label: "Appearance",
+        icon: Palette,
+        render: () => <AppearanceSettingsSection />,
+      },
+      {
+        id: "general-about",
+        label: "About",
+        icon: Info,
+        render: () => <AboutSettingsSection />,
+      },
+    ],
+  },
 ];
 
-export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) {
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>("graph");
+const ALL_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.sections);
+
+// Opening settings lands on the group for whatever the user is doing.
+const DEFAULT_SECTION_BY_MODE: Record<SchemaStore["mode"], SettingsSectionId> =
+  {
+    connected: "schema-graph",
+    canvas: "canvas-display",
+    explorer: "explorer-sources",
+  };
+
+export function AppSettingsSheet({
+  open,
+  onOpenChange,
+}: AppSettingsSheetProps) {
+  const mode = useSchemaStore((state) => state.mode);
+  const [activeSection, setActiveSection] =
+    useState<SettingsSectionId>("schema-graph");
 
   useEffect(() => {
     if (open) {
-      setActiveSection("graph");
+      setActiveSection(DEFAULT_SECTION_BY_MODE[mode]);
     }
-  }, [open]);
+  }, [open, mode]);
 
-  const renderActiveSection = () => {
-    switch (activeSection) {
-      case "graph":
-        return <GraphSettingsSection />;
-      case "appearance":
-        return <AppearanceSettingsSection />;
-      case "sources":
-        return <FolderSourcesSection />;
-      case "explorer":
-        return <ExplorerSettingsSection />;
-      case "about":
-        return <AboutSettingsSection />;
-      default:
-        return null;
-    }
-  };
+  const active = ALL_SECTIONS.find((section) => section.id === activeSection);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -67,30 +169,43 @@ export function AppSettingsSheet({ open, onOpenChange }: AppSettingsSheetProps) 
         </DialogHeader>
         <div className="min-h-0 flex-1 border-t">
           <div className="flex h-full min-h-0">
-            <nav className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-2">
-              {SETTINGS_SECTIONS.map((section) => {
-                const Icon = section.icon;
-                const isActive = activeSection === section.id;
-                return (
-                  <Button
-                    key={section.id}
-                    variant="ghost"
+            <nav className="flex w-48 shrink-0 flex-col overflow-y-auto border-r p-2">
+              {SETTINGS_GROUPS.map((group, groupIndex) => (
+                <div key={group.id} className="flex flex-col gap-0.5">
+                  <div
                     className={cn(
-                      "justify-start gap-2",
-                      isActive &&
-                        "bg-accent-blue/12 text-accent-blue hover:bg-accent-blue/18 hover:text-accent-blue"
+                      "px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground",
+                      groupIndex === 0 ? "pt-1" : "pt-3"
                     )}
-                    onClick={() => setActiveSection(section.id)}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{section.label}</span>
-                  </Button>
-                );
-              })}
+                    {group.title}
+                  </div>
+                  {group.sections.map((section) => {
+                    const Icon = section.icon;
+                    const isActive = activeSection === section.id;
+                    return (
+                      <Button
+                        key={section.id}
+                        variant="ghost"
+                        aria-current={isActive ? "page" : undefined}
+                        className={cn(
+                          "justify-start gap-2",
+                          isActive &&
+                            "bg-accent-blue/12 text-accent-blue hover:bg-accent-blue/18 hover:text-accent-blue"
+                        )}
+                        onClick={() => setActiveSection(section.id)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{section.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              ))}
             </nav>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 sm:px-6 sm:pt-4">
-              {renderActiveSection()}
+              {active?.render()}
             </div>
           </div>
         </div>
