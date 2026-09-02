@@ -1,12 +1,9 @@
 import { useShallow } from "zustand/shallow";
 import { useSchemaStore } from "@/features/schema-graph/store";
 import { GraphDisplayFields } from "./graph-display-fields";
-import { NodeStyleField } from "./node-style-field";
 
 export function CanvasDisplaySettingsSection() {
   const {
-    canvasNodeStyle,
-    setCanvasNodeStyle,
     canvasEdgeLabelMode,
     setCanvasEdgeLabelMode,
     canvasShowMiniMap,
@@ -15,8 +12,6 @@ export function CanvasDisplaySettingsSection() {
     setCanvasDetailViewMode,
   } = useSchemaStore(
     useShallow((state) => ({
-      canvasNodeStyle: state.canvasNodeStyle,
-      setCanvasNodeStyle: state.setCanvasNodeStyle,
       canvasEdgeLabelMode: state.canvasEdgeLabelMode,
       setCanvasEdgeLabelMode: state.setCanvasEdgeLabelMode,
       canvasShowMiniMap: state.canvasShowMiniMap,
@@ -31,12 +26,10 @@ export function CanvasDisplaySettingsSection() {
       <div className="space-y-1">
         <h3 className="text-base font-semibold">Display</h3>
         <p className="text-xs text-muted-foreground">
-          Canvas Mode keeps its own node style, edge labels, minimap, and
-          details placement.
+          Canvas Mode keeps its own edge labels, minimap, and details
+          placement. Node styling lives under Appearance.
         </p>
       </div>
-
-      <NodeStyleField value={canvasNodeStyle} onChange={setCanvasNodeStyle} />
 
       <GraphDisplayFields
         edgeLabelMode={canvasEdgeLabelMode}

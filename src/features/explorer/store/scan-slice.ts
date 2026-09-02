@@ -19,7 +19,6 @@ export interface ScanSlice {
   scanOperationId: string | null;
   scanFolderPath: string | null;
   scanFolderName: string | null;
-  scanFilePattern: string;
   scanProgress: ScanProgressPayload | null;
   /** File results streamed so far (live during a scan, final afterwards). */
   scanFiles: ScanFileResult[];
@@ -36,7 +35,6 @@ export interface ScanSlice {
   appendScanResults: (operationId: string, results: ScanFileResult[]) => void;
   cancelScan: () => Promise<void>;
   clearScanResult: () => void;
-  setScanFilePattern: (pattern: string) => void;
   getFolderBadge: (folderPath: string) => ValidationStatus | undefined;
   confirmPendingScan: () => void;
   dismissPendingScan: () => void;
@@ -127,7 +125,6 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
     scanOperationId: null,
     scanFolderPath: null,
     scanFolderName: null,
-    scanFilePattern: "*.xml",
     scanProgress: null,
     scanFiles: [],
     scanResult: null,
@@ -219,10 +216,6 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
         scanResult: null,
         scanProgress: null,
       });
-    },
-
-    setScanFilePattern: (pattern: string) => {
-      set({ scanFilePattern: pattern });
     },
 
     getFolderBadge: (folderPath: string): ValidationStatus | undefined => {

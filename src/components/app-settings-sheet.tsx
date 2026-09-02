@@ -8,13 +8,10 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   FolderSync,
-  GitBranch,
   Info,
-  LayoutGrid,
   Network,
   Palette,
   PenTool,
-  Search,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,12 +20,9 @@ import {
   type SchemaStore,
 } from "@/features/schema-graph/store";
 import { GraphSettingsSection } from "@/features/settings/components/sections/graph-settings-section";
-import { SchemaNodesSettingsSection } from "@/features/settings/components/sections/schema-nodes-settings-section";
 import { CanvasDisplaySettingsSection } from "@/features/settings/components/sections/canvas-display-settings-section";
 import { AppearanceSettingsSection } from "@/features/settings/components/sections/appearance-settings-section";
 import { FolderSourcesSection } from "@/features/settings/components/sections/folder-sources-section";
-import { ExplorerSettingsSection } from "@/features/settings/components/sections/explorer-settings-section";
-import { ExplorerNodesSettingsSection } from "@/features/settings/components/sections/explorer-nodes-settings-section";
 import { AboutSettingsSection } from "@/features/settings/components/sections/about-settings-section";
 
 interface AppSettingsSheetProps {
@@ -38,11 +32,8 @@ interface AppSettingsSheetProps {
 
 export type SettingsSectionId =
   | "schema-graph"
-  | "schema-nodes"
   | "canvas-display"
   | "explorer-sources"
-  | "explorer-scan"
-  | "explorer-nodes"
   | "general-appearance"
   | "general-about";
 
@@ -71,12 +62,6 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         icon: Network,
         render: () => <GraphSettingsSection />,
       },
-      {
-        id: "schema-nodes",
-        label: "Nodes",
-        icon: LayoutGrid,
-        render: () => <SchemaNodesSettingsSection />,
-      },
     ],
   },
   {
@@ -100,18 +85,6 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         label: "Sources",
         icon: FolderSync,
         render: () => <FolderSourcesSection />,
-      },
-      {
-        id: "explorer-scan",
-        label: "Scanning",
-        icon: Search,
-        render: () => <ExplorerSettingsSection />,
-      },
-      {
-        id: "explorer-nodes",
-        label: "Nodes",
-        icon: GitBranch,
-        render: () => <ExplorerNodesSettingsSection />,
       },
     ],
   },

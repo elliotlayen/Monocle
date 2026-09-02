@@ -10,8 +10,6 @@ export function useScan() {
     scanStatus,
     scanProgress,
     scanResult,
-    scanFilePattern,
-    setScanFilePattern,
     scanFolderName,
   } = useExplorerStore(
     useShallow((state) => ({
@@ -20,8 +18,6 @@ export function useScan() {
       scanStatus: state.scanStatus,
       scanProgress: state.scanProgress,
       scanResult: state.scanResult,
-      scanFilePattern: state.scanFilePattern,
-      setScanFilePattern: state.setScanFilePattern,
       scanFolderName: state.scanFolderName,
     }))
   );
@@ -32,8 +28,6 @@ export function useScan() {
     scanStatus,
     scanProgress,
     scanResult,
-    scanFilePattern,
-    setScanFilePattern,
     scanFolderName,
   };
 }

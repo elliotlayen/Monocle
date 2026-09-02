@@ -13,13 +13,19 @@ import { NODE_STYLE_OPTIONS } from "./display-options";
 interface NodeStyleFieldProps {
   value: NodeStyle;
   onChange: (style: NodeStyle) => void;
+  /** Field label; defaults to "Node style". */
+  label?: string;
 }
 
 /** Node style select plus live preview, shared by Schema Browser and Canvas Mode. */
-export function NodeStyleField({ value, onChange }: NodeStyleFieldProps) {
+export function NodeStyleField({
+  value,
+  onChange,
+  label = "Node style",
+}: NodeStyleFieldProps) {
   return (
     <div className="space-y-2">
-      <Label>Node style</Label>
+      <Label>{label}</Label>
       <Select
         value={value}
         onValueChange={(next) => onChange(next as NodeStyle)}

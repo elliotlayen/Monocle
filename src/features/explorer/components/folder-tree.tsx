@@ -545,7 +545,7 @@ export function FolderTree() {
               <ContextMenuItem
                 onClick={() => {
                   const store = useExplorerStore.getState();
-                  store.requestScan(menuTarget.path, store.scanFilePattern);
+                  store.requestScan(menuTarget.path, store.searchFilePattern);
                 }}
               >
                 Scan for Issues...
