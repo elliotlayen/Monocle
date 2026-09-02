@@ -168,7 +168,7 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => {
     lastRun: null,
     searchSourceId: null,
     scopePaths: new Set<string>(),
-    searchFilePattern: "*.xml",
+    searchFilePattern: "*",
     searchRegex: false,
     searchCaseSensitive: false,
     savedSearches: [],

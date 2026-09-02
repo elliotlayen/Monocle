@@ -40,6 +40,9 @@ export function FileTypePicker({
   const ids = patternToTypeIds(value);
   const isCustom = ids === null;
   const allChecked = !isCustom && coversAllTypes(ids);
+  // "All types" is the neutral default; anything narrower reads as an
+  // active filter, mirroring the "Choose folders" and date controls.
+  const isNarrowed = isCustom || !allChecked;
 
   const toggleType = (id: string) => {
     if (isCustom) {
@@ -62,13 +65,18 @@ export function FileTypePicker({
           type="button"
           aria-label={ariaLabel}
           className={cn(
-            "inline-flex h-[26px] items-center gap-1.5 rounded-md border border-border bg-muted px-2 text-[11px] text-foreground transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
+            "inline-flex h-[26px] w-32 items-center gap-1.5 rounded-md border px-2 text-[11px] transition-[transform,background-color,border-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
+            isNarrowed
+              ? "border-accent-blue/40 bg-accent-blue/10 text-foreground"
+              : "border-border bg-muted text-muted-foreground hover:text-foreground",
             className
           )}
         >
-          <FileType className="h-3 w-3 text-muted-foreground" />
-          {fileTypeSummary(value)}
-          <ChevronDown className="h-3 w-3 opacity-50" />
+          <FileType className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-left">
+            {fileTypeSummary(value)}
+          </span>
+          <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-50" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-44">

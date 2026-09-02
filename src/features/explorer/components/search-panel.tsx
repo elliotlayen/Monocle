@@ -455,23 +455,25 @@ export function SearchPanel() {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-[26px] gap-1.5 border px-2 text-[11px] font-normal",
+                  "h-[26px] w-48 justify-start gap-1.5 border px-2 text-[11px] font-normal",
                   dateRange?.from
                     ? "border-accent-blue/40 bg-accent-blue/10 text-foreground"
                     : "border-border bg-muted text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="h-3.5 w-3.5" />
-                {dateRange?.from
-                  ? dateRange.to
-                    ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
-                    : format(dateRange.from, "MMM d, yyyy")
-                  : "Any date"}
+                <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {dateRange?.from
+                    ? dateRange.to
+                      ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
+                      : format(dateRange.from, "MMM d, yyyy")
+                    : "Any date"}
+                </span>
                 {dateRange?.from && (
                   <span
                     role="button"
                     tabIndex={0}
-                    className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-sm hover:bg-accent-blue/25"
+                    className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm hover:bg-accent-blue/25"
                     aria-label="Clear date range"
                     onClick={(e) => {
                       e.stopPropagation();
