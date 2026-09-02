@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { CalendarIcon, Clock, FileCode, Search, Star, X } from "lucide-react";
+import {
+  CalendarIcon,
+  Clock,
+  FileCode,
+  ListFilter,
+  Search,
+  Star,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +34,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useExplorerStore } from "../store";
+import { ScopeTree } from "./scope-tree";
 import type { DateRange as DayPickerRange } from "react-day-picker";
 
 /** Live filename search debounce. */
@@ -360,6 +369,50 @@ export function SearchPanel() {
         <div className="flex flex-wrap items-center gap-1.5" id="explorer-scope-row">
           <span className="text-[10px] text-muted-foreground">in</span>
           {scopeChips}
+          <Popover
+            onOpenChange={(open) => {
+              if (!open) return;
+              // Make sure the source's top-level folders are loaded
+              const store = useExplorerStore.getState();
+              const source =
+                store.folderSources.find((s) => s.id === store.searchSourceId) ??
+                store.folderSources[0];
+              const root = source ? store.treeNodes.get(source.id) : undefined;
+              if (root && root.loadState === "idle") {
+                void store.expandNode(root.id);
+              }
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-[10.5px] transition-colors duration-[var(--duration-fast)]",
+                  scopePaths.size > 0
+                    ? "border-accent-blue text-accent-blue"
+                    : "border-border bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <ListFilter className="h-3 w-3" /> Choose folders
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-0">
+              <p className="border-b px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Scope: {activeSource?.label ?? ""}
+              </p>
+              <ScopeTree />
+              <div className="flex items-center gap-2 border-t px-3 py-1.5 text-[10.5px] text-muted-foreground">
+                Checked folders (and everything inside) are searched.
+                <button
+                  type="button"
+                  className="ml-auto text-accent-blue hover:underline"
+                  onClick={clearScope}
+                >
+                  Clear
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
           {scopePaths.size > 0 && (
             <button
               type="button"
