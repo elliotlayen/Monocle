@@ -9,6 +9,7 @@ import {
   FileCode,
   FileText,
   AlertTriangle,
+  Plus,
   RotateCw,
   Star,
   X,
@@ -239,7 +240,9 @@ function FolderTreeRowInner({
               <X className="h-2 w-2" /> scope
             </>
           ) : (
-            "+ scope"
+            <>
+              <Plus className="h-2 w-2" /> scope
+            </>
           )}
         </span>
       )}
