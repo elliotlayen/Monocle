@@ -10,10 +10,16 @@ import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
 import type { SliceCreator } from "./store-types";
 
+/**
+ * Content-search scope: everything, one source (by id), or whatever folder
+ * is currently selected in the tree (resolved when the search runs).
+ */
+export type SearchScope = "all" | "selected" | `source:${string}`;
+
 export interface SearchSlice {
   searchMode: SearchMode;
   searchQuery: string;
-  searchCheckedPaths: Set<string>;
+  searchScope: SearchScope;
   searchFilePattern: string;
   searchStatus: SearchStatus;
   searchProgress: SearchProgressPayload | null;
@@ -27,7 +33,7 @@ export interface SearchSlice {
 
   setSearchMode: (mode: SearchMode) => void;
   setSearchQuery: (text: string) => void;
-  toggleSearchCheck: (path: string) => void;
+  setSearchScope: (scope: SearchScope) => void;
   setSearchFilePattern: (pattern: string) => void;
   startContentSearch: (
     folderPaths: string[],
@@ -100,7 +106,7 @@ export function parseSearchTermsFrontend(query: string): string[] {
 export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
   searchMode: "filename",
   searchQuery: "",
-  searchCheckedPaths: new Set<string>(),
+  searchScope: "all",
   searchFilePattern: "*.xml",
   searchStatus: "idle",
   searchProgress: null,
@@ -153,20 +159,8 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
     }
   },
 
-  toggleSearchCheck: (path: string) => {
-    const prev = get().searchCheckedPaths;
-    const next = new Set(prev);
-    if (next.has(path)) {
-      next.delete(path);
-    } else {
-      next.add(path);
-      // Remove any descendant paths — parent already covers them
-      for (const p of next) {
-        if (p !== path && p.startsWith(path + "/")) next.delete(p);
-        if (p !== path && p.startsWith(path + "\\")) next.delete(p);
-      }
-    }
-    set({ searchCheckedPaths: next });
+  setSearchScope: (scope: SearchScope) => {
+    set({ searchScope: scope });
   },
 
   setSearchFilePattern: (pattern: string) => {
@@ -290,7 +284,6 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
       searchProgress: null,
       searchStatus: "idle",
       activeSearchTerms: null,
-      searchCheckedPaths: new Set<string>(),
     });
   },
 

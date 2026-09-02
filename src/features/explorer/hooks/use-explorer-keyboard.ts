@@ -1,9 +1,15 @@
 import { useEffect } from "react";
 import { useExplorerStore } from "../store";
 
-function focusById(id: string) {
+function focusById(id: string, attempts = 5) {
   requestAnimationFrame(() => {
-    document.getElementById(id)?.focus();
+    const el = document.getElementById(id);
+    if (el) {
+      el.focus();
+    } else if (attempts > 1) {
+      // The target view may still be mounting; retry a few frames.
+      focusById(id, attempts - 1);
+    }
   });
 }
 

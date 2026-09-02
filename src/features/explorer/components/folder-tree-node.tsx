@@ -26,8 +26,6 @@ export function treeRowDomId(key: string): string {
 
 interface FolderTreeRowProps {
   row: TreeRow;
-  showCheckbox: boolean;
-  isChecked: boolean;
   isSelected: boolean;
   isFocused: boolean;
   /** Seconds the row has been loading, or null when not worth showing. */
@@ -36,7 +34,6 @@ interface FolderTreeRowProps {
   onOpenFile: (row: TreeNodeRow) => void;
   onCancelLoad: (row: TreeNodeRow) => void;
   onRetry: (row: TreeNodeRow) => void;
-  onToggleCheck: (path: string) => void;
   onFavoritesToggle: (sourceId: string) => void;
 }
 
@@ -104,8 +101,6 @@ function RowBadge({ row }: { row: TreeNodeRow }) {
 
 function FolderTreeRowInner({
   row,
-  showCheckbox,
-  isChecked,
   isSelected,
   isFocused,
   elapsedSeconds,
@@ -113,7 +108,6 @@ function FolderTreeRowInner({
   onOpenFile,
   onCancelLoad,
   onRetry,
-  onToggleCheck,
   onFavoritesToggle,
 }: FolderTreeRowProps) {
   if (row.kind === "favorites-header") {
@@ -207,21 +201,6 @@ function FolderTreeRowInner({
       )}
       {row.isFavorite && row.isDir && !isSource && (
         <Star className="h-3.5 w-3.5 flex-shrink-0 fill-warning text-warning" />
-      )}
-      {showCheckbox && row.isDir && (
-        <>
-          <span className="flex-1" />
-          <input
-            type="checkbox"
-            checked={isChecked}
-            className="h-3.5 w-3.5 rounded border-muted-foreground accent-primary flex-shrink-0 mr-1"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCheck(row.path);
-            }}
-            onChange={() => {}}
-          />
-        </>
       )}
     </div>
   );

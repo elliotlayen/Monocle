@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   ArrowUpDown,
@@ -32,11 +32,9 @@ import {
 } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { useExplorerStore, parseSearchTermsFrontend } from "../store";
-import { useSearch } from "../hooks/use-search";
+import { useExplorerStore } from "../store";
 import { FolderTree } from "./folder-tree";
-import { SearchBar } from "./search-bar";
-import { SearchResults } from "./search-results";
+import { SearchView } from "./search-view";
 import { ScanView } from "./scan-view";
 import type { DateRange } from "react-day-picker";
 
@@ -68,15 +66,6 @@ export function ExplorerSidebar({
     loadSources,
     filterInputText,
     setFilterText,
-    searchStatus,
-    searchCheckedPaths,
-    searchResults,
-    searchErrors,
-    searchSummary,
-    searchProgress,
-    searchQuery,
-    openFile,
-    setActiveSearchTerms,
   } = useExplorerStore(
     useShallow((state) => ({
       sidebarOpen: state.sidebarOpen,
@@ -89,92 +78,16 @@ export function ExplorerSidebar({
       loadSources: state.loadSources,
       filterInputText: state.filterInputText,
       setFilterText: state.setFilterText,
-      searchStatus: state.searchStatus,
-      searchCheckedPaths: state.searchCheckedPaths,
-      searchResults: state.searchResults,
-      searchErrors: state.searchErrors,
-      searchSummary: state.searchSummary,
-      searchProgress: state.searchProgress,
-      searchQuery: state.searchQuery,
-      openFile: state.openFile,
-      setActiveSearchTerms: state.setActiveSearchTerms,
     }))
   );
 
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const hasDateFilter = dateRange?.from != null;
 
-  // Subscribe to search events (searchResultHub, searchProgressHub)
-  const { cancelContentSearch, clearSearchResults } = useSearch();
-
   // Load sources on mount
   useEffect(() => {
     loadSources();
   }, [loadSources]);
-
-  // Derive scope label from checked paths
-  const currentScopeLabel = (() => {
-    if (searchCheckedPaths.size === 0) return "";
-    const names = Array.from(searchCheckedPaths).map(
-      (p) => p.split(/[/\\]/).pop() ?? p
-    );
-    if (names.length <= 2) return names.join(", ");
-    return `${names.length} folders`;
-  })();
-
-  // Wire onSearch — uses checked paths
-  const handleSearch = useCallback(() => {
-    const store = useExplorerStore.getState();
-    const paths = Array.from(store.searchCheckedPaths);
-
-    if (paths.length > 0) {
-      const names = paths.map((p) => p.split(/[/\\]/).pop() ?? p);
-      const scopeLabel =
-        names.length <= 2 ? names.join(", ") : `${names.length} folders`;
-      store.startContentSearch(paths, scopeLabel);
-    }
-  }, []);
-
-  // Wire file click from search results
-  const handleFileClick = useCallback(
-    (filePath: string) => {
-      setActiveSearchTerms(parseSearchTermsFrontend(searchQuery));
-      openFile(filePath);
-    },
-    [openFile, setActiveSearchTerms, searchQuery]
-  );
-
-  // A snippet click opens the file and jumps to its line
-  const handleSnippetClick = useCallback(
-    (filePath: string, line: number) => {
-      setActiveSearchTerms(parseSearchTermsFrontend(searchQuery));
-      void openFile(filePath).then(() => {
-        useExplorerStore.getState().jumpToProblem(filePath, line, 1);
-      });
-    },
-    [openFile, setActiveSearchTerms, searchQuery]
-  );
-
-  // Group headers show the folder relative to its source root
-  const getGroupLabel = useCallback((folderPath: string) => {
-    const { folderSources } = useExplorerStore.getState();
-    const source = folderSources.find(
-      (s) =>
-        folderPath === s.path ||
-        folderPath.startsWith(s.path + "/") ||
-        folderPath.startsWith(s.path + "\\")
-    );
-    if (!source) return folderPath.split(/[/\\]/).pop() ?? folderPath;
-    if (folderPath === source.path) return source.label;
-    const rel = folderPath.slice(source.path.length + 1).replace(/\\/g, "/");
-    return `${source.label} / ${rel}`;
-  }, []);
-
-  const showSearchResults =
-    activeView === "search" &&
-    (searchStatus !== "idle" ||
-      searchResults.length > 0 ||
-      searchErrors.length > 0);
 
   return (
     <div
@@ -187,8 +100,18 @@ export function ExplorerSidebar({
       style={{ width }}
     >
       {/* Header */}
-      <div className="flex-shrink-0 border-b p-3">
-        <div className="flex items-center justify-between mb-2">
+      <div
+        className={cn(
+          "flex-shrink-0 p-3",
+          activeView === "explorer" && "border-b"
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-center justify-between",
+            activeView === "explorer" && "mb-2"
+          )}
+        >
           <h2 className="pl-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {VIEW_TITLES[activeView]}
           </h2>
@@ -349,29 +272,13 @@ export function ExplorerSidebar({
             )}
           </div>
         )}
-        {activeView === "search" && (
-          <SearchBar onSearchExecute={handleSearch} />
-        )}
       </div>
 
       {/* Body per view */}
       {activeView === "scan" ? (
         <ScanView />
-      ) : showSearchResults ? (
-        <SearchResults
-          results={searchResults}
-          errors={searchErrors}
-          summary={searchSummary}
-          progress={searchProgress}
-          status={searchStatus}
-          scopeLabel={searchSummary?.scopeLabel ?? currentScopeLabel}
-          searchQuery={searchQuery}
-          onCancel={cancelContentSearch}
-          onClear={clearSearchResults}
-          onFileClick={handleFileClick}
-          onSnippetClick={handleSnippetClick}
-          getGroupLabel={getGroupLabel}
-        />
+      ) : activeView === "search" ? (
+        <SearchView />
       ) : (
         <FolderTree />
       )}

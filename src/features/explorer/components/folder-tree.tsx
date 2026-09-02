@@ -31,8 +31,6 @@ export function FolderTree() {
     dateRange,
     folderBadgeCache,
     validationCache,
-    searchMode,
-    searchCheckedPaths,
     selectedPath,
   } = useExplorerStore(
     useShallow((state) => ({
@@ -46,8 +44,6 @@ export function FolderTree() {
       dateRange: state.dateRange,
       folderBadgeCache: state.folderBadgeCache,
       validationCache: state.validationCache,
-      searchMode: state.searchMode,
-      searchCheckedPaths: state.searchCheckedPaths,
       selectedPath: state.selectedPath,
     }))
   );
@@ -148,19 +144,6 @@ export function FolderTree() {
     // Deliberately depends only on the selection, not on row churn.
   }, [selectedPath]);
 
-  const showCheckboxes = searchMode === "content";
-  const isPathChecked = useCallback(
-    (path: string) => {
-      if (searchCheckedPaths.has(path)) return true;
-      for (const checked of searchCheckedPaths) {
-        if (path.startsWith(checked + "/") || path.startsWith(checked + "\\"))
-          return true;
-      }
-      return false;
-    },
-    [searchCheckedPaths]
-  );
-
   // Stable row callbacks (rows re-render only when their data changes)
   const handleToggle = useCallback((row: TreeNodeRow) => {
     const store = useExplorerStore.getState();
@@ -183,9 +166,6 @@ export function FolderTree() {
   }, []);
   const handleRetry = useCallback((row: TreeNodeRow) => {
     useExplorerStore.getState().expandNode(row.id);
-  }, []);
-  const handleToggleCheck = useCallback((path: string) => {
-    useExplorerStore.getState().toggleSearchCheck(path);
   }, []);
   const handleFavoritesToggle = useCallback((sourceId: string) => {
     setFavoritesCollapsed((prev) => {
@@ -401,10 +381,6 @@ export function FolderTree() {
                 >
                   <FolderTreeRow
                     row={row}
-                    showCheckbox={showCheckboxes && row.kind === "node"}
-                    isChecked={
-                      row.kind === "node" ? isPathChecked(row.path) : false
-                    }
                     isSelected={
                       row.kind === "node" && row.path === selectedPath
                     }
@@ -416,7 +392,6 @@ export function FolderTree() {
                     onOpenFile={handleOpenFile}
                     onCancelLoad={handleCancelLoad}
                     onRetry={handleRetry}
-                    onToggleCheck={handleToggleCheck}
                     onFavoritesToggle={handleFavoritesToggle}
                   />
                 </div>
