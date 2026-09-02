@@ -38,6 +38,7 @@ export interface TabsSlice {
   closeOtherTabs: (tabId: string) => void;
   closeAllTabs: () => void;
   setActiveTab: (tabId: string) => void;
+  moveTab: (fromId: string, toId: string) => void;
   setViewMode: (tabId: string, mode: ViewMode) => void;
   setScrollPosition: (tabId: string, view: ViewMode, position: number) => void;
   setTreeExpandedIds: (tabId: string, ids: string[]) => void;
@@ -264,6 +265,17 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
 
   setActiveTab: (tabId: string) => {
     set({ activeTabId: tabId });
+  },
+
+  moveTab: (fromId: string, toId: string) => {
+    const { tabs } = get();
+    const fromIndex = tabs.findIndex((t) => t.id === fromId);
+    const toIndex = tabs.findIndex((t) => t.id === toId);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+    const next = [...tabs];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    set({ tabs: next });
   },
 
   setViewMode: (tabId: string, mode: ViewMode) => {

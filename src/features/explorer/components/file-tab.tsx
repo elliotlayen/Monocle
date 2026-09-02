@@ -1,3 +1,5 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { FileCode, FileSearch, FileText, Loader2, X } from "lucide-react";
 import {
   ContextMenu,
@@ -34,6 +36,14 @@ export function FileTab({
   onCloseAll,
 }: FileTabProps) {
   const { copyPath, copyContent, openExternal, saveCopy } = useFileActions();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tab.id });
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,54 +71,78 @@ export function FileTab({
   };
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          className={cn(
-            "group flex h-full cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-r border-border px-3 text-xs transition-colors duration-[var(--duration-fast)]",
-            isActive
-              ? "bg-background text-foreground shadow-[inset_0_-2px_0_0_var(--accent-blue)]"
-              : "bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          )}
-          onClick={onActivate}
-          onMouseDown={handleMiddleClick}
-        >
-          {renderIcon()}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="max-w-[160px] truncate text-xs">
-                  {tab.fileName}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{tab.filePath}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <button
+    <div
+      ref={setNodeRef}
+      className={cn("h-full flex-shrink-0", isDragging && "z-10 opacity-70")}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      {...attributes}
+      {...listeners}
+    >
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
             className={cn(
-              "h-5 w-5 rounded-sm flex items-center justify-center hover:bg-muted-foreground/20",
-              isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              "group flex h-full cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-r border-border px-3 text-xs transition-colors duration-[var(--duration-fast)]",
+              isActive
+                ? "bg-background text-foreground shadow-[inset_0_-2px_0_0_var(--accent-blue)]"
+                : "bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )}
-            onClick={handleClose}
-            aria-label={`Close ${tab.fileName}`}
+            onClick={onActivate}
+            onMouseDown={handleMiddleClick}
           >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onClick={onClose}>Close</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={onCloseOthers}>Close Others</ContextMenuItem>
-        <ContextMenuItem onClick={onCloseAll}>Close All</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => copyPath(tab.filePath)}>Copy Path</ContextMenuItem>
-        <ContextMenuItem onClick={() => openExternal(tab.filePath)}>Open in External Editor</ContextMenuItem>
-        <ContextMenuItem onClick={() => copyContent(tab.content)} disabled={tab.isLoading}>Copy Content</ContextMenuItem>
-        <ContextMenuItem onClick={() => saveCopy(tab.fileName, tab.content)} disabled={tab.isLoading}>Save Copy...</ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+            {renderIcon()}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="max-w-[160px] truncate text-xs">
+                    {tab.fileName}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{tab.filePath}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <button
+              className={cn(
+                "h-5 w-5 rounded-sm flex items-center justify-center hover:bg-muted-foreground/20",
+                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              )}
+              onClick={handleClose}
+              aria-label={`Close ${tab.fileName}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={onClose}>Close</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={onCloseOthers}>
+            Close Others
+          </ContextMenuItem>
+          <ContextMenuItem onClick={onCloseAll}>Close All</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => copyPath(tab.filePath)}>
+            Copy Path
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => openExternal(tab.filePath)}>
+            Open in External Editor
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => copyContent(tab.content)}
+            disabled={tab.isLoading}
+          >
+            Copy Content
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => saveCopy(tab.fileName, tab.content)}
+            disabled={tab.isLoading}
+          >
+            Save Copy...
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
   );
 }
