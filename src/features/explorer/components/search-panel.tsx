@@ -41,6 +41,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useExplorerStore } from "../store";
+import { FileTypePicker } from "./file-type-picker";
 import { ScopeTree } from "./scope-tree";
 import type { DateRange as DayPickerRange } from "react-day-picker";
 
@@ -441,14 +442,12 @@ export function SearchPanel() {
           )}
         </div>
 
-        {/* Row 4: pattern, dates, regex/case */}
+        {/* Row 4: file types, dates, regex/case */}
         <div className="flex flex-wrap items-center gap-2">
-          <Input
+          <FileTypePicker
             value={searchFilePattern}
-            onChange={(e) => setSearchFilePattern(e.target.value)}
-            aria-label="File pattern"
-            placeholder="*.xml"
-            className="h-[26px] w-20 text-[11px]"
+            onChange={setSearchFilePattern}
+            ariaLabel="File types to search"
           />
           <Popover>
             <PopoverTrigger asChild>

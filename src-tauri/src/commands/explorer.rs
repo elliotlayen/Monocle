@@ -29,6 +29,36 @@ pub struct ExplorerState {
     pub active_listings: Mutex<HashMap<String, CancellationToken>>,
 }
 
+/// One or more comma-separated glob patterns; a file name matches when any
+/// of them does (e.g. "*.xml,*.json"). An empty input matches everything.
+pub struct FilePatterns {
+    patterns: Vec<Pattern>,
+}
+
+impl FilePatterns {
+    pub fn parse(input: &str) -> Result<Self, String> {
+        let mut patterns = Vec::new();
+        for part in input.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            patterns.push(
+                Pattern::new(part)
+                    .map_err(|e| format!("Invalid file pattern '{}': {}", part, e))?,
+            );
+        }
+        if patterns.is_empty() {
+            patterns.push(Pattern::new("*").expect("literal pattern"));
+        }
+        Ok(Self { patterns })
+    }
+
+    pub fn matches(&self, name: &str) -> bool {
+        self.patterns.iter().any(|p| p.matches(name))
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirEntry {
@@ -513,7 +543,7 @@ fn search_worker_count(candidate_count: usize) -> usize {
 
 fn collect_search_candidates(
     paths: &[String],
-    pattern: &Pattern,
+    pattern: &FilePatterns,
     cancel_token: &CancellationToken,
     date_from: &Option<String>,
     date_to: &Option<String>,
@@ -708,7 +738,7 @@ fn emit_search_progress(
 fn content_search_worker(
     app: AppHandle,
     paths: Vec<String>,
-    pattern: Pattern,
+    pattern: FilePatterns,
     matcher: SearchMatcher,
     query: String,
     file_pattern: String,
@@ -878,8 +908,7 @@ pub async fn content_search_cmd(
     let paths: Vec<String> = serde_json::from_str(&folder_paths)
         .map_err(|e| format!("Invalid folder_paths JSON: {}", e))?;
 
-    let pattern = Pattern::new(&file_pattern)
-        .map_err(|e| format!("Invalid file pattern '{}': {}", file_pattern, e))?;
+    let pattern = FilePatterns::parse(&file_pattern)?;
 
     let cancel_token = CancellationToken::new();
     let token_clone = cancel_token.clone();
@@ -1005,7 +1034,7 @@ fn build_name_matcher(
 fn filename_search_worker(
     app: AppHandle,
     paths: Vec<String>,
-    pattern: Pattern,
+    pattern: FilePatterns,
     matcher: NameMatcher,
     query: String,
     date_from: Option<String>,
@@ -1145,8 +1174,7 @@ pub async fn filename_search_cmd(
     let paths: Vec<String> = serde_json::from_str(&folder_paths)
         .map_err(|e| format!("Invalid folder_paths JSON: {}", e))?;
 
-    let pattern = Pattern::new(&file_pattern)
-        .map_err(|e| format!("Invalid file pattern '{}': {}", file_pattern, e))?;
+    let pattern = FilePatterns::parse(&file_pattern)?;
 
     let cancel_token = CancellationToken::new();
     let token_clone = cancel_token.clone();
@@ -1332,8 +1360,7 @@ pub async fn bulk_scan_cmd(
     operation_id: String,
     explorer_state: State<'_, ExplorerState>,
 ) -> Result<ScanSummary, String> {
-    let pattern = Pattern::new(&file_pattern)
-        .map_err(|e| format!("Invalid file pattern '{}': {}", file_pattern, e))?;
+    let pattern = FilePatterns::parse(&file_pattern)?;
 
     let cancel_token = CancellationToken::new();
     let token_clone = cancel_token.clone();
@@ -1801,7 +1828,7 @@ mod tests {
             std::fs::write(dir.join("file.xml"), "<x/>").unwrap();
         }
 
-        let pattern = Pattern::new("*.xml").unwrap();
+        let pattern = FilePatterns::parse("*.xml").unwrap();
         let token = CancellationToken::new();
         let (candidates, cancelled) = collect_search_candidates(
             &[temp_dir.path().to_string_lossy().to_string()],
@@ -1974,5 +2001,31 @@ mod tests {
         assert_eq!(payload.total_errors, cloned.total_errors);
         assert_eq!(payload.total_warnings, cloned.total_warnings);
         assert_eq!(payload.total_clean, cloned.total_clean);
+    }
+
+    #[test]
+    fn file_patterns_parse_single_and_multi() {
+        let single = FilePatterns::parse("*.xml").unwrap();
+        assert!(single.matches("file.xml"));
+        assert!(!single.matches("file.json"));
+
+        let multi = FilePatterns::parse("*.xml, *.json").unwrap();
+        assert!(multi.matches("file.xml"));
+        assert!(multi.matches("file.json"));
+        assert!(!multi.matches("file.txt"));
+    }
+
+    #[test]
+    fn file_patterns_empty_matches_everything() {
+        let all = FilePatterns::parse("").unwrap();
+        assert!(all.matches("anything.bin"));
+        let trailing = FilePatterns::parse("*.xml,").unwrap();
+        assert!(trailing.matches("file.xml"));
+        assert!(!trailing.matches("file.txt"));
+    }
+
+    #[test]
+    fn file_patterns_invalid_part_errors() {
+        assert!(FilePatterns::parse("*.xml,[").is_err());
     }
 }

@@ -1,6 +1,6 @@
 import { useShallow } from "zustand/shallow";
-import { Input } from "@/components/ui/input";
 import { useExplorerStore } from "@/features/explorer/store";
+import { FileTypePicker } from "@/features/explorer/components/file-type-picker";
 import { Label } from "@/components/ui/label";
 
 export function ExplorerSettingsSection() {
@@ -18,16 +18,17 @@ export function ExplorerSettingsSection() {
       </div>
 
       <div className="space-y-2">
-        <Label>Scan File Pattern</Label>
-        <Input
-          className="w-full"
-          value={scanFilePattern}
-          onChange={(e) => setScanFilePattern(e.target.value)}
-          placeholder="*.xml"
-        />
+        <Label>Scan File Types</Label>
+        <div>
+          <FileTypePicker
+            value={scanFilePattern}
+            onChange={setScanFilePattern}
+            ariaLabel="File types to scan"
+          />
+        </div>
         <p className="text-xs text-muted-foreground">
-          Glob pattern for validation scans (e.g., *.xml, *.json). The search
-          file pattern is set in the search panel itself.
+          File types included when scanning a folder for issues. The types for
+          searching are set in the search panel itself.
         </p>
       </div>
     </div>
