@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useExplorerStore } from "./store";
+import { settingsService } from "@/features/settings/services/settings-service";
 
 vi.mock("./services/explorer-service", () => ({
   explorerService: {
@@ -21,12 +22,18 @@ vi.mock("./services/explorer-service", () => ({
   },
 }));
 
-vi.mock("@/features/settings/services/settings-service", () => ({
-  settingsService: {
-    saveSettings: vi.fn().mockResolvedValue({}),
-    getSettings: vi.fn().mockResolvedValue({ folderSources: [] }),
-  },
-}));
+vi.mock("@/features/settings/services/settings-service", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/settings/services/settings-service")
+  >("@/features/settings/services/settings-service");
+  return {
+    ...actual,
+    settingsService: {
+      saveSettings: vi.fn().mockResolvedValue({}),
+      getSettings: vi.fn().mockResolvedValue({ folderSources: [] }),
+    },
+  };
+});
 
 vi.mock("@/features/notifications/store", () => ({
   showToast: vi.fn(),
@@ -87,9 +94,7 @@ describe("explorer store - tab management", () => {
 
     it("removes tab and shows error toast on readFile failure", async () => {
       const { explorerService } = await import("./services/explorer-service");
-      const { showToast } = await import(
-        "@/features/notifications/store"
-      );
+      const { showToast } = await import("@/features/notifications/store");
       vi.mocked(explorerService.readFile).mockRejectedValueOnce(
         new Error("File not found")
       );
@@ -332,44 +337,48 @@ describe("explorer store - scan and search performance state", () => {
       "/b/z.xml",
       "/a/m.xml",
     ]);
-    expect(state.searchResultPathSet).toEqual(new Set(["/b/z.xml", "/a/m.xml"]));
+    expect(state.searchResultPathSet).toEqual(
+      new Set(["/b/z.xml", "/a/m.xml"])
+    );
     expect(state.searchErrors).toHaveLength(1);
     expect(state.searchErrorPathSet).toEqual(new Set(["/errors/bad.xml"]));
   });
 
   it("sorts search results once the content search completes", async () => {
     const { explorerService } = await import("./services/explorer-service");
-    vi.mocked(explorerService.contentSearch).mockImplementationOnce(async () => {
-      useExplorerStore.getState().appendSearchResults(
-        [
-          {
-            filePath: "/b/z.xml",
-            fileName: "z.xml",
-            parentFolder: "/b",
-            matchCount: 1,
-            operationId: "search-op",
-          },
-          {
-            filePath: "/a/m.xml",
-            fileName: "m.xml",
-            parentFolder: "/a",
-            matchCount: 2,
-            operationId: "search-op",
-          },
-        ],
-        []
-      );
+    vi.mocked(explorerService.contentSearch).mockImplementationOnce(
+      async () => {
+        useExplorerStore.getState().appendSearchResults(
+          [
+            {
+              filePath: "/b/z.xml",
+              fileName: "z.xml",
+              parentFolder: "/b",
+              matchCount: 1,
+              operationId: "search-op",
+            },
+            {
+              filePath: "/a/m.xml",
+              fileName: "m.xml",
+              parentFolder: "/a",
+              matchCount: 2,
+              operationId: "search-op",
+            },
+          ],
+          []
+        );
 
-      return {
-        query: "alpha",
-        scopeLabel: "scope",
-        filePattern: "*.xml",
-        totalFilesScanned: 2,
-        totalFilesMatched: 2,
-        totalMatches: 3,
-        cancelled: false,
-      };
-    });
+        return {
+          query: "alpha",
+          scopeLabel: "scope",
+          filePattern: "*.xml",
+          totalFilesScanned: 2,
+          totalFilesMatched: 2,
+          totalMatches: 3,
+          cancelled: false,
+        };
+      }
+    );
 
     await useExplorerStore.getState().startContentSearch(["/root"], "scope");
 
@@ -475,7 +484,48 @@ describe("explorer store - scan and search performance state", () => {
     const state = useExplorerStore.getState();
     expect(state.treeNodes.get("/root/Config.xml")?.parentId).toBe("source-1");
     expect(state.treeNodes.get("/root/Nested")?.parentId).toBe("source-1");
-    expect(state.filenameSearchIndex.get("/root/Config.xml")).toBe("config.xml");
+    expect(state.filenameSearchIndex.get("/root/Config.xml")).toBe(
+      "config.xml"
+    );
     expect(state.filenameSearchIndex.get("/root/Nested")).toBe("nested");
+  });
+});
+
+describe("explorer store - node style setting", () => {
+  beforeEach(() => {
+    useExplorerStore.setState({ explorerNodeStyle: "soft" });
+    vi.clearAllMocks();
+  });
+
+  it("hydrates explorerNodeStyle from settings when valid", async () => {
+    vi.mocked(settingsService.getSettings).mockResolvedValueOnce({
+      folderSources: [],
+      explorerNodeStyle: "capsule",
+    });
+
+    await useExplorerStore.getState().loadSources();
+
+    expect(useExplorerStore.getState().explorerNodeStyle).toBe("capsule");
+  });
+
+  it("falls back to soft when the persisted value is invalid", async () => {
+    useExplorerStore.setState({ explorerNodeStyle: "outline" });
+    vi.mocked(settingsService.getSettings).mockResolvedValueOnce({
+      folderSources: [],
+      explorerNodeStyle: "solid" as never,
+    });
+
+    await useExplorerStore.getState().loadSources();
+
+    expect(useExplorerStore.getState().explorerNodeStyle).toBe("soft");
+  });
+
+  it("persists explorerNodeStyle through setExplorerNodeStyle", () => {
+    useExplorerStore.getState().setExplorerNodeStyle("depth");
+
+    expect(useExplorerStore.getState().explorerNodeStyle).toBe("depth");
+    expect(settingsService.saveSettings).toHaveBeenCalledWith({
+      explorerNodeStyle: "depth",
+    });
   });
 });

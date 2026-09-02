@@ -1,4 +1,4 @@
-import { memo, type CSSProperties } from "react";
+import { memo, type ReactNode } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
   Braces,
@@ -9,10 +9,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSchemaStore } from "@/features/schema-graph/store";
-import type { NodeStyle } from "@/features/settings/services/settings-service";
+import { useExplorerStore } from "../store";
+import type { ExplorerNodeStyle } from "@/features/settings/services/settings-service";
 import type { VisibleXmlNode, XmlNodeKind } from "../utils/xml-tree-model";
 import { XML_NODE_HEIGHT } from "../utils/xml-tree-layout";
+import { getXmlNodeStyleSpec } from "../utils/xml-node-style";
 
 export interface XmlFlowNodeData {
   xml: VisibleXmlNode;
@@ -42,80 +43,110 @@ const KIND_ICONS: Record<XmlNodeKind, LucideIcon> = {
   other: Hash,
 };
 
-function mix(color: string, percent: number, base: string): string {
-  return `color-mix(in srgb, ${color} ${percent}%, ${base})`;
-}
-
-interface XmlNodeStyleSpec {
-  shellStyle: CSSProperties;
-  /** True when the node paints a solid kind color and content must go on-color. */
-  onColor: boolean;
+export interface XmlNodeCardProps {
+  xml: VisibleXmlNode;
+  width: number;
+  compact: boolean;
+  style: ExplorerNodeStyle;
+  onClick?: () => void;
+  className?: string;
+  /** Flow handles; the settings preview passes nothing. */
+  children?: ReactNode;
 }
 
 /**
- * The same node style setting the schema browser/canvas nodes follow
- * (Settings > Graph > Node Style), translated to the single-row XML card.
- * Mix percentages match getNodeStyleSpec in
- * src/features/schema-graph/components/node-style.ts.
+ * The XML tree card without React Flow. The flow node and the settings
+ * preview both render this, so the two cannot drift.
  */
-function getXmlNodeStyle(style: NodeStyle, color: string): XmlNodeStyleSpec {
-  switch (style) {
-    case "tinted":
-      return {
-        shellStyle: {
-          backgroundColor: mix(color, 16, "var(--card)"),
-          borderColor: "var(--border)",
-        },
-        onColor: false,
-      };
-    case "surface":
-      return {
-        shellStyle: {
-          backgroundColor: mix(color, 12, "var(--card)"),
-          borderColor: mix(color, 45, "var(--border)"),
-        },
-        onColor: false,
-      };
-    case "solid":
-      return {
-        shellStyle: {
-          backgroundColor: color,
-          borderColor: mix(color, 70, "var(--border)"),
-          color: "var(--object-on-color)",
-        },
-        onColor: true,
-      };
-    case "adaptive":
-    default:
-      return {
-        shellStyle: {
-          borderColor: mix(color, 35, "var(--border)"),
-          background: `linear-gradient(135deg, ${mix(color, 12, "var(--card)")}, var(--card) 60%)`,
-          boxShadow: `inset 3px 0 0 0 ${color}`,
-        },
-        onColor: false,
-      };
-  }
+export function XmlNodeCard({
+  xml,
+  width,
+  compact,
+  style,
+  onClick,
+  className,
+  children,
+}: XmlNodeCardProps) {
+  const color = XML_KIND_COLORS[xml.kind];
+  const Icon = KIND_ICONS[xml.kind];
+  const spec = getXmlNodeStyleSpec(style, color, xml.depth);
+  const icon = (
+    <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} aria-hidden />
+  );
+
+  return (
+    <div
+      style={{ width, height: XML_NODE_HEIGHT, ...spec.shellStyle }}
+      className={cn(
+        "relative flex items-center gap-2 overflow-hidden border text-xs",
+        "transition-shadow duration-200",
+        spec.shellClass,
+        onClick && "cursor-pointer hover:shadow-md",
+        className
+      )}
+      onClick={onClick}
+      title={xml.value ? `${xml.label}: ${xml.value}` : xml.label}
+    >
+      {children}
+      {spec.iconWrapperClass ? (
+        <span className={spec.iconWrapperClass} style={spec.iconWrapperStyle}>
+          {icon}
+        </span>
+      ) : (
+        icon
+      )}
+      <span
+        className={cn(
+          "truncate font-semibold",
+          xml.kind === "comment" && "font-normal italic"
+        )}
+        style={{ color: xml.kind === "text" ? "var(--foreground)" : color }}
+      >
+        {xml.label || " "}
+      </span>
+      {!compact &&
+        xml.attrs.map((attr) => (
+          <span
+            key={attr.name}
+            className="flex min-w-0 shrink items-center text-[10px]"
+          >
+            <span className="text-object-functions">{attr.name}</span>
+            <span className="text-muted-foreground">=</span>
+            <span className="truncate text-success">
+              &quot;{attr.value}&quot;
+            </span>
+          </span>
+        ))}
+      {!compact && xml.value !== undefined && (
+        <span className="truncate text-[11px] text-success">{xml.value}</span>
+      )}
+      {!xml.isExpanded && xml.hasChildren && (
+        <span
+          className="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+          style={{
+            color,
+            backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
+          }}
+        >
+          +{xml.childCount}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function XmlFlowNodeComponent({ data }: NodeProps) {
   const { xml, width, compact, onToggle } = data as unknown as XmlFlowNodeData;
-  const nodeStyle = useSchemaStore((state) => state.nodeStyle);
+  const style = useExplorerStore((state) => state.explorerNodeStyle);
   const toggleable = xml.kind === "element" && xml.hasChildren;
-  const color = XML_KIND_COLORS[xml.kind];
-  const Icon = KIND_ICONS[xml.kind];
-  const { shellStyle, onColor } = getXmlNodeStyle(nodeStyle, color);
 
   return (
-    <div
-      style={{ width, height: XML_NODE_HEIGHT, ...shellStyle }}
-      className={cn(
-        "relative flex items-center gap-2 overflow-hidden rounded-lg border pl-3 pr-2.5 text-xs",
-        "transition-shadow duration-200",
-        toggleable && "cursor-pointer hover:shadow-md"
-      )}
+    <XmlNodeCard
+      xml={xml}
+      width={width}
+      compact={compact}
+      style={style}
       onClick={toggleable ? () => onToggle(xml.id) : undefined}
-      title={xml.value ? `${xml.label}: ${xml.value}` : xml.label}
     >
       <Handle
         type="target"
@@ -124,83 +155,6 @@ function XmlFlowNodeComponent({ data }: NodeProps) {
         style={{ left: 0, top: "50%" }}
         isConnectable={false}
       />
-      <Icon
-        className="h-3.5 w-3.5 shrink-0"
-        style={{ color: onColor ? "var(--object-on-color)" : color }}
-        aria-hidden
-      />
-      <span
-        className={cn(
-          "truncate font-semibold",
-          xml.kind === "comment" && "font-normal italic"
-        )}
-        style={{
-          color: onColor
-            ? "var(--object-on-color)"
-            : xml.kind === "text"
-              ? "var(--foreground)"
-              : color,
-        }}
-      >
-        {xml.label || " "}
-      </span>
-      {!compact &&
-        xml.attrs.map((attr) => (
-          <span
-            key={attr.name}
-            className={cn(
-              "flex min-w-0 shrink items-center text-[10px]",
-              onColor && "opacity-85"
-            )}
-          >
-            <span
-              className={onColor ? undefined : "text-object-functions"}
-              style={onColor ? { color: "var(--object-on-color)" } : undefined}
-            >
-              {attr.name}
-            </span>
-            <span
-              className={onColor ? "opacity-70" : "text-muted-foreground"}
-              style={onColor ? { color: "var(--object-on-color)" } : undefined}
-            >
-              =
-            </span>
-            <span
-              className={cn("truncate", onColor ? undefined : "text-success")}
-              style={onColor ? { color: "var(--object-on-color)" } : undefined}
-            >
-              &quot;{attr.value}&quot;
-            </span>
-          </span>
-        ))}
-      {!compact && xml.value !== undefined && (
-        <span
-          className="truncate text-[11px]"
-          style={{
-            color: onColor ? "var(--object-on-color)" : "var(--success)",
-          }}
-        >
-          {xml.value}
-        </span>
-      )}
-      {!xml.isExpanded && xml.hasChildren && (
-        <span
-          className="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-          style={
-            onColor
-              ? {
-                  color: "var(--object-on-color)",
-                  backgroundColor: "color-mix(in srgb, var(--object-on-color) 20%, transparent)",
-                }
-              : {
-                  color,
-                  backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
-                }
-          }
-        >
-          +{xml.childCount}
-        </span>
-      )}
       <Handle
         type="source"
         position={Position.Right}
@@ -208,7 +162,7 @@ function XmlFlowNodeComponent({ data }: NodeProps) {
         style={{ right: 0, top: "50%" }}
         isConnectable={false}
       />
-    </div>
+    </XmlNodeCard>
   );
 }
 

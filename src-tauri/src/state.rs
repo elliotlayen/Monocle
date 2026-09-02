@@ -37,6 +37,8 @@ pub struct AppSettings {
     pub folder_sources: Vec<FolderSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explorer_sidebar_width: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explorer_node_style: Option<String>,
 }
 
 pub struct AppState {
@@ -57,6 +59,7 @@ pub struct AppSettingsUpdate {
     pub node_style: Option<String>,
     pub folder_sources: Option<Vec<FolderSource>>,
     pub explorer_sidebar_width: Option<f64>,
+    pub explorer_node_style: Option<String>,
 }
 
 impl AppState {
@@ -135,6 +138,9 @@ impl AppState {
         if let Some(explorer_sidebar_width) = update.explorer_sidebar_width {
             settings.explorer_sidebar_width = Some(explorer_sidebar_width);
         }
+        if let Some(explorer_node_style) = update.explorer_node_style {
+            settings.explorer_node_style = Some(explorer_node_style);
+        }
 
         let updated = settings.clone();
         drop(settings);
@@ -183,6 +189,7 @@ mod tests {
                 node_style: Some("solid".to_string()),
                 folder_sources: None,
                 explorer_sidebar_width: None,
+                explorer_node_style: Some("capsule".to_string()),
             })
             .expect("update settings");
 
@@ -195,6 +202,7 @@ mod tests {
         assert_eq!(settings.show_mini_map, Some(true));
         assert_eq!(settings.detail_view_mode.as_deref(), Some("drawer"));
         assert_eq!(settings.node_style.as_deref(), Some("solid"));
+        assert_eq!(settings.explorer_node_style.as_deref(), Some("capsule"));
     }
 
     #[test]

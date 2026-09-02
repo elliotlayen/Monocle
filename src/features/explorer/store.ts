@@ -18,7 +18,12 @@ import type {
   SearchSummary,
 } from "./types";
 import { explorerService } from "./services/explorer-service";
-import { settingsService } from "@/features/settings/services/settings-service";
+import {
+  settingsService,
+  isExplorerNodeStyle,
+  DEFAULT_EXPLORER_NODE_STYLE,
+  type ExplorerNodeStyle,
+} from "@/features/settings/services/settings-service";
 import { showToast } from "@/features/notifications/store";
 import { disambiguateTabNames } from "./utils/tab-disambiguator";
 import { parseXml } from "./utils/xml-parser";
@@ -37,6 +42,7 @@ interface ExplorerStore {
   dateRange: DateRange;
   sidebarOpen: boolean;
   sidebarWidth: number;
+  explorerNodeStyle: ExplorerNodeStyle;
   tabs: FileTab[];
   activeTabId: string | null;
   validationCache: Map<
@@ -89,6 +95,7 @@ interface ExplorerStore {
   toggleFavorite: (sourceId: string, clientName: string) => Promise<void>;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
+  setExplorerNodeStyle: (style: ExplorerNodeStyle) => void;
   reorderSources: (newSources: FolderSource[]) => void;
   saveSources: () => Promise<void>;
   openFile: (filePath: string) => Promise<void>;
@@ -127,7 +134,10 @@ interface ExplorerStore {
   setSearchQuery: (text: string) => void;
   toggleSearchCheck: (path: string) => void;
   setSearchFilePattern: (pattern: string) => void;
-  startContentSearch: (folderPaths: string[], scopeLabel: string) => Promise<void>;
+  startContentSearch: (
+    folderPaths: string[],
+    scopeLabel: string
+  ) => Promise<void>;
   updateSearchProgress: (payload: SearchProgressPayloadType) => void;
   appendSearchResults: (
     results: SearchResultFile[],
@@ -148,10 +158,11 @@ function buildChildNodes(
 
     let isFavorite: boolean | undefined;
     if (entry.isDir) {
-      const source = folderSources.find((s) =>
-        entry.path === s.path ||
-        entry.path.startsWith(s.path + "/") ||
-        entry.path.startsWith(s.path + "\\")
+      const source = folderSources.find(
+        (s) =>
+          entry.path === s.path ||
+          entry.path.startsWith(s.path + "/") ||
+          entry.path.startsWith(s.path + "\\")
       );
       if (source) {
         isFavorite = source.favorites.includes(entry.path);
@@ -267,6 +278,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   dateRange: null,
   sidebarOpen: true,
   sidebarWidth: 280,
+  explorerNodeStyle: DEFAULT_EXPLORER_NODE_STYLE,
   tabs: [],
   activeTabId: null,
   validationCache: new Map(),
@@ -307,6 +319,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const settings = await settingsService.getSettings();
       const sources = settings.folderSources ?? [];
       const sidebarWidth = settings.explorerSidebarWidth ?? 280;
+      const explorerNodeStyle = isExplorerNodeStyle(settings.explorerNodeStyle)
+        ? settings.explorerNodeStyle
+        : DEFAULT_EXPLORER_NODE_STYLE;
 
       const treeNodes = new Map<string, TreeNode>();
       for (const source of sources) {
@@ -320,6 +335,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         expandedIds: new Set(),
         activeOperations: new Map(),
         sidebarWidth,
+        explorerNodeStyle,
       });
     } catch {
       // Silently handle settings load failure
@@ -452,8 +468,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   toggleFavorite: async (sourceId: string, folderPath: string) => {
     try {
-      const updatedSettings =
-        await explorerService.toggleFavorite(sourceId, folderPath);
+      const updatedSettings = await explorerService.toggleFavorite(
+        sourceId,
+        folderPath
+      );
       const updatedSources = updatedSettings.folderSources ?? [];
 
       const nextNodes = new Map(get().treeNodes);
@@ -505,6 +523,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     settingsService
       .saveSettings({ explorerSidebarWidth: width })
       .catch(() => {});
+  },
+
+  setExplorerNodeStyle: (style: ExplorerNodeStyle) => {
+    set({ explorerNodeStyle: style });
+    settingsService.saveSettings({ explorerNodeStyle: style }).catch(() => {});
   },
 
   reorderSources: (newSources: FolderSource[]) =>
@@ -759,9 +782,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     set({ pendingJump: null });
   },
 
-  getValidationStatus: (
-    filePath: string
-  ): ValidationStatus | undefined => {
+  getValidationStatus: (filePath: string): ValidationStatus | undefined => {
     const cached = get().validationCache.get(filePath);
     if (!cached) return undefined;
     if (cached.problems.some((p) => p.severity === "error")) return "error";
@@ -940,7 +961,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   setSearchMode: (mode: SearchMode) => {
     const { searchMode: currentMode, searchResults, searchQuery } = get();
-    if (currentMode === "content" && mode === "filename" && searchResults.length > 0) {
+    if (
+      currentMode === "content" &&
+      mode === "filename" &&
+      searchResults.length > 0
+    ) {
       // Switching from content to filename with results: clear search state, sync query to filterText
       set({
         searchMode: mode,
