@@ -217,7 +217,9 @@ function FolderTreeRowInner({
           role="button"
           tabIndex={-1}
           className={cn(
-            "inline-flex h-4 flex-shrink-0 items-center gap-0.5 rounded px-1 text-[9px] tracking-wide transition-opacity duration-[var(--duration-fast)]",
+            // Right-aligned so a click near the folder name never lands on
+            // the badge by accident.
+            "ml-auto mr-1 inline-flex h-4 flex-shrink-0 items-center gap-0.5 rounded px-1 text-[9px] tracking-wide transition-opacity duration-[var(--duration-fast)]",
             scoped
               ? "border border-accent-blue/40 bg-accent-blue/12 text-accent-blue"
               : "border border-border text-muted-foreground opacity-0 group-hover:opacity-100"

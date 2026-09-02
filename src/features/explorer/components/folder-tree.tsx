@@ -11,6 +11,7 @@ import {
 import { useExplorerStore } from "../store";
 import {
   flattenTree,
+  isPathInScope,
   loadedFilenameMatches,
   resultsMatchIndex,
   tintRunFlags,
@@ -542,6 +543,27 @@ export function FolderTree() {
               >
                 Search in This Folder
               </ContextMenuItem>
+              {scopePaths.has(menuTarget.path) ? (
+                <ContextMenuItem
+                  onClick={() =>
+                    useExplorerStore.getState().toggleScopePath(menuTarget.path)
+                  }
+                >
+                  Remove from Search Scope
+                </ContextMenuItem>
+              ) : scopeActive && isPathInScope(scopePaths, menuTarget.path) ? (
+                <ContextMenuItem disabled>
+                  In Search Scope via Parent
+                </ContextMenuItem>
+              ) : (
+                <ContextMenuItem
+                  onClick={() =>
+                    useExplorerStore.getState().toggleScopePath(menuTarget.path)
+                  }
+                >
+                  Add to Search Scope
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 onClick={() => {
                   const store = useExplorerStore.getState();
