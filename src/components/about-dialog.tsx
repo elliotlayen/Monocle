@@ -25,9 +25,6 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
         <div className="flex flex-col items-center py-2">
           <MonocleLogo className="mb-4 h-14 w-14" />
           <h2 className="text-lg font-bold tracking-wide">Monocle</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            SQL Server schema visualizer
-          </p>
           {version && (
             <span className="mt-3 rounded-sm border px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
               v{version}

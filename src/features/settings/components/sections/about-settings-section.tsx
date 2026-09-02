@@ -21,9 +21,6 @@ export function AboutSettingsSection() {
     <div className="space-y-6 px-1">
       <div className="space-y-1">
         <h3 className="text-base font-semibold">About</h3>
-        <p className="text-xs text-muted-foreground">
-          App details and release notes for this version.
-        </p>
       </div>
 
       <div className="rounded-lg border p-4">
