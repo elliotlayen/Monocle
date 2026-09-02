@@ -107,11 +107,13 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
       <div
         className={cn(
-          "h-4 w-4 rounded-sm border border-primary flex items-center justify-center",
-          checked ? "bg-primary" : "bg-transparent"
+          "h-4 w-4 rounded-sm border flex items-center justify-center",
+          checked ? "border-accent-blue bg-accent-blue" : "border-primary bg-transparent"
         )}
       >
-        {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+        {checked && (
+          <Check className="h-3 w-3 text-[var(--accent-on-color)]" />
+        )}
       </div>
     </span>
     {children}
