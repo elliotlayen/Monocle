@@ -51,6 +51,8 @@ pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent_color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schema_filter: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_expand_threshold: Option<u32>,
@@ -95,6 +97,7 @@ pub struct AppState {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettingsUpdate {
     pub theme: Option<String>,
+    pub accent_color: Option<String>,
     pub schema_filter: Option<String>,
     pub focus_expand_threshold: Option<u32>,
     pub browse_threshold: Option<u32>,
@@ -162,6 +165,9 @@ impl AppState {
 
         if let Some(theme) = update.theme {
             settings.theme = Some(theme);
+        }
+        if let Some(accent_color) = update.accent_color {
+            settings.accent_color = Some(accent_color);
         }
         if let Some(schema_filter) = update.schema_filter {
             settings.schema_filter = Some(schema_filter);
@@ -260,6 +266,7 @@ mod tests {
         state
             .update_settings(AppSettingsUpdate {
                 theme: Some("light".to_string()),
+                accent_color: Some("purple".to_string()),
                 schema_filter: Some("sales".to_string()),
                 focus_expand_threshold: None,
                 browse_threshold: None,
@@ -284,6 +291,7 @@ mod tests {
         let settings = reloaded.get_settings().expect("get settings");
 
         assert_eq!(settings.theme.as_deref(), Some("light"));
+        assert_eq!(settings.accent_color.as_deref(), Some("purple"));
         assert_eq!(settings.schema_filter.as_deref(), Some("sales"));
         assert_eq!(settings.edge_label_mode.as_deref(), Some("auto"));
         assert_eq!(settings.show_mini_map, Some(true));

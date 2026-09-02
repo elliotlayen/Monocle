@@ -49,6 +49,27 @@ export function isExplorerNodeStyle(
   );
 }
 
+/** App-wide accent color; "system" follows the OS accent where supported. */
+export const ACCENT_COLORS = [
+  "blue",
+  "purple",
+  "pink",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "system",
+] as const;
+export type AccentColor = (typeof ACCENT_COLORS)[number];
+export const DEFAULT_ACCENT_COLOR: AccentColor = "blue";
+
+export function isAccentColor(value: unknown): value is AccentColor {
+  return (
+    typeof value === "string" &&
+    (ACCENT_COLORS as readonly string[]).includes(value)
+  );
+}
+
 export type SearchFieldMode = "filename" | "content";
 
 export interface SavedSearch {
@@ -74,6 +95,7 @@ export interface ServerSource {
 
 export interface AppSettings {
   theme?: ThemeSetting;
+  accentColor?: AccentColor;
   schemaFilter?: string;
   focusExpandThreshold?: number;
   browseThreshold?: number;
@@ -95,6 +117,7 @@ export interface AppSettings {
 
 export interface SettingsUpdate {
   theme?: ThemeSetting;
+  accentColor?: AccentColor;
   schemaFilter?: string;
   focusExpandThreshold?: number;
   browseThreshold?: number;
