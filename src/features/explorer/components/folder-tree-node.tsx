@@ -16,12 +16,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatDateFolder } from "../utils/date-format";
 import type { TreeNodeRow, TreeRow } from "../store/selectors";
+
+/** DOM id for a tree row, used by aria-activedescendant. */
+export function treeRowDomId(key: string): string {
+  return `tree-row-${key}`;
+}
 
 interface FolderTreeRowProps {
   row: TreeRow;
   showCheckbox: boolean;
   isChecked: boolean;
+  isSelected: boolean;
+  isFocused: boolean;
   /** Seconds the row has been loading, or null when not worth showing. */
   elapsedSeconds: number | null;
   onToggle: (row: TreeNodeRow) => void;
@@ -98,6 +106,8 @@ function FolderTreeRowInner({
   row,
   showCheckbox,
   isChecked,
+  isSelected,
+  isFocused,
   elapsedSeconds,
   onToggle,
   onOpenFile,
@@ -126,13 +136,22 @@ function FolderTreeRowInner({
   const isSource = row.type === "source";
   const isError = row.loadState === "error";
   const isLoading = row.loadState === "loading";
+  const dateLabel =
+    row.isDir && !isSource ? formatDateFolder(row.name).formatted : null;
 
   return (
     <div
+      id={treeRowDomId(row.key)}
       data-row-key={row.key}
+      role="treeitem"
+      aria-level={row.depth + 1}
+      aria-selected={isSelected}
+      {...(row.isDir ? { "aria-expanded": row.isExpanded } : {})}
       className={cn(
-        "group flex items-center gap-1 w-full rounded hover:bg-muted cursor-pointer",
+        "group flex items-center gap-1 w-full rounded cursor-pointer",
         isSource ? "py-1.5" : "py-1",
+        isSelected ? "bg-accent" : "hover:bg-muted",
+        isFocused && "ring-1 ring-ring",
         isError && !isSource && "text-muted-foreground"
       )}
       style={{ paddingLeft: `${row.depth * 16}px` }}
@@ -143,6 +162,11 @@ function FolderTreeRowInner({
       <span className={cn("text-sm truncate", isSource && "font-semibold")}>
         {row.name}
       </span>
+      {dateLabel && (
+        <span className="text-xs text-muted-foreground flex-shrink-0 truncate">
+          {dateLabel}
+        </span>
+      )}
       {isSource && row.tag && (
         <Badge variant="secondary" className="text-xs flex-shrink-0">
           {row.tag}

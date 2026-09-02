@@ -11,7 +11,10 @@ import {
 import { useExplorerStore } from "../store";
 import { flattenTree, type TreeNodeRow } from "../store/selectors";
 import { useFileActions } from "../hooks/use-file-actions";
-import { FolderTreeRow } from "./folder-tree-node";
+import { FolderTreeRow, treeRowDomId } from "./folder-tree-node";
+
+/** Milliseconds before an idle type-ahead buffer resets. */
+const TYPEAHEAD_RESET_MS = 500;
 
 /** Rows loading for at least this long show elapsed time and a cancel button. */
 const LOADING_INFO_DELAY_S = 3;
@@ -30,6 +33,7 @@ export function FolderTree() {
     validationCache,
     searchMode,
     searchCheckedPaths,
+    selectedPath,
   } = useExplorerStore(
     useShallow((state) => ({
       folderSources: state.folderSources,
@@ -44,6 +48,7 @@ export function FolderTree() {
       validationCache: state.validationCache,
       searchMode: state.searchMode,
       searchCheckedPaths: state.searchCheckedPaths,
+      selectedPath: state.selectedPath,
     }))
   );
 
@@ -53,6 +58,11 @@ export function FolderTree() {
     new Set()
   );
   const [menuTarget, setMenuTarget] = useState<TreeNodeRow | null>(null);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const typeaheadRef = useRef<{ buffer: string; timer: number | null }>({
+    buffer: "",
+    timer: null,
+  });
 
   const rows = useMemo(
     () =>
@@ -144,6 +154,8 @@ export function FolderTree() {
   const handleToggle = useCallback((row: TreeNodeRow) => {
     const store = useExplorerStore.getState();
     if (row.type !== "source") store.setLastInteractedFolder(row.path);
+    store.setSelectedPath(row.path);
+    setFocusedKey(row.key);
     if (row.isExpanded) {
       store.collapseNode(row.id);
     } else {
@@ -151,7 +163,10 @@ export function FolderTree() {
     }
   }, []);
   const handleOpenFile = useCallback((row: TreeNodeRow) => {
-    useExplorerStore.getState().openFile(row.path);
+    const store = useExplorerStore.getState();
+    store.setSelectedPath(row.path);
+    setFocusedKey(row.key);
+    store.openFile(row.path);
   }, []);
   const handleCancelLoad = useCallback((row: TreeNodeRow) => {
     useExplorerStore.getState().cancelLoad(row.id);
@@ -170,6 +185,134 @@ export function FolderTree() {
       return next;
     });
   }, []);
+
+  // Keyboard navigation: the scroll container is the single tab stop and
+  // routes arrows/Enter/type-ahead over node rows via aria-activedescendant.
+  const focusRowAt = useCallback(
+    (index: number) => {
+      const row = rows[index];
+      if (!row || row.kind !== "node") return;
+      setFocusedKey(row.key);
+      rowVirtualizer.scrollToIndex(index);
+    },
+    [rows, rowVirtualizer]
+  );
+
+  const findFocusedIndex = useCallback(() => {
+    if (focusedKey === null) return -1;
+    return rows.findIndex((r) => r.key === focusedKey);
+  }, [rows, focusedKey]);
+
+  const moveFocus = useCallback(
+    (delta: 1 | -1) => {
+      const current = findFocusedIndex();
+      let index = current === -1 ? (delta === 1 ? -1 : rows.length) : current;
+      do {
+        index += delta;
+      } while (index >= 0 && index < rows.length && rows[index].kind !== "node");
+      if (index >= 0 && index < rows.length) focusRowAt(index);
+    },
+    [rows, findFocusedIndex, focusRowAt]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const store = useExplorerStore.getState();
+      const currentIndex = findFocusedIndex();
+      const current =
+        currentIndex >= 0 && rows[currentIndex].kind === "node"
+          ? (rows[currentIndex] as TreeNodeRow)
+          : null;
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          moveFocus(1);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          moveFocus(-1);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (!current || !current.isDir) break;
+          if (!current.isExpanded) {
+            store.expandNode(current.id);
+          } else {
+            moveFocus(1);
+          }
+          break;
+        case "ArrowLeft": {
+          e.preventDefault();
+          if (!current) break;
+          if (current.isDir && current.isExpanded) {
+            store.collapseNode(current.id);
+            break;
+          }
+          // Walk back to the nearest shallower node row (the parent).
+          for (let i = currentIndex - 1; i >= 0; i--) {
+            const row = rows[i];
+            if (row.kind === "node" && row.depth < current.depth) {
+              focusRowAt(i);
+              break;
+            }
+          }
+          break;
+        }
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          if (!current) break;
+          if (current.isDir) {
+            handleToggle(current);
+          } else {
+            handleOpenFile(current);
+          }
+          break;
+        case "Home":
+          e.preventDefault();
+          for (let i = 0; i < rows.length; i++) {
+            if (rows[i].kind === "node") {
+              focusRowAt(i);
+              break;
+            }
+          }
+          break;
+        case "End":
+          e.preventDefault();
+          for (let i = rows.length - 1; i >= 0; i--) {
+            if (rows[i].kind === "node") {
+              focusRowAt(i);
+              break;
+            }
+          }
+          break;
+        default: {
+          if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
+          const state = typeaheadRef.current;
+          if (state.timer !== null) window.clearTimeout(state.timer);
+          state.buffer += e.key.toLowerCase();
+          state.timer = window.setTimeout(() => {
+            state.buffer = "";
+            state.timer = null;
+          }, TYPEAHEAD_RESET_MS);
+          const start = currentIndex + 1;
+          for (let step = 0; step < rows.length; step++) {
+            const i = (start + step) % rows.length;
+            const row = rows[i];
+            if (
+              row.kind === "node" &&
+              row.name.toLowerCase().startsWith(state.buffer)
+            ) {
+              focusRowAt(i);
+              break;
+            }
+          }
+        }
+      }
+    },
+    [rows, findFocusedIndex, moveFocus, focusRowAt, handleToggle, handleOpenFile]
+  );
 
   // One context menu for the whole tree. Right-clicks resolve to a row via
   // data-row-key; source rows and empty space open nothing.
@@ -220,7 +363,14 @@ export function FolderTree() {
       <ContextMenuTrigger asChild>
         <div
           ref={scrollParentRef}
-          className="flex-1 overflow-auto"
+          className="flex-1 overflow-auto outline-none"
+          role="tree"
+          aria-label="Folder tree"
+          tabIndex={0}
+          aria-activedescendant={
+            focusedKey !== null ? treeRowDomId(focusedKey) : undefined
+          }
+          onKeyDown={handleKeyDown}
           onContextMenu={handleContainerContextMenu}
         >
           <div
@@ -245,6 +395,10 @@ export function FolderTree() {
                     isChecked={
                       row.kind === "node" ? isPathChecked(row.path) : false
                     }
+                    isSelected={
+                      row.kind === "node" && row.path === selectedPath
+                    }
+                    isFocused={row.key === focusedKey}
                     elapsedSeconds={
                       row.kind === "node" ? elapsedFor(row) : null
                     }
