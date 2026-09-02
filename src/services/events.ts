@@ -52,11 +52,15 @@ export function useTauriEvent<T>(
 import type {
   FilenameResultsBatchPayload,
   ScanProgressPayload,
+  ScanResultsBatchPayload,
   SearchProgressPayload,
   SearchResultsBatchPayload,
 } from "@/features/explorer/types";
 export const scanProgressHub =
   createEventHub<ScanProgressPayload>("scan-progress");
+export const scanResultsBatchHub = createEventHub<ScanResultsBatchPayload>(
+  "scan-results-batch"
+);
 
 // Search event hubs
 export const searchResultsBatchHub =

@@ -849,22 +849,21 @@ fn filename_search_worker(
     let mut truncated = false;
     let mut cancelled = false;
 
-    let flush =
-        |pending: &mut Vec<FilenameResultPayload>, last_emit: &mut Instant, force: bool| {
-            if pending.is_empty() {
-                return;
-            }
-            let batch_full = pending.len() >= SEARCH_RESULT_BATCH_SIZE;
-            if !force && !batch_full && last_emit.elapsed() < SEARCH_RESULT_BATCH_INTERVAL {
-                return;
-            }
-            let payload = FilenameResultsBatchPayload {
-                operation_id: operation_id.clone(),
-                results: std::mem::take(pending),
-            };
-            let _ = app.emit("filename-results-batch", payload);
-            *last_emit = Instant::now();
+    let flush = |pending: &mut Vec<FilenameResultPayload>, last_emit: &mut Instant, force: bool| {
+        if pending.is_empty() {
+            return;
+        }
+        let batch_full = pending.len() >= SEARCH_RESULT_BATCH_SIZE;
+        if !force && !batch_full && last_emit.elapsed() < SEARCH_RESULT_BATCH_INTERVAL {
+            return;
+        }
+        let payload = FilenameResultsBatchPayload {
+            operation_id: operation_id.clone(),
+            results: std::mem::take(pending),
         };
+        let _ = app.emit("filename-results-batch", payload);
+        *last_emit = Instant::now();
+    };
 
     'roots: for root in &paths {
         match std::fs::metadata(root) {
@@ -1003,7 +1002,7 @@ pub struct ScanProgressPayload {
     pub total_clean: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanFileResult {
     pub file_path: String,
@@ -1015,6 +1014,15 @@ pub struct ScanFileResult {
     pub has_bom: bool,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanResultsBatchPayload {
+    pub operation_id: String,
+    pub results: Vec<ScanFileResult>,
+}
+
+/// Scan results stream via scan-results-batch events; the summary carries
+/// only the aggregate counts.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanSummary {
@@ -1026,7 +1034,6 @@ pub struct ScanSummary {
     pub clean_files: u32,
     pub total_errors: u32,
     pub total_warnings: u32,
-    pub files: Vec<ScanFileResult>,
     pub cancelled: bool,
 }
 
@@ -1150,9 +1157,10 @@ pub async fn bulk_scan_cmd(
         let mut error_files: u32 = 0;
         let mut warning_files: u32 = 0;
         let mut clean_files: u32 = 0;
-        let mut file_results: Vec<ScanFileResult> = Vec::new();
+        let mut pending_results: Vec<ScanFileResult> = Vec::new();
         let mut cancelled = false;
         let mut last_emit_time = std::time::Instant::now();
+        let mut last_batch_emit_time = std::time::Instant::now();
         let mut last_progress_file_path = Path::new(&folder_path_clone).to_path_buf();
         let mut last_progress_status = "clean".to_string();
         let mut last_progress_error_count: u32 = 0;
@@ -1194,6 +1202,28 @@ pub async fn bulk_scan_cmd(
             let _ = app.emit("scan-progress", payload);
             *last_emit_time = std::time::Instant::now();
         };
+
+        let flush_results =
+            |force: bool,
+             pending: &mut Vec<ScanFileResult>,
+             last_batch_emit_time: &mut std::time::Instant| {
+                if pending.is_empty() {
+                    return;
+                }
+                let batch_full = pending.len() >= SEARCH_RESULT_BATCH_SIZE;
+                if !force
+                    && !batch_full
+                    && last_batch_emit_time.elapsed() < SEARCH_RESULT_BATCH_INTERVAL
+                {
+                    return;
+                }
+                let payload = ScanResultsBatchPayload {
+                    operation_id: op_id.clone(),
+                    results: std::mem::take(pending),
+                };
+                let _ = app.emit("scan-results-batch", payload);
+                *last_batch_emit_time = std::time::Instant::now();
+            };
 
         for entry_result in WalkDir::new(&folder_path_clone).into_iter() {
             if token_clone.is_cancelled() {
@@ -1267,7 +1297,8 @@ pub async fn bulk_scan_cmd(
                         total_clean,
                         &mut last_emit_time,
                     );
-                    file_results.push(file_result);
+                    pending_results.push(file_result);
+                    flush_results(false, &mut pending_results, &mut last_batch_emit_time);
                 }
                 Ok(None) | Err(_) => {
                     last_progress_status = "clean".to_string();
@@ -1304,6 +1335,8 @@ pub async fn bulk_scan_cmd(
             );
         }
 
+        flush_results(true, &mut pending_results, &mut last_batch_emit_time);
+
         ScanSummary {
             folder_path: folder_path_clone,
             file_pattern: file_pattern_clone,
@@ -1313,7 +1346,6 @@ pub async fn bulk_scan_cmd(
             clean_files,
             total_errors,
             total_warnings,
-            files: file_results,
             cancelled,
         }
     })
@@ -1541,33 +1573,6 @@ mod tests {
             clean_files: 1,
             total_errors: 3,
             total_warnings: 0,
-            files: vec![
-                ScanFileResult {
-                    file_path: "/test/path/bad.xml".to_string(),
-                    file_name: "bad.xml".to_string(),
-                    relative_path: "bad.xml".to_string(),
-                    status: "error".to_string(),
-                    problems: vec![ValidationProblem {
-                        line: 1,
-                        column: 5,
-                        end_column: 6,
-                        message: "Null byte (0x00) detected".to_string(),
-                        severity: "error".to_string(),
-                        code: "null-byte".to_string(),
-                    }],
-                    encoding: "UTF-8".to_string(),
-                    has_bom: false,
-                },
-                ScanFileResult {
-                    file_path: "/test/path/good.xml".to_string(),
-                    file_name: "good.xml".to_string(),
-                    relative_path: "good.xml".to_string(),
-                    status: "clean".to_string(),
-                    problems: vec![],
-                    encoding: "UTF-8".to_string(),
-                    has_bom: false,
-                },
-            ],
             cancelled: false,
         };
 
@@ -1580,12 +1585,37 @@ mod tests {
         assert_eq!(json["cancelled"], false);
         assert_eq!(json["totalErrors"], 3);
         assert_eq!(json["totalWarnings"], 0);
-        assert!(json["files"].is_array());
-        assert_eq!(json["files"].as_array().unwrap().len(), 2);
-        // Verify camelCase on nested ScanFileResult
-        assert_eq!(json["files"][0]["filePath"], "/test/path/bad.xml");
-        assert_eq!(json["files"][0]["relativePath"], "bad.xml");
-        assert_eq!(json["files"][0]["hasBom"], false);
+        // Files stream separately via scan-results-batch; the summary is slim.
+        assert!(json.get("files").is_none());
+    }
+
+    #[test]
+    fn test_scan_results_batch_payload_serialization() {
+        let payload = ScanResultsBatchPayload {
+            operation_id: "op-1".to_string(),
+            results: vec![ScanFileResult {
+                file_path: "/test/path/bad.xml".to_string(),
+                file_name: "bad.xml".to_string(),
+                relative_path: "bad.xml".to_string(),
+                status: "error".to_string(),
+                problems: vec![ValidationProblem {
+                    line: 1,
+                    column: 5,
+                    end_column: 6,
+                    message: "Null byte (0x00) detected".to_string(),
+                    severity: "error".to_string(),
+                    code: "null-byte".to_string(),
+                }],
+                encoding: "UTF-8".to_string(),
+                has_bom: false,
+            }],
+        };
+
+        let json = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json["operationId"], "op-1");
+        assert_eq!(json["results"][0]["filePath"], "/test/path/bad.xml");
+        assert_eq!(json["results"][0]["relativePath"], "bad.xml");
+        assert_eq!(json["results"][0]["hasBom"], false);
     }
 
     #[test]

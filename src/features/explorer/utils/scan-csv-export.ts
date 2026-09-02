@@ -1,4 +1,4 @@
-import type { ScanSummary } from "../types";
+import type { ScanReport } from "../types";
 
 export function escapeCsv(value: string): string {
   if (
@@ -16,7 +16,7 @@ function sanitizeCsvComment(value: string): string {
   return value.replace(/[\r\n]/g, " ");
 }
 
-export function exportScanToCsv(result: ScanSummary): string {
+export function exportScanToCsv(result: ScanReport): string {
   const lines: string[] = [];
 
   // Metadata comments (D-21)

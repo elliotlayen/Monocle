@@ -96,6 +96,8 @@ export interface ScanFileResult {
   hasBom: boolean;
 }
 
+/** Slim scan summary returned by bulk_scan_cmd; file results stream via
+ * scan-results-batch events. */
 export interface ScanSummary {
   folderPath: string;
   filePattern: string;
@@ -105,8 +107,17 @@ export interface ScanSummary {
   cleanFiles: number;
   totalErrors: number;
   totalWarnings: number;
-  files: ScanFileResult[];
   cancelled: boolean;
+}
+
+/** Frontend-assembled summary plus the accumulated streamed file results. */
+export interface ScanReport extends ScanSummary {
+  files: ScanFileResult[];
+}
+
+export interface ScanResultsBatchPayload {
+  operationId: string;
+  results: ScanFileResult[];
 }
 
 export type ScanStatus = "idle" | "scanning" | "completed" | "cancelled";

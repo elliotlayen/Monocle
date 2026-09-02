@@ -1,6 +1,6 @@
-import type { ScanSummary } from "../types";
+import type { ScanReport } from "../types";
 
-export function formatScanAsText(result: ScanSummary): string {
+export function formatScanAsText(result: ScanReport): string {
   const lines: string[] = [];
 
   lines.push(`Scan Report - ${result.folderPath}`);
@@ -38,7 +38,7 @@ function escapeMarkdownCell(value: string): string {
   return value.replace(/\|/g, "\\|");
 }
 
-export function formatScanAsMarkdown(result: ScanSummary): string {
+export function formatScanAsMarkdown(result: ScanReport): string {
   const lines: string[] = [];
 
   lines.push("# Scan Report");

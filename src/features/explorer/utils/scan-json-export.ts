@@ -1,6 +1,6 @@
-import type { ScanSummary } from "../types";
+import type { ScanReport } from "../types";
 
-export function exportScanToJson(result: ScanSummary): string {
+export function exportScanToJson(result: ScanReport): string {
   const exportData = {
     metadata: {
       folderPath: result.folderPath,

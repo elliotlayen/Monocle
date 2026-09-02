@@ -201,6 +201,7 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
         tabs: recomputeTabNames(filtered),
         activeTabId: newActiveTabId,
         scanStatus: "idle",
+        scanFiles: [],
         scanResult: null,
         scanProgress: null,
       });
@@ -221,6 +222,7 @@ export const createTabsSlice: SliceCreator<TabsSlice> = (set, get) => ({
       tabs: [],
       activeTabId: null,
       scanStatus: "idle",
+      scanFiles: [],
       scanResult: null,
       scanProgress: null,
     });

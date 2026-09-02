@@ -17,6 +17,7 @@ import { ActivityRail } from "./activity-rail";
 import { BreadcrumbBar } from "./breadcrumb-bar";
 import { QuickOpen } from "./quick-open";
 import { useExplorerKeyboard } from "../hooks/use-explorer-keyboard";
+import { useScanEvents } from "../hooks/use-scan-events";
 import { FileTabBar } from "./file-tab-bar";
 import { FileContentArea } from "./file-content-area";
 import { ScanProgressPanel } from "./scan-progress-panel";
@@ -30,6 +31,7 @@ interface ExplorerShellProps {
 
 export function ExplorerShell({ onHome, onOpenSettings }: ExplorerShellProps) {
   useExplorerKeyboard();
+  useScanEvents();
 
   const {
     sidebarOpen,

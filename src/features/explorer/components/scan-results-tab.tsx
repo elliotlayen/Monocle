@@ -91,9 +91,20 @@ function ColumnHeader({
 }
 
 export function ScanResultsTab() {
-  const { scanResult, openFile } = useExplorerStore(
+  const {
+    scanFiles,
+    scanResult,
+    scanStatus,
+    scanProgress,
+    scanFolderPath,
+    openFile,
+  } = useExplorerStore(
     useShallow((state) => ({
+      scanFiles: state.scanFiles,
       scanResult: state.scanResult,
+      scanStatus: state.scanStatus,
+      scanProgress: state.scanProgress,
+      scanFolderPath: state.scanFolderPath,
       openFile: state.openFile,
     }))
   );
@@ -113,13 +124,12 @@ export function ScanResultsTab() {
   };
 
   const filteredAndSorted = useMemo(() => {
-    if (!scanResult) return [];
-    let files = scanResult.files;
+    let files = scanFiles;
     if (showIssuesOnly) {
       files = files.filter((f) => f.status !== "clean");
     }
     return sortFiles(files, sortField, sortDirection);
-  }, [scanResult, showIssuesOnly, sortField, sortDirection]);
+  }, [scanFiles, showIssuesOnly, sortField, sortDirection]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredAndSorted.length,
@@ -129,7 +139,15 @@ export function ScanResultsTab() {
     getItemKey: (index) => filteredAndSorted[index]?.filePath ?? index,
   });
 
-  if (!scanResult) return null;
+  if (!scanFolderPath) return null;
+
+  // Live counts come from progress while scanning; final ones from the summary
+  const totalFiles = scanResult?.totalFiles ?? scanProgress?.filesProcessed ?? 0;
+  const totalErrors = scanResult?.totalErrors ?? scanProgress?.totalErrors ?? 0;
+  const totalWarnings =
+    scanResult?.totalWarnings ?? scanProgress?.totalWarnings ?? 0;
+  const cleanFiles = scanResult?.cleanFiles ?? scanProgress?.totalClean ?? 0;
+  const isScanning = scanStatus === "scanning";
 
   const handleFileClick = (filePath: string) => {
     openFile(filePath);
@@ -138,28 +156,38 @@ export function ScanResultsTab() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <ScanResultsHeader
-        result={scanResult}
+        folderPath={scanFolderPath}
+        totalFiles={totalFiles}
+        totalErrors={totalErrors}
+        totalWarnings={totalWarnings}
         showIssuesOnly={showIssuesOnly}
         onToggleFilter={() => setShowIssuesOnly((prev) => !prev)}
+        exportsEnabled={!isScanning}
       />
+
+      {scanStatus === "cancelled" && (
+        <p className="border-b bg-warning/10 px-4 py-1.5 text-xs text-warning">
+          Partial results: the scan was cancelled after {totalFiles} files.
+        </p>
+      )}
 
       {/* Summary stat cards */}
       <div className="flex items-center gap-4 px-4 py-2 border-b">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <FolderOpen className="h-3.5 w-3.5" />
-          <span className="font-medium">{scanResult.totalFiles}</span> files
+          <span className="font-medium">{totalFiles}</span> files
         </div>
         <div className="flex items-center gap-1.5 text-xs text-destructive">
           <CircleAlert className="h-3.5 w-3.5" />
-          <span className="font-medium">{scanResult.totalErrors}</span> errors
+          <span className="font-medium">{totalErrors}</span> errors
         </div>
         <div className="flex items-center gap-1.5 text-xs text-warning">
           <TriangleAlert className="h-3.5 w-3.5" />
-          <span className="font-medium">{scanResult.totalWarnings}</span> warnings
+          <span className="font-medium">{totalWarnings}</span> warnings
         </div>
         <div className="flex items-center gap-1.5 text-xs text-success">
           <CircleCheck className="h-3.5 w-3.5" />
-          <span className="font-medium">{scanResult.cleanFiles}</span> clean
+          <span className="font-medium">{cleanFiles}</span> clean
         </div>
       </div>
 
@@ -230,7 +258,7 @@ export function ScanResultsTab() {
               >
                 <ScanFileRow
                   file={file}
-                  scanRoot={scanResult.folderPath}
+                  scanRoot={scanFolderPath}
                   onFileClick={handleFileClick}
                 />
               </div>
@@ -238,9 +266,11 @@ export function ScanResultsTab() {
           })}
           {filteredAndSorted.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              {showIssuesOnly
-                ? "No issues found -- all files are clean"
-              : "No files in scan results"}
+              {isScanning
+                ? "Scanning..."
+                : showIssuesOnly
+                  ? "No issues found -- all files are clean"
+                  : "No files in scan results"}
             </div>
           )}
         </div>

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { exportScanToJson } from "./scan-json-export";
-import type { ScanSummary } from "../types";
+import type { ScanReport } from "../types";
 
 function makeSummary(
-  overrides: Partial<ScanSummary> = {}
-): ScanSummary {
+  overrides: Partial<ScanReport> = {}
+): ScanReport {
   return {
     folderPath: "/data/clients/ABC",
     filePattern: "*.xml",

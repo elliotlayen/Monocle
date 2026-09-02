@@ -1,8 +1,8 @@
 import jsPDF from "jspdf";
-import type { ScanSummary } from "../types";
+import type { ScanReport } from "../types";
 
 export async function exportScanToPdf(
-  result: ScanSummary
+  result: ScanReport
 ): Promise<Uint8Array> {
   const doc = new jsPDF({
     orientation: "portrait",

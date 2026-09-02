@@ -9,18 +9,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useScanExport } from "../hooks/use-scan-export";
-import type { ScanSummary } from "../types";
 
 export interface ScanResultsHeaderProps {
-  result: ScanSummary;
+  folderPath: string;
+  totalFiles: number;
+  totalErrors: number;
+  totalWarnings: number;
   showIssuesOnly: boolean;
   onToggleFilter: () => void;
+  /** Exports are disabled while the scan is still streaming results. */
+  exportsEnabled: boolean;
 }
 
 export function ScanResultsHeader({
-  result,
+  folderPath,
+  totalFiles,
+  totalErrors,
+  totalWarnings,
   showIssuesOnly,
   onToggleFilter,
+  exportsEnabled,
 }: ScanResultsHeaderProps) {
   const {
     exportCsv,
@@ -30,7 +38,7 @@ export function ScanResultsHeader({
     exportClipboardMarkdown,
   } = useScanExport();
 
-  const folderName = result.folderPath.split(/[/\\]/).pop() ?? result.folderPath;
+  const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
 
   return (
     <div className="flex h-9 items-center gap-2 border-b bg-muted/40 px-3">
@@ -44,7 +52,7 @@ export function ScanResultsHeader({
           {folderName}
         </span>
         <span className="text-xs text-muted-foreground flex-shrink-0">
-          {result.totalFiles} files, {result.totalErrors} errors, {result.totalWarnings} warnings
+          {totalFiles} files, {totalErrors} errors, {totalWarnings} warnings
         </span>
       </div>
 
@@ -65,7 +73,12 @@ export function ScanResultsHeader({
       {/* Export dropdown (D-16) */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-7 px-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2"
+            disabled={!exportsEnabled}
+          >
             <Download className="h-3.5 w-3.5 mr-1" />
             <span className="text-xs">Export</span>
           </Button>

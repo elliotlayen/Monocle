@@ -3,7 +3,8 @@ import type {
   ValidationStatus,
   ScanStatus,
   ScanProgressPayload,
-  ScanSummary,
+  ScanFileResult,
+  ScanReport,
 } from "../types";
 import { explorerService } from "../services/explorer-service";
 import { showToast } from "@/features/notifications/store";
@@ -19,7 +20,9 @@ export interface ScanSlice {
   scanFolderName: string | null;
   scanFilePattern: string;
   scanProgress: ScanProgressPayload | null;
-  scanResult: ScanSummary | null;
+  /** File results streamed so far (live during a scan, final afterwards). */
+  scanFiles: ScanFileResult[];
+  scanResult: ScanReport | null;
   folderBadgeCache: Map<string, ValidationStatus>;
   pendingScanRequest: {
     folderPath: string;
@@ -29,6 +32,7 @@ export interface ScanSlice {
   requestScan: (folderPath: string, filePattern: string) => void;
   startScan: (folderPath: string, filePattern: string) => Promise<void>;
   updateScanProgress: (payload: ScanProgressPayload) => void;
+  appendScanResults: (operationId: string, results: ScanFileResult[]) => void;
   cancelScan: () => Promise<void>;
   clearScanResult: () => void;
   setScanFilePattern: (pattern: string) => void;
@@ -36,6 +40,11 @@ export interface ScanSlice {
   confirmPendingScan: () => void;
   dismissPendingScan: () => void;
 }
+
+/** Client-side cap on retained problems per scanned file. */
+const MAX_PROBLEMS_PER_FILE = 50;
+
+const scanFilePaths = new Set<string>();
 
 // Resolves when the currently running bulk scan settles (including its state
 // updates), so a restart can wait for the real completion instead of sleeping.
@@ -46,86 +55,54 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
     const operationId = crypto.randomUUID();
     const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
 
-    // Remove existing scan:results tab before starting new scan (Open Q2)
+    // The results tab opens immediately; rows stream into it live (D-12)
+    const scanTab: FileTab = {
+      id: "scan:results",
+      filePath: "scan:results",
+      fileName: `Scan Results - ${folderName}`,
+      content: "",
+      fileSize: 0,
+      viewMode: "source",
+      scrollPosition: { source: 0, tree: 0 },
+      treeExpandedIds: [],
+      monacoViewState: null,
+      isXml: false,
+      parseError: false,
+      isLoading: false,
+      problems: [],
+      encoding: "",
+      hasBom: false,
+      isScanResult: true,
+    };
     const existingTabs = get().tabs.filter((t) => t.id !== "scan:results");
 
+    scanFilePaths.clear();
     set({
       scanStatus: "scanning",
       scanOperationId: operationId,
       scanFolderPath: folderPath,
       scanFolderName: folderName,
       scanProgress: null,
+      scanFiles: [],
       scanResult: null,
       pendingScanRequest: null,
-      tabs: recomputeTabNames(existingTabs),
-      ...(get().activeTabId === "scan:results"
-        ? {
-            activeTabId:
-              existingTabs.length > 0
-                ? existingTabs[existingTabs.length - 1].id
-                : null,
-          }
-        : {}),
+      tabs: recomputeTabNames([...existingTabs, scanTab]),
+      activeTabId: "scan:results",
     });
 
     try {
-      const result = await explorerService.bulkScan(
+      const summary = await explorerService.bulkScan(
         folderPath,
         filePattern,
         operationId
       );
 
-      // Update validation cache with all file results (bounded)
-      const nextCache = appendBounded(
-        get().validationCache,
-        result.files.map(
-          (file) =>
-            [
-              file.filePath,
-              {
-                problems: file.problems,
-                encoding: file.encoding,
-                hasBom: file.hasBom,
-              },
-            ] as const
-        ),
-        VALIDATION_CACHE_MAX
-      );
-
-      // Compute folder badge cache
-      const folderBadges = computeAggregateBadges(result.files, folderPath);
-
-      // Create synthetic scan results tab (D-12)
-      const scanTab: FileTab = {
-        id: "scan:results",
-        filePath: "scan:results",
-        fileName: `Scan Results - ${folderName}`,
-        content: "",
-        fileSize: 0,
-        viewMode: "source",
-        scrollPosition: { source: 0, tree: 0 },
-        treeExpandedIds: [],
-        monacoViewState: null,
-        isXml: false,
-        parseError: false,
-        isLoading: false,
-        problems: [],
-        encoding: "",
-        hasBom: false,
-        isScanResult: true,
-      };
-
-      const currentTabs = get().tabs.filter((t) => t.id !== "scan:results");
-      const updatedTabs = recomputeTabNames([...currentTabs, scanTab]);
-
+      const files = get().scanFiles;
       set({
-        scanStatus: result.cancelled ? "cancelled" : "completed",
-        scanResult: result,
+        scanStatus: summary.cancelled ? "cancelled" : "completed",
+        scanResult: { ...summary, files },
         scanOperationId: null,
-        validationCache: nextCache,
-        folderBadgeCache: folderBadges,
-        tabs: updatedTabs,
-        activeTabId: "scan:results",
+        folderBadgeCache: computeAggregateBadges(files, folderPath),
       });
     } catch {
       set({
@@ -148,6 +125,7 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
     scanFolderName: null,
     scanFilePattern: "*.xml",
     scanProgress: null,
+    scanFiles: [],
     scanResult: null,
     folderBadgeCache: new Map(),
     pendingScanRequest: null,
@@ -178,6 +156,46 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
       set({ scanProgress: payload });
     },
 
+    appendScanResults: (operationId: string, results: ScanFileResult[]) => {
+      if (results.length === 0) return;
+      if (get().scanOperationId !== operationId) return;
+
+      const next = [...get().scanFiles];
+      const cacheEntries: Array<
+        readonly [
+          string,
+          { problems: ScanFileResult["problems"]; encoding: string; hasBom: boolean },
+        ]
+      > = [];
+      for (const result of results) {
+        if (scanFilePaths.has(result.filePath)) continue;
+        scanFilePaths.add(result.filePath);
+        const bounded =
+          result.problems.length > MAX_PROBLEMS_PER_FILE
+            ? { ...result, problems: result.problems.slice(0, MAX_PROBLEMS_PER_FILE) }
+            : result;
+        next.push(bounded);
+        cacheEntries.push([
+          bounded.filePath,
+          {
+            problems: bounded.problems,
+            encoding: bounded.encoding,
+            hasBom: bounded.hasBom,
+          },
+        ] as const);
+      }
+
+      set({
+        scanFiles: next,
+        // Tree and tab badges update live as results stream in.
+        validationCache: appendBounded(
+          get().validationCache,
+          cacheEntries,
+          VALIDATION_CACHE_MAX
+        ),
+      });
+    },
+
     cancelScan: async () => {
       const { scanOperationId } = get();
       if (scanOperationId) {
@@ -190,8 +208,10 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
     },
 
     clearScanResult: () => {
+      scanFilePaths.clear();
       set({
         scanStatus: "idle",
+        scanFiles: [],
         scanResult: null,
         scanProgress: null,
       });
