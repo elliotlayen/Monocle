@@ -84,6 +84,10 @@ export const tauri = {
     folderPaths: string,
     filePattern: string,
     scopeLabel: string,
+    regex: boolean,
+    caseSensitive: boolean,
+    dateFrom: string | null,
+    dateTo: string | null,
     operationId: string
   ) =>
     invokeCommand<SearchSummary>("content_search_cmd", {
@@ -91,6 +95,10 @@ export const tauri = {
       folderPaths,
       filePattern,
       scopeLabel,
+      regex,
+      caseSensitive,
+      dateFrom,
+      dateTo,
       operationId,
     }),
 

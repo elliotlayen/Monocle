@@ -4,6 +4,7 @@ use crate::validation::{detect_and_decode, validate_characters};
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 use glob::Pattern;
 use ignore::WalkBuilder;
+use regex::{Regex, RegexBuilder};
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader};
@@ -214,38 +215,40 @@ pub async fn toggle_favorite_cmd(
 /// Quoted substrings (using double quotes) are preserved as single terms.
 /// Unclosed quotes treat the remainder as a single term.
 /// Empty quotes are skipped.
+#[allow(dead_code)] // exercised by tests; production uses the _with_case variant
 pub fn parse_search_terms(query: &str) -> Vec<String> {
+    parse_search_terms_with_case(query, false)
+}
+
+/// Like [`parse_search_terms`], but keeps the original casing when
+/// `case_sensitive` is set.
+pub fn parse_search_terms_with_case(query: &str, case_sensitive: bool) -> Vec<String> {
     let mut terms = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;
 
+    let flush = |current: &mut String, terms: &mut Vec<String>| {
+        let trimmed = current.trim();
+        if !trimmed.is_empty() {
+            terms.push(if case_sensitive {
+                trimmed.to_string()
+            } else {
+                trimmed.to_lowercase()
+            });
+        }
+        current.clear();
+    };
+
     for ch in query.chars() {
         match ch {
             '"' => {
-                if in_quotes {
-                    // End of quoted section
-                    let trimmed = current.trim().to_string();
-                    if !trimmed.is_empty() {
-                        terms.push(trimmed.to_lowercase());
-                    }
-                    current.clear();
-                    in_quotes = false;
-                } else {
-                    // Start of quoted section -- flush current token first
-                    let trimmed = current.trim().to_string();
-                    if !trimmed.is_empty() {
-                        terms.push(trimmed.to_lowercase());
-                    }
-                    current.clear();
-                    in_quotes = true;
-                }
+                // Both entering and leaving a quoted section flush the
+                // accumulated token.
+                flush(&mut current, &mut terms);
+                in_quotes = !in_quotes;
             }
             ' ' if !in_quotes => {
-                let trimmed = current.trim().to_string();
-                if !trimmed.is_empty() {
-                    terms.push(trimmed.to_lowercase());
-                }
-                current.clear();
+                flush(&mut current, &mut terms);
             }
             _ => {
                 current.push(ch);
@@ -254,23 +257,27 @@ pub fn parse_search_terms(query: &str) -> Vec<String> {
     }
 
     // Handle remaining content (including unclosed quotes)
-    let trimmed = current.trim().to_string();
-    if !trimmed.is_empty() {
-        terms.push(trimmed.to_lowercase());
-    }
+    flush(&mut current, &mut terms);
 
     terms
 }
 
 struct SearchMatcher {
     terms: Vec<String>,
+    case_sensitive: bool,
     ascii_matcher: Option<AhoCorasick>,
+    /// Set in regex mode; then `terms` holds the single raw pattern.
+    pattern: Option<Regex>,
 }
 
-fn build_search_matcher(terms: &[String]) -> SearchMatcher {
-    let ascii_matcher = if !terms.is_empty() && terms.iter().all(|term| term.is_ascii()) {
+fn build_search_matcher(terms: &[String], case_sensitive: bool) -> SearchMatcher {
+    // Exact (case-sensitive) matching is byte-safe for any UTF-8 term; the
+    // ascii_case_insensitive transform is only correct for ASCII terms.
+    let use_automaton =
+        !terms.is_empty() && (case_sensitive || terms.iter().all(|term| term.is_ascii()));
+    let ascii_matcher = if use_automaton {
         AhoCorasickBuilder::new()
-            .ascii_case_insensitive(true)
+            .ascii_case_insensitive(!case_sensitive)
             .build(terms)
             .ok()
     } else {
@@ -279,8 +286,42 @@ fn build_search_matcher(terms: &[String]) -> SearchMatcher {
 
     SearchMatcher {
         terms: terms.to_vec(),
+        case_sensitive,
         ascii_matcher,
+        pattern: None,
     }
+}
+
+fn build_regex_matcher(query: &str, case_sensitive: bool) -> Result<SearchMatcher, String> {
+    let pattern = RegexBuilder::new(query)
+        .case_insensitive(!case_sensitive)
+        .build()
+        .map_err(|e| format!("Invalid regular expression: {}", e))?;
+    Ok(SearchMatcher {
+        terms: vec![query.to_string()],
+        case_sensitive,
+        ascii_matcher: None,
+        pattern: Some(pattern),
+    })
+}
+
+/// True unless the name is a YYYYMMDD folder outside the given ISO date range.
+fn date_segment_in_range(name: &str, from: &Option<String>, to: &Option<String>) -> bool {
+    if name.len() != 8 || !name.bytes().all(|b| b.is_ascii_digit()) {
+        return true;
+    }
+    let iso = format!("{}-{}-{}", &name[0..4], &name[4..6], &name[6..8]);
+    if let Some(from) = from {
+        if iso.as_str() < from.as_str() {
+            return false;
+        }
+    }
+    if let Some(to) = to {
+        if iso.as_str() > to.as_str() {
+            return false;
+        }
+    }
+    true
 }
 
 /// At most this many matching lines are captured per file as previews.
@@ -326,7 +367,15 @@ fn search_file_content(
         }
 
         let mut line_matched = false;
-        if let Some(ascii_matcher) = &matcher.ascii_matcher {
+        if let Some(pattern) = &matcher.pattern {
+            let line = String::from_utf8_lossy(&buffer);
+            let count = pattern.find_iter(&line).count().min(u32::MAX as usize) as u32;
+            if count > 0 {
+                found_terms[0] = true;
+                match_count = match_count.saturating_add(count);
+                line_matched = true;
+            }
+        } else if let Some(ascii_matcher) = &matcher.ascii_matcher {
             for matched in ascii_matcher.find_overlapping_iter(&buffer) {
                 let idx = matched.pattern().as_usize();
                 found_terms[idx] = true;
@@ -334,7 +383,12 @@ fn search_file_content(
                 line_matched = true;
             }
         } else {
-            let line = String::from_utf8_lossy(&buffer).to_lowercase();
+            let raw = String::from_utf8_lossy(&buffer);
+            let line = if matcher.case_sensitive {
+                raw.to_string()
+            } else {
+                raw.to_lowercase()
+            };
             for (idx, term) in matcher.terms.iter().enumerate() {
                 let count = line.matches(term.as_str()).count().min(u32::MAX as usize) as u32;
                 if count > 0 {
@@ -369,7 +423,7 @@ fn search_file_content(
 
 #[cfg(test)]
 fn search_file_line_by_line(file_path: &Path, terms: &[String]) -> std::io::Result<Option<u32>> {
-    let matcher = build_search_matcher(terms);
+    let matcher = build_search_matcher(terms, false);
     search_file_content(file_path, &matcher, None)
         .map(|found| found.map(|matches| matches.match_count))
 }
@@ -461,6 +515,8 @@ fn collect_search_candidates(
     paths: &[String],
     pattern: &Pattern,
     cancel_token: &CancellationToken,
+    date_from: &Option<String>,
+    date_to: &Option<String>,
 ) -> (VecDeque<SearchFileCandidate>, bool) {
     let mut candidates = VecDeque::new();
     let mut cancelled = false;
@@ -486,6 +542,22 @@ fn collect_search_candidates(
             .git_global(false)
             .git_exclude(false)
             .follow_links(false);
+        let (from, to) = (date_from.clone(), date_to.clone());
+        builder.filter_entry(move |entry| {
+            // Never prune the searched root itself, only folders inside it.
+            if entry.depth() == 0 {
+                return true;
+            }
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            if !is_dir {
+                return true;
+            }
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| date_segment_in_range(name, &from, &to))
+                .unwrap_or(true)
+        });
 
         for entry_result in builder.build() {
             if cancel_token.is_cancelled() {
@@ -632,20 +704,24 @@ fn emit_search_progress(
     *last_emit_time = Instant::now();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn content_search_worker(
     app: AppHandle,
     paths: Vec<String>,
     pattern: Pattern,
-    terms: Vec<String>,
+    matcher: SearchMatcher,
     query: String,
     file_pattern: String,
     scope_label: String,
+    date_from: Option<String>,
+    date_to: Option<String>,
     operation_id: String,
     cancel_token: CancellationToken,
 ) -> SearchSummaryResult {
-    let (candidates, mut cancelled) = collect_search_candidates(&paths, &pattern, &cancel_token);
+    let (candidates, mut cancelled) =
+        collect_search_candidates(&paths, &pattern, &cancel_token, &date_from, &date_to);
     let worker_count = search_worker_count(candidates.len());
-    let matcher = Arc::new(build_search_matcher(&terms));
+    let matcher = Arc::new(matcher);
     let queue = Arc::new(Mutex::new(candidates));
     let (tx, rx) = mpsc::channel::<SearchScanOutcome>();
     let mut handles = Vec::with_capacity(worker_count);
@@ -771,19 +847,33 @@ fn content_search_worker(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn content_search_cmd(
     app: AppHandle,
     query: String,
     folder_paths: String,
     file_pattern: String,
     scope_label: String,
+    regex: bool,
+    case_sensitive: bool,
+    date_from: Option<String>,
+    date_to: Option<String>,
     operation_id: String,
     explorer_state: State<'_, ExplorerState>,
 ) -> Result<SearchSummaryResult, String> {
-    let terms = parse_search_terms(&query);
-    if terms.is_empty() {
-        return Err("Search query is empty".to_string());
-    }
+    // Build the matcher up front so invalid input fails before any walking.
+    let matcher = if regex {
+        if query.trim().is_empty() {
+            return Err("Search query is empty".to_string());
+        }
+        build_regex_matcher(&query, case_sensitive)?
+    } else {
+        let terms = parse_search_terms_with_case(&query, case_sensitive);
+        if terms.is_empty() {
+            return Err("Search query is empty".to_string());
+        }
+        build_search_matcher(&terms, case_sensitive)
+    };
 
     let paths: Vec<String> = serde_json::from_str(&folder_paths)
         .map_err(|e| format!("Invalid folder_paths JSON: {}", e))?;
@@ -809,10 +899,12 @@ pub async fn content_search_cmd(
             app,
             paths,
             pattern,
-            terms,
+            matcher,
             query,
             file_pattern,
             scope_label,
+            date_from,
+            date_to,
             operation_id,
             token_clone,
         )
@@ -1491,7 +1583,7 @@ mod tests {
         let file_path = temp_dir.path().join("sample.xml");
         std::fs::write(&file_path, "CONFIG value\nconfig VALUE\n").unwrap();
 
-        let matcher = build_search_matcher(&["config".to_string(), "value".to_string()]);
+        let matcher = build_search_matcher(&["config".to_string(), "value".to_string()], false);
         assert!(matcher.ascii_matcher.is_some());
 
         let result = search_file_content(&file_path, &matcher, None).unwrap();
@@ -1509,7 +1601,7 @@ mod tests {
         let file_path = temp_dir.path().join("sample.xml");
         std::fs::write(&file_path, "Café\nCAFÉ\n").unwrap();
 
-        let matcher = build_search_matcher(&["café".to_string()]);
+        let matcher = build_search_matcher(&["café".to_string()], false);
         assert!(matcher.ascii_matcher.is_none());
 
         let result = search_file_content(&file_path, &matcher, None).unwrap();
@@ -1519,12 +1611,110 @@ mod tests {
     }
 
     #[test]
+    fn test_case_sensitive_matcher_distinguishes_case() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("sample.xml");
+        std::fs::write(&file_path, "Config value\nconfig VALUE\n").unwrap();
+
+        let matcher = build_search_matcher(&["Config".to_string()], true);
+        let found = search_file_content(&file_path, &matcher, None)
+            .unwrap()
+            .expect("expected a match");
+        assert_eq!(found.match_count, 1);
+        assert_eq!(found.previews[0].line, 1);
+
+        let miss = build_search_matcher(&["CONFIG".to_string()], true);
+        assert!(search_file_content(&file_path, &miss, None)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_parse_search_terms_with_case_preserves_casing() {
+        let terms = parse_search_terms_with_case("Alpha \"Beta Gamma\"", true);
+        assert_eq!(terms, vec!["Alpha".to_string(), "Beta Gamma".to_string()]);
+        let lowered = parse_search_terms_with_case("Alpha \"Beta Gamma\"", false);
+        assert_eq!(lowered, vec!["alpha".to_string(), "beta gamma".to_string()]);
+    }
+
+    #[test]
+    fn test_regex_matcher_counts_matches() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("sample.xml");
+        std::fs::write(&file_path, "ORD-1042 and ord-7 here\nno hits\nORD-99\n").unwrap();
+
+        let matcher = build_regex_matcher(r"ord-\d+", false).unwrap();
+        let found = search_file_content(&file_path, &matcher, None)
+            .unwrap()
+            .expect("expected regex matches");
+        assert_eq!(found.match_count, 3);
+        assert_eq!(found.previews.len(), 2);
+
+        let cased = build_regex_matcher(r"ord-\d+", true).unwrap();
+        let found = search_file_content(&file_path, &cased, None)
+            .unwrap()
+            .expect("expected one cased match");
+        assert_eq!(found.match_count, 1);
+    }
+
+    #[test]
+    fn test_invalid_regex_is_rejected() {
+        assert!(build_regex_matcher("[unclosed", false).is_err());
+    }
+
+    #[test]
+    fn test_date_segment_in_range() {
+        let from = Some("2026-08-30".to_string());
+        let to = Some("2026-09-01".to_string());
+        assert!(date_segment_in_range("20260830", &from, &to));
+        assert!(date_segment_in_range("20260901", &from, &to));
+        assert!(!date_segment_in_range("20260829", &from, &to));
+        assert!(!date_segment_in_range("20260902", &from, &to));
+        // Non-date folders always pass
+        assert!(date_segment_in_range("inbound", &from, &to));
+        assert!(date_segment_in_range("2026090", &from, &to));
+        // Open-ended bounds
+        assert!(date_segment_in_range("19990101", &None, &to));
+        assert!(!date_segment_in_range("19990101", &from, &None));
+    }
+
+    #[test]
+    fn test_collect_candidates_prunes_date_folders() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        for folder in ["20260828", "20260901", "static"] {
+            let dir = temp_dir.path().join(folder);
+            std::fs::create_dir(&dir).unwrap();
+            std::fs::write(dir.join("file.xml"), "<x/>").unwrap();
+        }
+
+        let pattern = Pattern::new("*.xml").unwrap();
+        let token = CancellationToken::new();
+        let (candidates, cancelled) = collect_search_candidates(
+            &[temp_dir.path().to_string_lossy().to_string()],
+            &pattern,
+            &token,
+            &Some("2026-09-01".to_string()),
+            &None,
+        );
+
+        assert!(!cancelled);
+        let paths: Vec<String> = candidates
+            .iter()
+            .map(|c| c.file_path.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.iter().any(|p| p.contains("20260901")));
+        assert!(paths.iter().any(|p| p.contains("static")));
+        assert!(!paths.iter().any(|p| p.contains("20260828")));
+    }
+
+    #[test]
     fn test_search_file_content_honors_cancellation() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("sample.xml");
         std::fs::write(&file_path, "alpha beta\n").unwrap();
 
-        let matcher = build_search_matcher(&["alpha".to_string()]);
+        let matcher = build_search_matcher(&["alpha".to_string()], false);
         let token = CancellationToken::new();
         token.cancel();
 
@@ -1544,7 +1734,7 @@ mod tests {
             file_name: "large.xml".to_string(),
             parent_folder: temp_dir.path().to_string_lossy().to_string(),
         };
-        let matcher = build_search_matcher(&["alpha".to_string()]);
+        let matcher = build_search_matcher(&["alpha".to_string()], false);
         let token = CancellationToken::new();
 
         let result = scan_search_candidate(candidate, &matcher, "op", &token);

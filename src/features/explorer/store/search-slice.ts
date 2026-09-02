@@ -23,6 +23,8 @@ export interface SearchSlice {
   searchQuery: string;
   searchScope: SearchScope;
   searchFilePattern: string;
+  searchRegex: boolean;
+  searchCaseSensitive: boolean;
   searchStatus: SearchStatus;
   searchProgress: SearchProgressPayload | null;
   searchResults: SearchResultFile[];
@@ -44,6 +46,8 @@ export interface SearchSlice {
   setSearchQuery: (text: string) => void;
   setSearchScope: (scope: SearchScope) => void;
   setSearchFilePattern: (pattern: string) => void;
+  setSearchRegex: (regex: boolean) => void;
+  setSearchCaseSensitive: (caseSensitive: boolean) => void;
   startFilenameSearch: (folderPaths: string[]) => Promise<void>;
   appendFilenameResults: (
     operationId: string,
@@ -78,6 +82,14 @@ function sortSearchErrors(errors: SearchErrorFile[]): SearchErrorFile[] {
     if (folderCompare !== 0) return folderCompare;
     return a.fileName.localeCompare(b.fileName);
   });
+}
+
+/** Local-date ISO string (YYYY-MM-DD) for the backend date filters. */
+export function toIsoDate(date: Date | undefined | null): string | null {
+  if (!date) return null;
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /**
@@ -123,6 +135,8 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
   searchQuery: "",
   searchScope: "all",
   searchFilePattern: "*.xml",
+  searchRegex: false,
+  searchCaseSensitive: false,
   searchStatus: "idle",
   searchProgress: null,
   searchResults: [],
@@ -166,6 +180,14 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
     set({ searchFilePattern: pattern });
   },
 
+  setSearchRegex: (regex: boolean) => {
+    set({ searchRegex: regex });
+  },
+
+  setSearchCaseSensitive: (caseSensitive: boolean) => {
+    set({ searchCaseSensitive: caseSensitive });
+  },
+
   startContentSearch: async (folderPaths: string[], scopeLabel: string) => {
     const { searchQuery, searchFilePattern } = get();
     const operationId = crypto.randomUUID();
@@ -182,11 +204,16 @@ export const createSearchSlice: SliceCreator<SearchSlice> = (set, get) => ({
     });
 
     try {
+      const { searchRegex, searchCaseSensitive, dateRange } = get();
       const result = await explorerService.contentSearch(
         searchQuery,
         JSON.stringify(folderPaths),
         searchFilePattern,
         scopeLabel,
+        searchRegex,
+        searchCaseSensitive,
+        toIsoDate(dateRange?.from),
+        toIsoDate(dateRange?.to),
         operationId
       );
 

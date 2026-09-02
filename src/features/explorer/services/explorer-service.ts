@@ -48,9 +48,23 @@ export const explorerService = {
     folderPaths: string,
     filePattern: string,
     scopeLabel: string,
+    regex: boolean,
+    caseSensitive: boolean,
+    dateFrom: string | null,
+    dateTo: string | null,
     operationId: string
   ): Promise<SearchSummary> =>
-    tauri.contentSearch(query, folderPaths, filePattern, scopeLabel, operationId),
+    tauri.contentSearch(
+      query,
+      folderPaths,
+      filePattern,
+      scopeLabel,
+      regex,
+      caseSensitive,
+      dateFrom,
+      dateTo,
+      operationId
+    ),
 
   filenameSearch: (
     query: string,
