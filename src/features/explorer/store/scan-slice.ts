@@ -38,29 +38,12 @@ export interface ScanSlice {
   dismissPendingScan: () => void;
 }
 
-export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => ({
-  scanStatus: "idle",
-  scanOperationId: null,
-  scanFolderPath: null,
-  scanFolderName: null,
-  scanFilePattern: "*.xml",
-  scanProgress: null,
-  scanResult: null,
-  folderBadgeCache: new Map(),
-  lastInteractedFolderPath: null,
-  pendingScanRequest: null,
+// Resolves when the currently running bulk scan settles (including its state
+// updates), so a restart can wait for the real completion instead of sleeping.
+let inFlightScan: Promise<void> | null = null;
 
-  requestScan: (folderPath: string, filePattern: string) => {
-    const { scanStatus } = get();
-    if (scanStatus === "scanning") {
-      // Store pending request for confirmation dialog (D-04)
-      set({ pendingScanRequest: { folderPath, filePattern } });
-    } else {
-      get().startScan(folderPath, filePattern);
-    }
-  },
-
-  startScan: async (folderPath: string, filePattern: string) => {
+export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => {
+  const runScan = async (folderPath: string, filePattern: string) => {
     const operationId = crypto.randomUUID();
     const folderName = folderPath.split(/[/\\]/).pop() ?? folderPath;
 
@@ -150,68 +133,102 @@ export const createScanSlice: SliceCreator<ScanSlice> = (set, get) => ({
         duration: 5000,
       });
     }
-  },
+  };
 
-  updateScanProgress: (payload: ScanProgressPayload) => {
-    const { scanOperationId } = get();
-    if (payload.operationId !== scanOperationId) return;
-    set({ scanProgress: payload });
-  },
+  return {
+    scanStatus: "idle",
+    scanOperationId: null,
+    scanFolderPath: null,
+    scanFolderName: null,
+    scanFilePattern: "*.xml",
+    scanProgress: null,
+    scanResult: null,
+    folderBadgeCache: new Map(),
+    lastInteractedFolderPath: null,
+    pendingScanRequest: null,
 
-  cancelScan: async () => {
-    const { scanOperationId } = get();
-    if (scanOperationId) {
-      try {
-        await explorerService.cancelScan(scanOperationId);
-      } catch {
-        // Best-effort cancel
+    requestScan: (folderPath: string, filePattern: string) => {
+      const { scanStatus } = get();
+      if (scanStatus === "scanning") {
+        // Store pending request for confirmation dialog (D-04)
+        set({ pendingScanRequest: { folderPath, filePattern } });
+      } else {
+        get().startScan(folderPath, filePattern);
       }
-    }
-  },
+    },
 
-  clearScanResult: () => {
-    set({
-      scanStatus: "idle",
-      scanResult: null,
-      scanProgress: null,
-    });
-  },
+    startScan: async (folderPath: string, filePattern: string) => {
+      const promise = runScan(folderPath, filePattern);
+      inFlightScan = promise;
+      try {
+        await promise;
+      } finally {
+        if (inFlightScan === promise) inFlightScan = null;
+      }
+    },
 
-  setScanFilePattern: (pattern: string) => {
-    set({ scanFilePattern: pattern });
-  },
+    updateScanProgress: (payload: ScanProgressPayload) => {
+      const { scanOperationId } = get();
+      if (payload.operationId !== scanOperationId) return;
+      set({ scanProgress: payload });
+    },
 
-  setLastInteractedFolder: (path: string) => {
-    set({ lastInteractedFolderPath: path });
-  },
+    cancelScan: async () => {
+      const { scanOperationId } = get();
+      if (scanOperationId) {
+        try {
+          await explorerService.cancelScan(scanOperationId);
+        } catch {
+          // Best-effort cancel
+        }
+      }
+    },
 
-  getFolderBadge: (folderPath: string): ValidationStatus | undefined => {
-    return get().folderBadgeCache.get(folderPath);
-  },
-
-  confirmPendingScan: () => {
-    const { pendingScanRequest } = get();
-    if (!pendingScanRequest) return;
-
-    const { folderPath, filePattern } = pendingScanRequest;
-    // Cancel current scan, then start new one
-    const doIt = async () => {
-      await get().cancelScan();
-      // Small delay to allow cancellation to propagate
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      get().startScan(folderPath, filePattern);
-    };
-    doIt().catch(() => {
-      showToast({
-        type: "error",
-        title: "Failed to start scan",
-        message: "An error occurred while restarting the scan",
-        duration: 5000,
+    clearScanResult: () => {
+      set({
+        scanStatus: "idle",
+        scanResult: null,
+        scanProgress: null,
       });
-    });
-  },
+    },
 
-  dismissPendingScan: () => {
-    set({ pendingScanRequest: null });
-  },
-});
+    setScanFilePattern: (pattern: string) => {
+      set({ scanFilePattern: pattern });
+    },
+
+    setLastInteractedFolder: (path: string) => {
+      set({ lastInteractedFolderPath: path });
+    },
+
+    getFolderBadge: (folderPath: string): ValidationStatus | undefined => {
+      return get().folderBadgeCache.get(folderPath);
+    },
+
+    confirmPendingScan: () => {
+      const { pendingScanRequest } = get();
+      if (!pendingScanRequest) return;
+
+      const { folderPath, filePattern } = pendingScanRequest;
+      // Cancel the running scan and wait for it to actually settle (its
+      // completion writes scan state) before starting the new one.
+      const doIt = async () => {
+        const running = inFlightScan;
+        await get().cancelScan();
+        if (running) await running;
+        get().startScan(folderPath, filePattern);
+      };
+      doIt().catch(() => {
+        showToast({
+          type: "error",
+          title: "Failed to start scan",
+          message: "An error occurred while restarting the scan",
+          duration: 5000,
+        });
+      });
+    },
+
+    dismissPendingScan: () => {
+      set({ pendingScanRequest: null });
+    },
+  };
+};

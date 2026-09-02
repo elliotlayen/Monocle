@@ -24,6 +24,8 @@ export const createUiSlice: SliceCreator<UiSlice> = (set) => ({
 
   setSidebarWidth: (width: number) => {
     set({ sidebarWidth: width });
+    // Deliberately silent: a failed width persist is cosmetic and this fires
+    // on every drag-resize commit.
     settingsService
       .saveSettings({ explorerSidebarWidth: width })
       .catch(() => {});
@@ -31,6 +33,7 @@ export const createUiSlice: SliceCreator<UiSlice> = (set) => ({
 
   setExplorerNodeStyle: (style: ExplorerNodeStyle) => {
     set({ explorerNodeStyle: style });
+    // Deliberately silent: the in-memory style still applies for the session.
     settingsService.saveSettings({ explorerNodeStyle: style }).catch(() => {});
   },
 });

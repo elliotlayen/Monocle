@@ -1,5 +1,6 @@
 import type { FolderSource, TreeNode, DirEntry } from "../types";
 import { explorerService } from "../services/explorer-service";
+import { showToast } from "@/features/notifications/store";
 import {
   settingsService,
   isExplorerNodeStyle,
@@ -182,7 +183,12 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
         explorerNodeStyle,
       });
     } catch {
-      // Silently handle settings load failure
+      showToast({
+        type: "error",
+        title: "Failed to load explorer settings",
+        message: "Folder sources could not be loaded",
+        duration: 5000,
+      });
     }
   },
 
@@ -356,7 +362,12 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
         filenameSearchIndex: buildFilenameSearchIndex(nextNodes),
       });
     } catch {
-      // Silently handle toggle failure
+      showToast({
+        type: "error",
+        title: "Failed to update favorite",
+        message: "The favorite could not be saved",
+        duration: 5000,
+      });
     }
   },
 
@@ -372,7 +383,12 @@ export const createTreeSlice: SliceCreator<TreeSlice> = (set, get) => ({
       // loaded subtrees; added or repointed sources start fresh.
       set(reconcileTreeWithSources(get(), folderSources));
     } catch {
-      // Silently handle save failure
+      showToast({
+        type: "error",
+        title: "Failed to save sources",
+        message: "Folder source changes could not be persisted",
+        duration: 5000,
+      });
     }
   },
 
